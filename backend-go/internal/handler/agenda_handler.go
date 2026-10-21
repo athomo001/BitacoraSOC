@@ -428,6 +428,12 @@ type agendaTaskDTO struct {
 	CanEdit       bool              `json:"canEdit"`
 	// FlowID: es un paso de un flujo (9.7); se edita desde el flujo.
 	FlowID *uuid.UUID `json:"flowId,omitempty"`
+	// Acciones de la Gestión CSM (9.4): tipo, tarea clave y el ticket al que
+	// le da seguimiento.
+	ActionKind   *string    `json:"actionKind,omitempty"`
+	IsKey        bool       `json:"isKey"`
+	TicketID     *uuid.UUID `json:"ticketId,omitempty"`
+	TicketNumber string     `json:"ticketNumber,omitempty"`
 }
 
 func toAgendaTaskDTO(t db.ListAgendaTasksRow, u agendaUser) agendaTaskDTO {
@@ -437,7 +443,8 @@ func toAgendaTaskDTO(t db.ListAgendaTasksRow, u agendaUser) agendaTaskDTO {
 		ClientID: uuidPtr(t.OrganizationID), ClientName: t.OrganizationName, Paused: t.Paused, AssigneeKind: t.AssigneeKind,
 		Recurrence: rec, WarnDays: nonNilInts(t.WarnDays), Steps: nonNilStrings(t.Steps), DocURL: textPtr(t.DocUrl),
 		ReportKind: textPtr(t.ReportKind), Active: t.Active, CreatedBy: uuidPtr(t.CreatedBy), CreatedByName: t.CreatedByName,
-		CanEdit: u.canEditTask(t) && !t.FlowID.Valid, FlowID: uuidPtr(t.FlowID)}
+		CanEdit: u.canEditTask(t) && !t.FlowID.Valid, FlowID: uuidPtr(t.FlowID),
+		ActionKind: textPtr(t.ActionKind), IsKey: t.IsKey, TicketID: uuidPtr(t.TicketID), TicketNumber: t.TicketNumber}
 	switch t.AssigneeKind {
 	case "person":
 		d.AssigneeID, d.AssigneeName = uuidPtr(t.AssigneeUserID), t.AssigneeUserName
@@ -954,7 +961,30 @@ type agendaTaskRequest struct {
 	// Window: crear una ventana de mantenimiento con la misma fecha (solo
 	// tareas de una vez; decisión del dueño 2026-10-15).
 	Window *agendaWindowRequest `json:"window"`
+	// Acciones de la Gestión CSM (9.4). Sin enviar, al editar se conservan
+	// (la pantalla de la Agenda no los manda).
+	ActionKind *string    `json:"actionKind"`
+	IsKey      *bool      `json:"isKey"`
+	TicketID   *uuid.UUID `json:"ticketId"`
 }
+
+// actionFields: lo que se guarda de la acción, con lo que ya tenía la tarea
+// para lo que no vino en el pedido.
+func (req agendaTaskRequest) actionFields(kind pgtype.Text, key bool, ticket pgtype.UUID) (pgtype.Text, bool, pgtype.UUID) {
+	if req.ActionKind != nil {
+		kind = optText(*req.ActionKind)
+	}
+	if req.IsKey != nil {
+		key = *req.IsKey
+	}
+	if req.TicketID != nil {
+		ticket = pgUUIDOf(*req.TicketID)
+	}
+	return kind, key, ticket
+}
+
+// agendaActionKinds: Reunión, Comité y Contacto cuentan como contacto con el cliente.
+var agendaActionKinds = map[string]bool{"meeting": true, "committee": true, "contact": true, "report": true, "other": true}
 
 func (req *agendaTaskRequest) validate(today time.Time) error {
 	req.Name = strings.TrimSpace(req.Name)
@@ -973,6 +1003,8 @@ func (req *agendaTaskRequest) validate(today time.Time) error {
 		return errors.New("informe: incident o bulletin")
 	case req.ReportKind != "" && req.ClientID == nil:
 		return errors.New("para cerrarla con un informe elige el cliente")
+	case req.ActionKind != nil && *req.ActionKind != "" && !agendaActionKinds[*req.ActionKind]:
+		return errors.New("tipo de acción: meeting, committee, contact, report u other")
 	}
 	if req.DocURL != "" {
 		u, err := url.Parse(req.DocURL)
@@ -1069,10 +1101,12 @@ func (h *AgendaHandler) CreateTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	user, level, team := req.assignee()
+	kind, key, ticket := req.actionFields(pgtype.Text{}, false, pgtype.UUID{})
 	id, err := h.Queries.CreateAgendaTask(ctx, db.CreateAgendaTaskParams{
 		Name: req.Name, Description: req.Description, AreaID: req.AreaID, OrganizationID: optionalUUID(req.ClientID),
 		AssigneeKind: req.AssigneeKind, AssigneeUserID: user, AssigneeLevelID: level, AssigneeTeamID: team, Recurrence: rec,
 		WarnDays: req.WarnDays, Steps: req.Steps, DocUrl: optText(req.DocURL), ReportKind: optText(req.ReportKind), CreatedBy: pgUUIDOf(u.id),
+		ActionKind: kind, IsKey: key, TicketID: ticket,
 	})
 	if err != nil {
 		if isForeignKeyViolation(err) {
@@ -1173,6 +1207,7 @@ func (h *AgendaHandler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	user, level, team := req.assignee()
+	kind, key, ticket := req.actionFields(t.ActionKind, t.IsKey, t.TicketID)
 	ac, err := loadAgendaCal(ctx, h.Queries, h.now(), h.now())
 	if err != nil {
 		agendaFail(w, r, err)
@@ -1182,6 +1217,7 @@ func (h *AgendaHandler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 		ID: t.ID, Name: req.Name, Description: req.Description, AreaID: req.AreaID, OrganizationID: optionalUUID(req.ClientID),
 		AssigneeKind: req.AssigneeKind, AssigneeUserID: user, AssigneeLevelID: level, AssigneeTeamID: team, Recurrence: rec,
 		WarnDays: req.WarnDays, Steps: req.Steps, DocUrl: optText(req.DocURL), ReportKind: optText(req.ReportKind),
+		ActionKind: kind, IsKey: key, TicketID: ticket,
 	}); err != nil {
 		agendaFail(w, r, err)
 		return

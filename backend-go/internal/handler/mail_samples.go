@@ -234,6 +234,18 @@ func (h *MailSamplesHandler) samples(ctx context.Context, now time.Time, extras 
 	add(mailSample{Name: "Resumen mensual del área", Slug: "resumen-mensual", When: "Mi equipo → Resumen mensual → Enviar por correo (lo envía la jefatura; no sale solo).",
 		Subject: fmt.Sprintf("Resumen mensual Infraestructura · %s %d", spanishMonths[prev.Month()-1], prev.Year()), Text: htmlToText(monthly), HTML: monthly, Inline: logo}, err)
 
+	summaryPeriod := fmt.Sprintf("%s %d", spanishMonths[prev.Month()-1], prev.Year())
+	clientSummary, err2 := mailtpl.RenderClientSummary(mailtpl.ClientSummaryOptions{
+		Title: "Resumen de servicio · Casinos", PeriodLabel: summaryPeriod, LogoSrc: logoSrc(logo), BrandName: appTitle,
+		SLAPct: 89, SLATarget: 95, Response: "9 min", Resolution: "6,2 h", Year: prev.Year(),
+		Incidents: []mailtpl.ClientSummaryArea{{Area: "SOC", P2: 3, P3: 5, P4: 2}, {Area: "NOC", P2: 2, P3: 4, P4: 1}},
+		Goals: []mailtpl.ClientSummaryGoal{{Name: "Migrar el monitoreo al SIEM nuevo", Done: 1, Total: 5, State: "En riesgo"},
+			{Name: "Renovar el contrato", Done: 4, Total: 4, State: "Cumplida"}},
+	})
+	add(mailSample{Name: "Gestión: resumen de servicio del cliente", Slug: "gestion-resumen-cliente",
+		When:    "Gestión → ficha del cliente o Indicadores → Exportar resumen → Enviar por correo (lo envía la CSM; no sale solo).",
+		Subject: "Resumen de servicio · Casinos · " + summaryPeriod, Text: htmlToText(clientSummary), HTML: clientSummary, Inline: logo}, err2)
+
 	if extras {
 		// El aviso de escalamiento sale solo en texto (sin HTML).
 		esc := &EscalationHandler{Now: func() time.Time { return now }}

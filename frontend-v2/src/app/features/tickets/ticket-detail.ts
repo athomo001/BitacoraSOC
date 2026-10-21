@@ -23,6 +23,7 @@ import { TicketMailComponent } from './ticket-mail';
 import { RouterLink } from '@angular/router';
 import { ModuleAccessService } from '../../core/auth/module-access.service';
 import { PlacePickerComponent, placeLabel } from './place-picker';
+import { TicketFollowupsComponent } from '../management/ticket-followups';
 
 import '../../core/i18n/packs/tickets';
 type Tab = 'activity' | 'images' | 'tasks' | 'entries';
@@ -56,7 +57,7 @@ const TASK_PRESETS = [15, 30, 60] as const;
 @Component({
   selector: 'app-ticket-detail',
   standalone: true,
-  imports: [DatePipe, FormsModule, MatIconModule, MarkdownComponent, AuthImgDirective, TicketRelationsComponent, TicketMailComponent, RouterLink, PlacePickerComponent],
+  imports: [DatePipe, FormsModule, MatIconModule, MarkdownComponent, AuthImgDirective, TicketRelationsComponent, TicketMailComponent, RouterLink, PlacePickerComponent, TicketFollowupsComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './ticket-detail.html',
   styleUrl: './ticket-detail.css',
@@ -100,6 +101,8 @@ export class TicketDetailComponent {
   private readonly http = inject(HttpClient);
   /** Eliminar un ticket mal creado: solo admin (pedido del dueño: cancelar = borrar). */
   protected readonly canDelete = this.perms.isAdmin;
+  /** Gestión CSM (9.4): acción de seguimiento desde el ticket. */
+  protected readonly management = this.perms.management;
   protected readonly confirmDelete = signal(false);
   private readonly orgs = inject(OrganizationsService);
   protected readonly modules = inject(ModuleAccessService);

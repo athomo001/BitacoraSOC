@@ -23,6 +23,37 @@ func (q *Queries) AssetCodeTaken(ctx context.Context, code string) (bool, error)
 	return exists, err
 }
 
+const countOpenGlpiTicketsByGroup = `-- name: CountOpenGlpiTicketsByGroup :many
+SELECT glpi_group_id::int AS group_id, count(*)::int AS open_count FROM tickets
+WHERE source = 'glpi' AND glpi_group_id IS NOT NULL AND NOT glpi_deleted AND status NOT IN ('resolved', 'closed', 'cancelled')
+GROUP BY glpi_group_id
+`
+
+type CountOpenGlpiTicketsByGroupRow struct {
+	GroupID   int32 `json:"group_id"`
+	OpenCount int32 `json:"open_count"`
+}
+
+func (q *Queries) CountOpenGlpiTicketsByGroup(ctx context.Context) ([]CountOpenGlpiTicketsByGroupRow, error) {
+	rows, err := q.db.Query(ctx, countOpenGlpiTicketsByGroup)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []CountOpenGlpiTicketsByGroupRow
+	for rows.Next() {
+		var i CountOpenGlpiTicketsByGroupRow
+		if err := rows.Scan(&i.GroupID, &i.OpenCount); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const createGlpiRun = `-- name: CreateGlpiRun :one
 INSERT INTO glpi_import_runs (trigger, user_id) VALUES ($1, $2) RETURNING id
 `
@@ -37,6 +68,41 @@ func (q *Queries) CreateGlpiRun(ctx context.Context, arg CreateGlpiRunParams) (u
 	var id uuid.UUID
 	err := row.Scan(&id)
 	return id, err
+}
+
+const createGlpiTicketRun = `-- name: CreateGlpiTicketRun :one
+INSERT INTO glpi_ticket_runs (trigger, user_id, first_load, started_at) VALUES ($1, $2, $3, clock_timestamp()) RETURNING id
+`
+
+type CreateGlpiTicketRunParams struct {
+	Trigger   string      `json:"trigger"`
+	UserID    pgtype.UUID `json:"user_id"`
+	FirstLoad bool        `json:"first_load"`
+}
+
+// clock_timestamp: la hora real aunque la corrida vaya dentro de una transacción.
+func (q *Queries) CreateGlpiTicketRun(ctx context.Context, arg CreateGlpiTicketRunParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, createGlpiTicketRun, arg.Trigger, arg.UserID, arg.FirstLoad)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
+}
+
+const deleteGlpiTicketCommentsExcept = `-- name: DeleteGlpiTicketCommentsExcept :exec
+DELETE FROM ticket_comments
+WHERE ticket_id = $1 AND glpi_id IS NOT NULL
+  AND NOT ((glpi_kind || ':' || glpi_id) = ANY($2::text[]))
+`
+
+type DeleteGlpiTicketCommentsExceptParams struct {
+	TicketID uuid.UUID `json:"ticket_id"`
+	Keep     []string  `json:"keep"`
+}
+
+// Lo que se borró en GLPI también sale de la app (keep: «followup:12», «task:7»…).
+func (q *Queries) DeleteGlpiTicketCommentsExcept(ctx context.Context, arg DeleteGlpiTicketCommentsExceptParams) error {
+	_, err := q.db.Exec(ctx, deleteGlpiTicketCommentsExcept, arg.TicketID, arg.Keep)
+	return err
 }
 
 const finishGlpiRun = `-- name: FinishGlpiRun :exec
@@ -75,9 +141,38 @@ func (q *Queries) FinishGlpiRun(ctx context.Context, arg FinishGlpiRunParams) er
 	return err
 }
 
+const finishGlpiTicketRun = `-- name: FinishGlpiTicketRun :exec
+UPDATE glpi_ticket_runs SET finished_at = clock_timestamp(), ok = $1, created = $2, updated = $3,
+  skipped = $4, deleted = $5, message = $6
+WHERE id = $7
+`
+
+type FinishGlpiTicketRunParams struct {
+	Ok      bool      `json:"ok"`
+	Created int32     `json:"created"`
+	Updated int32     `json:"updated"`
+	Skipped int32     `json:"skipped"`
+	Deleted int32     `json:"deleted"`
+	Message string    `json:"message"`
+	ID      uuid.UUID `json:"id"`
+}
+
+func (q *Queries) FinishGlpiTicketRun(ctx context.Context, arg FinishGlpiTicketRunParams) error {
+	_, err := q.db.Exec(ctx, finishGlpiTicketRun,
+		arg.Ok,
+		arg.Created,
+		arg.Updated,
+		arg.Skipped,
+		arg.Deleted,
+		arg.Message,
+		arg.ID,
+	)
+	return err
+}
+
 const getGlpiConfig = `-- name: GetGlpiConfig :one
 
-SELECT id, api_url, app_token_encrypted, user_token_encrypted, verify_tls, timeout_seconds, import_computers, import_network, area_id, computer_types, entities, auto_mode, last_auto_at, last_failure_notified_on, last_test_at, last_test_ok, last_test, updated_at FROM glpi_config WHERE id
+SELECT id, api_url, app_token_encrypted, user_token_encrypted, verify_tls, timeout_seconds, import_computers, import_network, area_id, computer_types, entities, auto_mode, last_auto_at, last_failure_notified_on, last_test_at, last_test_ok, last_test, updated_at, tickets_enabled, tickets_every, tickets_since_days, tickets_cursor, ticket_entities, group_areas, tickets_last_auto_at, tickets_failure_notified_on FROM glpi_config WHERE id
 `
 
 // Importación desde GLPI (spec/16 §5.1, 9.6, 000043).
@@ -103,6 +198,39 @@ func (q *Queries) GetGlpiConfig(ctx context.Context) (GlpiConfig, error) {
 		&i.LastTestOk,
 		&i.LastTest,
 		&i.UpdatedAt,
+		&i.TicketsEnabled,
+		&i.TicketsEvery,
+		&i.TicketsSinceDays,
+		&i.TicketsCursor,
+		&i.TicketEntities,
+		&i.GroupAreas,
+		&i.TicketsLastAutoAt,
+		&i.TicketsFailureNotifiedOn,
+	)
+	return i, err
+}
+
+const getGlpiTicketState = `-- name: GetGlpiTicketState :one
+SELECT id, glpi_date_mod, glpi_linked_only, glpi_deleted, area_id FROM tickets WHERE glpi_id = $1
+`
+
+type GetGlpiTicketStateRow struct {
+	ID             uuid.UUID   `json:"id"`
+	GlpiDateMod    pgtype.Text `json:"glpi_date_mod"`
+	GlpiLinkedOnly bool        `json:"glpi_linked_only"`
+	GlpiDeleted    bool        `json:"glpi_deleted"`
+	AreaID         uuid.UUID   `json:"area_id"`
+}
+
+func (q *Queries) GetGlpiTicketState(ctx context.Context, glpiID pgtype.Int4) (GetGlpiTicketStateRow, error) {
+	row := q.db.QueryRow(ctx, getGlpiTicketState, glpiID)
+	var i GetGlpiTicketStateRow
+	err := row.Scan(
+		&i.ID,
+		&i.GlpiDateMod,
+		&i.GlpiLinkedOnly,
+		&i.GlpiDeleted,
+		&i.AreaID,
 	)
 	return i, err
 }
@@ -135,6 +263,45 @@ func (q *Queries) ListAssetsBySerial(ctx context.Context, serials []string) ([]L
 			&i.Name,
 			&i.Serial,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listGlpiHandLinks = `-- name: ListGlpiHandLinks :many
+SELECT DISTINCT ON (x.glpi_id) x.glpi_id::int AS glpi_id, x.user_id::uuid AS user_id
+FROM (
+  SELECT e.glpi_ticket_id::int AS glpi_id, e.user_id, COALESCE(e.glpi_linked_at, e.created_at) AS at
+  FROM entries e WHERE e.glpi_ticket_id ~ '^[0-9]{1,9}$'
+  UNION ALL
+  SELECT i.glpi_ticket::int, i.opened_by, i.opened_at
+  FROM escalation_incidents i WHERE i.glpi_ticket ~ '^[0-9]{1,9}$'
+) x
+ORDER BY x.glpi_id, x.at
+`
+
+type ListGlpiHandLinksRow struct {
+	GlpiID int32     `json:"glpi_id"`
+	UserID uuid.UUID `json:"user_id"`
+}
+
+// Números de GLPI enlazados a mano en la Bitácora o en Escalamiento, con
+// quien los enlazó primero (su área es la del ticket si no entra por grupo).
+func (q *Queries) ListGlpiHandLinks(ctx context.Context) ([]ListGlpiHandLinksRow, error) {
+	rows, err := q.db.Query(ctx, listGlpiHandLinks)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListGlpiHandLinksRow
+	for rows.Next() {
+		var i ListGlpiHandLinksRow
+		if err := rows.Scan(&i.GlpiID, &i.UserID); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -251,6 +418,122 @@ func (q *Queries) ListGlpiRuns(ctx context.Context) ([]ListGlpiRunsRow, error) {
 	return items, nil
 }
 
+const listGlpiTicketRuns = `-- name: ListGlpiTicketRuns :many
+SELECT r.id, r.trigger, r.user_id, r.first_load, r.started_at, r.finished_at, r.ok, r.created, r.updated, r.skipped, r.deleted, r.message, COALESCE(NULLIF(u.full_name, ''), u.username, '')::text AS user_name
+FROM glpi_ticket_runs r
+LEFT JOIN users u ON u.id = r.user_id
+ORDER BY r.started_at DESC
+LIMIT 20
+`
+
+type ListGlpiTicketRunsRow struct {
+	ID         uuid.UUID          `json:"id"`
+	Trigger    string             `json:"trigger"`
+	UserID     pgtype.UUID        `json:"user_id"`
+	FirstLoad  bool               `json:"first_load"`
+	StartedAt  pgtype.Timestamptz `json:"started_at"`
+	FinishedAt pgtype.Timestamptz `json:"finished_at"`
+	Ok         bool               `json:"ok"`
+	Created    int32              `json:"created"`
+	Updated    int32              `json:"updated"`
+	Skipped    int32              `json:"skipped"`
+	Deleted    int32              `json:"deleted"`
+	Message    string             `json:"message"`
+	UserName   string             `json:"user_name"`
+}
+
+func (q *Queries) ListGlpiTicketRuns(ctx context.Context) ([]ListGlpiTicketRunsRow, error) {
+	rows, err := q.db.Query(ctx, listGlpiTicketRuns)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListGlpiTicketRunsRow
+	for rows.Next() {
+		var i ListGlpiTicketRunsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Trigger,
+			&i.UserID,
+			&i.FirstLoad,
+			&i.StartedAt,
+			&i.FinishedAt,
+			&i.Ok,
+			&i.Created,
+			&i.Updated,
+			&i.Skipped,
+			&i.Deleted,
+			&i.Message,
+			&i.UserName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listOpenGlpiLinkedOnly = `-- name: ListOpenGlpiLinkedOnly :many
+SELECT glpi_id::int AS glpi_id FROM tickets
+WHERE source = 'glpi' AND glpi_linked_only AND NOT glpi_deleted AND status NOT IN ('closed', 'cancelled')
+`
+
+// Los que llegaron solo por un enlace a mano: no los ve la búsqueda por
+// entidad, así que cada corrida los vuelve a leer mientras sigan abiertos.
+func (q *Queries) ListOpenGlpiLinkedOnly(ctx context.Context) ([]int32, error) {
+	rows, err := q.db.Query(ctx, listOpenGlpiLinkedOnly)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []int32
+	for rows.Next() {
+		var glpi_id int32
+		if err := rows.Scan(&glpi_id); err != nil {
+			return nil, err
+		}
+		items = append(items, glpi_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listUsersByEmails = `-- name: ListUsersByEmails :many
+SELECT id, lower(email)::text AS email, username FROM users WHERE active AND lower(email) = ANY($1::text[])
+`
+
+type ListUsersByEmailsRow struct {
+	ID       uuid.UUID `json:"id"`
+	Email    string    `json:"email"`
+	Username string    `json:"username"`
+}
+
+// El técnico de GLPI es la persona de la app con el mismo correo.
+func (q *Queries) ListUsersByEmails(ctx context.Context, emails []string) ([]ListUsersByEmailsRow, error) {
+	rows, err := q.db.Query(ctx, listUsersByEmails, emails)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListUsersByEmailsRow
+	for rows.Next() {
+		var i ListUsersByEmailsRow
+		if err := rows.Scan(&i.ID, &i.Email, &i.Username); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const markGlpiAutoRun = `-- name: MarkGlpiAutoRun :exec
 UPDATE glpi_config SET last_auto_at = $1 WHERE id
 `
@@ -267,6 +550,61 @@ UPDATE glpi_config SET last_failure_notified_on = $1 WHERE id
 func (q *Queries) MarkGlpiFailureNotified(ctx context.Context, day pgtype.Date) error {
 	_, err := q.db.Exec(ctx, markGlpiFailureNotified, day)
 	return err
+}
+
+const markGlpiTicketDeleted = `-- name: MarkGlpiTicketDeleted :execrows
+UPDATE tickets SET glpi_deleted = true, glpi_synced_at = now(), updated_at = now() WHERE glpi_id = $1 AND NOT glpi_deleted
+`
+
+func (q *Queries) MarkGlpiTicketDeleted(ctx context.Context, glpiID pgtype.Int4) (int64, error) {
+	result, err := q.db.Exec(ctx, markGlpiTicketDeleted, glpiID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const markGlpiTicketsAutoRun = `-- name: MarkGlpiTicketsAutoRun :exec
+UPDATE glpi_config SET tickets_last_auto_at = $1 WHERE id
+`
+
+func (q *Queries) MarkGlpiTicketsAutoRun(ctx context.Context, at pgtype.Timestamptz) error {
+	_, err := q.db.Exec(ctx, markGlpiTicketsAutoRun, at)
+	return err
+}
+
+const markGlpiTicketsFailureNotified = `-- name: MarkGlpiTicketsFailureNotified :exec
+UPDATE glpi_config SET tickets_failure_notified_on = $1 WHERE id
+`
+
+func (q *Queries) MarkGlpiTicketsFailureNotified(ctx context.Context, day pgtype.Date) error {
+	_, err := q.db.Exec(ctx, markGlpiTicketsFailureNotified, day)
+	return err
+}
+
+const recentGlpiTicketAutoRuns = `-- name: RecentGlpiTicketAutoRuns :many
+SELECT ok FROM glpi_ticket_runs WHERE trigger = 'auto' AND finished_at IS NOT NULL ORDER BY started_at DESC LIMIT 3
+`
+
+// Para avisar solo de errores repetidos: el resultado de las últimas automáticas.
+func (q *Queries) RecentGlpiTicketAutoRuns(ctx context.Context) ([]bool, error) {
+	rows, err := q.db.Query(ctx, recentGlpiTicketAutoRuns)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []bool
+	for rows.Next() {
+		var ok bool
+		if err := rows.Scan(&ok); err != nil {
+			return nil, err
+		}
+		items = append(items, ok)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const recordGlpiTest = `-- name: RecordGlpiTest :exec
@@ -316,6 +654,15 @@ func (q *Queries) SetAssetGlpiRemoved(ctx context.Context, arg SetAssetGlpiRemov
 	return err
 }
 
+const setGlpiTicketsCursor = `-- name: SetGlpiTicketsCursor :exec
+UPDATE glpi_config SET tickets_cursor = $1 WHERE id
+`
+
+func (q *Queries) SetGlpiTicketsCursor(ctx context.Context, cursor pgtype.Text) error {
+	_, err := q.db.Exec(ctx, setGlpiTicketsCursor, cursor)
+	return err
+}
+
 const updateGlpiConfig = `-- name: UpdateGlpiConfig :exec
 UPDATE glpi_config SET api_url = $1, app_token_encrypted = $2,
   user_token_encrypted = $3, verify_tls = $4,
@@ -353,6 +700,173 @@ func (q *Queries) UpdateGlpiConfig(ctx context.Context, arg UpdateGlpiConfigPara
 		arg.ComputerTypes,
 		arg.Entities,
 		arg.AutoMode,
+	)
+	return err
+}
+
+const updateGlpiTicketsConfig = `-- name: UpdateGlpiTicketsConfig :exec
+
+UPDATE glpi_config SET tickets_enabled = $1, tickets_every = $2,
+  tickets_since_days = $3, ticket_entities = $4,
+  group_areas = $5, entities = $6,
+  tickets_cursor = CASE WHEN $7::bool THEN NULL ELSE tickets_cursor END,
+  updated_at = now()
+WHERE id
+`
+
+type UpdateGlpiTicketsConfigParams struct {
+	TicketsEnabled   bool   `json:"tickets_enabled"`
+	TicketsEvery     string `json:"tickets_every"`
+	TicketsSinceDays int32  `json:"tickets_since_days"`
+	TicketEntities   []byte `json:"ticket_entities"`
+	GroupAreas       []byte `json:"group_areas"`
+	Entities         []byte `json:"entities"`
+	ResetCursor      bool   `json:"reset_cursor"`
+}
+
+// ===== Tickets de GLPI en la Ticketera (10d.1, spec/18, 000050) =====
+// reset_cursor: cambiaron las entidades o los grupos; la próxima corrida
+// vuelve a hacer la primera carga (no duplica: glpi_id es único).
+func (q *Queries) UpdateGlpiTicketsConfig(ctx context.Context, arg UpdateGlpiTicketsConfigParams) error {
+	_, err := q.db.Exec(ctx, updateGlpiTicketsConfig,
+		arg.TicketsEnabled,
+		arg.TicketsEvery,
+		arg.TicketsSinceDays,
+		arg.TicketEntities,
+		arg.GroupAreas,
+		arg.Entities,
+		arg.ResetCursor,
+	)
+	return err
+}
+
+const upsertGlpiTicket = `-- name: UpsertGlpiTicket :one
+INSERT INTO tickets (ticket_number, ticket_type, scope, client_id, assigned_user_id, status, impact, urgency, priority, title, description,
+  sla_response_due_at, sla_resolution_due_at, sla_on_hold_since, first_responded_at, resolved_at, closed_at, created_at, updated_at,
+  area_id, requested_area_id, public_tracking_enabled, source, glpi_id, glpi_date_mod, glpi_synced_at, glpi_deleted, glpi_linked_only,
+  glpi_group_id, glpi_group_name, glpi_technician)
+VALUES ('GLPI-' || $1::int, $2, $3, $4, $5,
+  $6, $7, $8, $9, $10, $11,
+  $12, $13, $14, $15,
+  $16, $17, $18, $19,
+  $20, $20, false, 'glpi', $1::int, $21, now(), $22,
+  $23, $24, $25, $26)
+ON CONFLICT (glpi_id) WHERE glpi_id IS NOT NULL DO UPDATE SET
+  ticket_type = EXCLUDED.ticket_type, scope = EXCLUDED.scope, client_id = EXCLUDED.client_id, assigned_user_id = EXCLUDED.assigned_user_id,
+  status = EXCLUDED.status, impact = EXCLUDED.impact, urgency = EXCLUDED.urgency, priority = EXCLUDED.priority,
+  title = EXCLUDED.title, description = EXCLUDED.description,
+  sla_response_due_at = EXCLUDED.sla_response_due_at, sla_resolution_due_at = EXCLUDED.sla_resolution_due_at,
+  sla_on_hold_since = EXCLUDED.sla_on_hold_since, first_responded_at = EXCLUDED.first_responded_at,
+  resolved_at = EXCLUDED.resolved_at, closed_at = EXCLUDED.closed_at, created_at = EXCLUDED.created_at, updated_at = EXCLUDED.updated_at,
+  area_id = EXCLUDED.area_id, requested_area_id = EXCLUDED.requested_area_id,
+  glpi_date_mod = EXCLUDED.glpi_date_mod, glpi_synced_at = now(), glpi_deleted = EXCLUDED.glpi_deleted,
+  glpi_linked_only = EXCLUDED.glpi_linked_only, glpi_group_id = EXCLUDED.glpi_group_id,
+  glpi_group_name = EXCLUDED.glpi_group_name, glpi_technician = EXCLUDED.glpi_technician
+RETURNING id, (xmax = 0)::bool AS inserted
+`
+
+type UpsertGlpiTicketParams struct {
+	GlpiID             int32              `json:"glpi_id"`
+	TicketType         TicketType         `json:"ticket_type"`
+	Scope              EntryScope         `json:"scope"`
+	ClientID           uuid.UUID          `json:"client_id"`
+	AssignedUserID     pgtype.UUID        `json:"assigned_user_id"`
+	Status             TicketStatus       `json:"status"`
+	Impact             ItilImpact         `json:"impact"`
+	Urgency            ItilUrgency        `json:"urgency"`
+	Priority           ItilPriority       `json:"priority"`
+	Title              string             `json:"title"`
+	Description        string             `json:"description"`
+	SlaResponseDueAt   pgtype.Timestamptz `json:"sla_response_due_at"`
+	SlaResolutionDueAt pgtype.Timestamptz `json:"sla_resolution_due_at"`
+	SlaOnHoldSince     pgtype.Timestamptz `json:"sla_on_hold_since"`
+	FirstRespondedAt   pgtype.Timestamptz `json:"first_responded_at"`
+	ResolvedAt         pgtype.Timestamptz `json:"resolved_at"`
+	ClosedAt           pgtype.Timestamptz `json:"closed_at"`
+	CreatedAt          pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
+	AreaID             uuid.UUID          `json:"area_id"`
+	GlpiDateMod        pgtype.Text        `json:"glpi_date_mod"`
+	GlpiDeleted        bool               `json:"glpi_deleted"`
+	GlpiLinkedOnly     bool               `json:"glpi_linked_only"`
+	GlpiGroupID        pgtype.Int4        `json:"glpi_group_id"`
+	GlpiGroupName      pgtype.Text        `json:"glpi_group_name"`
+	GlpiTechnician     pgtype.Text        `json:"glpi_technician"`
+}
+
+type UpsertGlpiTicketRow struct {
+	ID       uuid.UUID `json:"id"`
+	Inserted bool      `json:"inserted"`
+}
+
+// GLPI manda: cada corrida deja el ticket como está en GLPI. Sin enlace
+// público; el número es GLPI-<id>.
+func (q *Queries) UpsertGlpiTicket(ctx context.Context, arg UpsertGlpiTicketParams) (UpsertGlpiTicketRow, error) {
+	row := q.db.QueryRow(ctx, upsertGlpiTicket,
+		arg.GlpiID,
+		arg.TicketType,
+		arg.Scope,
+		arg.ClientID,
+		arg.AssignedUserID,
+		arg.Status,
+		arg.Impact,
+		arg.Urgency,
+		arg.Priority,
+		arg.Title,
+		arg.Description,
+		arg.SlaResponseDueAt,
+		arg.SlaResolutionDueAt,
+		arg.SlaOnHoldSince,
+		arg.FirstRespondedAt,
+		arg.ResolvedAt,
+		arg.ClosedAt,
+		arg.CreatedAt,
+		arg.UpdatedAt,
+		arg.AreaID,
+		arg.GlpiDateMod,
+		arg.GlpiDeleted,
+		arg.GlpiLinkedOnly,
+		arg.GlpiGroupID,
+		arg.GlpiGroupName,
+		arg.GlpiTechnician,
+	)
+	var i UpsertGlpiTicketRow
+	err := row.Scan(&i.ID, &i.Inserted)
+	return i, err
+}
+
+const upsertGlpiTicketComment = `-- name: UpsertGlpiTicketComment :exec
+INSERT INTO ticket_comments (ticket_id, user_id, author_name, content, is_public, origin, glpi_id, glpi_kind, glpi_time_seconds, created_at)
+VALUES ($1, $2, $3, $4, $5, '',
+  $6::int, $7::text, $8, $9)
+ON CONFLICT (ticket_id, glpi_kind, glpi_id) WHERE glpi_id IS NOT NULL DO UPDATE SET
+  user_id = EXCLUDED.user_id, author_name = EXCLUDED.author_name, content = EXCLUDED.content, is_public = EXCLUDED.is_public,
+  glpi_time_seconds = EXCLUDED.glpi_time_seconds, created_at = EXCLUDED.created_at
+`
+
+type UpsertGlpiTicketCommentParams struct {
+	TicketID        uuid.UUID          `json:"ticket_id"`
+	UserID          pgtype.UUID        `json:"user_id"`
+	AuthorName      string             `json:"author_name"`
+	Content         string             `json:"content"`
+	IsPublic        bool               `json:"is_public"`
+	GlpiID          int32              `json:"glpi_id"`
+	GlpiKind        string             `json:"glpi_kind"`
+	GlpiTimeSeconds pgtype.Int4        `json:"glpi_time_seconds"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+}
+
+func (q *Queries) UpsertGlpiTicketComment(ctx context.Context, arg UpsertGlpiTicketCommentParams) error {
+	_, err := q.db.Exec(ctx, upsertGlpiTicketComment,
+		arg.TicketID,
+		arg.UserID,
+		arg.AuthorName,
+		arg.Content,
+		arg.IsPublic,
+		arg.GlpiID,
+		arg.GlpiKind,
+		arg.GlpiTimeSeconds,
+		arg.CreatedAt,
 	)
 	return err
 }

@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal, viewChild } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
@@ -10,6 +10,7 @@ import { Organization, OrganizationsService } from '../../core/organizations/org
 import { I18nService } from '../../core/i18n/i18n.service';
 import { MessageKey } from '../../core/i18n/messages';
 import { problemDetail } from '../../core/http-error';
+import { AdminGlpiTicketsComponent } from './admin-glpi-tickets';
 
 import '../../core/i18n/packs/admin';
 import '../../core/i18n/packs/glpi';
@@ -54,7 +55,7 @@ function toDraft(c: GlpiConfig): GlpiDraft {
 @Component({
   selector: 'app-admin-glpi',
   standalone: true,
-  imports: [DatePipe, FormsModule, MatIconModule],
+  imports: [DatePipe, FormsModule, MatIconModule, AdminGlpiTicketsComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './admin-glpi.html',
   styleUrl: './admin-glpi.css',
@@ -64,6 +65,8 @@ export class AdminGlpiComponent implements OnInit {
   private readonly api = inject(GlpiService);
   private readonly inventory = inject(InventoryService);
   private readonly organizations = inject(OrganizationsService);
+  /** Tickets de GLPI (spec/18): comparte con esta sección el mapeo entidad → cliente. */
+  private readonly ticketsSection = viewChild(AdminGlpiTicketsComponent);
 
   protected readonly saved = signal<GlpiConfig | null>(null);
   protected readonly draft = signal<GlpiDraft | null>(null);
@@ -169,6 +172,19 @@ export class AdminGlpiComponent implements OnInit {
     this.patch({ entities });
   }
 
+  /** «Tickets de GLPI» guardó clientes de entidades: se toman sin perder lo que se está editando aquí. */
+  protected async refreshEntities(): Promise<void> {
+    try {
+      const config = await this.api.config();
+      const old = this.saved()?.entities ?? {};
+      const mine = Object.entries(this.draft()?.entities ?? {}).filter(([id, rule]) => JSON.stringify(old[id]) !== JSON.stringify(rule));
+      this.saved.update((s) => (s ? { ...s, entities: config.entities } : s));
+      this.draft.update((d) => (d ? { ...d, entities: { ...config.entities, ...Object.fromEntries(mine) } } : d));
+    } catch {
+      // Se ve al recargar la página.
+    }
+  }
+
   protected discard(): void {
     const s = this.saved();
     if (s) this.draft.set(toDraft(s));
@@ -183,6 +199,7 @@ export class AdminGlpiComponent implements OnInit {
     try {
       this.applySaved(await this.api.saveConfig({ ...d, url: d.url.trim(), appToken: d.appToken.trim() || undefined, userToken: d.userToken.trim() || undefined }));
       this.notice.set(this.i18n.t('admin.saved'));
+      void this.ticketsSection()?.refreshClients();
     } catch (e) {
       this.error.set(problemDetail(e, this.i18n.t('glpi.saveError')));
     } finally {

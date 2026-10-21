@@ -35,6 +35,9 @@ type EscalationHandler struct {
 	AuditLog *audit.Logger
 	Modules  middleware.ModuleAccess
 	Now      func() time.Time
+	// ClientNotice: una ventana que afecta a un cliente le deja al CSM a
+	// cargo la tarea «Avisar al cliente» (Gestión, spec/16 §4.6); nil = no.
+	ClientNotice func(ctx context.Context, client uuid.UUID, title string, start time.Time, actor uuid.UUID)
 }
 
 func (h *EscalationHandler) now() time.Time {
@@ -1301,6 +1304,9 @@ func (h *EscalationHandler) CreateWindow(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	h.AuditLog.Log(ctx, "maintenance_window.create", audit.LevelInfo, audit.Success(), map[string]any{"windowId": m.ID.String(), "suppress": m.SuppressNotifications})
+	if req.OrganizationID != nil && h.ClientNotice != nil {
+		h.ClientNotice(ctx, *req.OrganizationID, m.Title, req.StartsAt, actor.ID)
+	}
 	writeData(w, http.StatusCreated, toWindowDTO(m))
 }
 

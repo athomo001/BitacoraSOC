@@ -42,7 +42,15 @@ export interface AgendaTask {
   canEdit: boolean;
   /** Es un paso de un flujo (9.7): se edita desde el flujo. */
   flowId?: string;
+  /** Acciones de la Gestión CSM (9.4): tipo, tarea clave y el ticket que sigue. */
+  actionKind?: ActionKind;
+  isKey?: boolean;
+  ticketId?: string;
+  ticketNumber?: string;
 }
+
+/** Reunión, Comité y Contacto cuentan como contacto con el cliente (spec/16 §4.4.1). */
+export type ActionKind = 'meeting' | 'committee' | 'contact' | 'report' | 'other';
 
 /** El paso de un flujo en una ocurrencia y, si espera, a qué paso espera (9.7). */
 export interface AgendaOccurrenceFlow {
@@ -147,6 +155,10 @@ export interface AgendaTaskInput {
   reportKind: ReportKind | '';
   /** Ventana de mantenimiento con la misma fecha (solo tareas de una vez, al crearlas). */
   window?: { start: string; end: string; suppress: boolean } | null;
+  /** Acciones de la Gestión CSM; sin enviar, al editar se conservan. */
+  actionKind?: ActionKind | '';
+  isKey?: boolean;
+  ticketId?: string | null;
 }
 
 export interface PreviewDate { date: string; movedFrom?: string; reason?: string; }

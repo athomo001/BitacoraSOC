@@ -11,6 +11,7 @@ Qué hace cada pantalla de Bitácora Ops y cómo se usa en el día a día. Las p
 - [Directorio](#directorio)
 - [Reportes](#reportes)
 - [Ticketera](#ticketera)
+- [Gestión](#gestión)
 - [Complementos](#complementos)
 - [Administración](#administración)
 - [Atajos y accesibilidad](#atajos-y-accesibilidad)
@@ -201,6 +202,29 @@ Todo lo que hay que hacer para una fecha: el informe mensual de un cliente, el r
   - **Al terminar el anterior:** espera, y cuando el anterior se marca hecho (u omitido) vence en los días hábiles que pusiste. Si el anterior se atrasa, este se corre. A su responsable le llega el aviso en ese momento.
   - **En paralelo:** vence en esos días hábiles desde que empieza el flujo, aunque el anterior no haya terminado.
   Cada paso se hace desde Mis pendientes de su responsable, como cualquier tarea; lo que espera aparece en **En espera**, con a qué espera. En la pestaña se ve cada flujo con sus pasos unidos por flechas (punteada si va en paralelo), en qué paso va y si está a tiempo. Arma flujos con otras áreas quien puede asignarles tareas (jefaturas, Gestión y admin); lo edita quien lo creó.
+- **Mis metas** (pestaña): las metas que tienes a cargo o que son tuyas, con sus hitos para marcar y el certificado para adjuntar (ver [Gestión](#gestión)).
+
+---
+
+## Gestión
+
+Para el **perfil Gestión** (CSM), las **jefaturas** y el admin. Cuatro pestañas:
+
+- **Clientes:** la cartera, primero lo que necesita atención. **Mis cuentas** deja solo las tuyas y se recuerda. Cada cliente lleva su salud y el motivo debajo:
+  - **En riesgo** (rojo): un ticket abierto fuera de SLA o más de 60 días sin contacto.
+  - **Atención** (amarillo): más de 30 días sin reunión o comité, o una tarea clave atrasada.
+  - **Sana** (verde): nada de lo anterior. Los días se cuentan desde el inicio del servicio o desde que se empezó a usar la Gestión, lo más reciente.
+- **Ficha del cliente:** la salud con sus tres partes (tickets, contacto y tareas clave), la **renovación** con cuenta regresiva y sus pasos, y las cifras del mes (tareas a tiempo, tickets en SLA, atrasos, 1.ª respuesta y resolución). En **Resumen**: tickets abiertos, acciones y deadlines, metas en curso y últimas comunicaciones; en **Línea de tiempo**, todo en orden. Si no hay nada abierto dice **Cuenta al día**, con atajos para aplicar una plantilla o agendar una reunión. **Datos de la cuenta**: CSM a cargo, inicio del servicio, renovación y un objetivo de SLA propio si el contrato lo pide.
+- **Nueva acción:** qué hay que hacer, tipo (Reunión, Comité, Contacto, Informe u Otra), si es **clave**, el ticket, quién la hace (tú, o un área técnica: un nivel, una persona o la guardia) y para cuándo. Es una tarea normal de la Agenda. Reunión, Comité y Contacto cuentan como contacto con el cliente al marcarse hechas; si una clave se atrasa, la cuenta pasa a amarillo.
+- **Exportar resumen:** SLA del período, tiempos medios, incidentes por área y metas del cliente. **Descargar PDF** o **Enviar por correo** a los dominios válidos de Reportes. No sale solo.
+- **Metas:** de un cliente, un área o una persona, con hitos. Un hito se marca a mano o queda **enlazado** a un ticket (se marca solo al resolverse, también uno de GLPI) o a una tarea de la Agenda (al hacerse). Pasa sola a **En riesgo** con 10 días hábiles o menos y menos de la mitad de los hitos, y a **No cumplida** si vence la fecha. Con todos los hitos queda **Cumplida**. Si pide el certificado (archivo o enlace), no se cumple hasta adjuntarlo; si cuenta para el **bono**, queda **Por confirmar** hasta que la jefatura la confirme. Las metas de una persona las pone la jefatura de su área o el admin, y las ven la persona, su jefatura, quien la creó y el admin.
+- **Indicadores:** por cliente o por área, del mes en curso, el anterior o los últimos 90 días. El gráfico muestra el SLA de los últimos 6 meses con la línea del objetivo; se comparan hasta 5, marcados en la tabla. Abajo, quién está bajo el objetivo y la carga por área. El admin cambia el objetivo general (95 %).
+- **Plantillas:** listas de acciones con quién y cuándo, relativas al día en que se aplican, a una fecha o a la renovación del cliente. **Aplicar a** un cliente crea las tareas en la Agenda, cada una para su área y nivel. Vienen tres: Incorporar un cliente, Revisión trimestral y Renovación.
+
+También:
+
+- **Panel del ticket:** quien ve Gestión tiene ahí **Acciones de seguimiento**, con las que ya hay y el botón para crear otra ligada al ticket.
+- **Ventanas de mantenimiento:** si afectan a un cliente con CSM a cargo, le dejan la tarea clave «Avisar al cliente» 2 días hábiles antes del inicio.
 
 ---
 
@@ -297,6 +321,15 @@ Quien todavía no tiene grupos ni áreas ve todos los tickets, como antes.
 - **Al cliente:** solo en tickets con **Afecta al cliente** (viene marcado en P1 y P2). Le llega al abrir, en cada comentario visible al cliente (los seguidos se juntan en un correo) y al resolver. Nunca lleva comentarios internos ni nombres de técnicos.
 - **En el ticket:** la casilla *Afecta al cliente*, *Avisar a* (Para/CC del escalamiento del cliente, editable solo para ese ticket) y *Correos enviados*, con *Reenviar* si uno falló.
 
+**Tickets de GLPI** (con «Sincronización con GLPI» encendida y los tickets prendidos en Administración → GLPI):
+
+- Llegan solos a la Ticketera, con el número `GLPI-…` y la marca **GLPI**: los de tus entidades asignados a un grupo técnico con área (el área decide la cola), y siempre los que alguien enlazó por su número desde la Bitácora o Escalamiento.
+- El filtro **Origen** (Todos, App, GLPI) los separa.
+- **Se ven, no se editan:** el estado, la prioridad, el técnico y los comentarios se cambian en GLPI con **Abrir en GLPI**; la app los vuelve a traer en la próxima corrida. No tienen enlace público y la app no manda correos por ellos.
+- El **SLA** es el de GLPI. En la actividad salen los seguimientos, las **tareas** con su tiempo y la **solución**; las **notas internas de GLPI** van en amarillo.
+- Para unir una entrada a un ticket de GLPI, en la entrada usa **Enlazar ticket** con su número; queda en la pestaña **Bitácora** del ticket.
+- Si en GLPI se borra o va a la papelera, sale de la cola y queda marcado «Eliminado en GLPI».
+
 ---
 
 ## Complementos
@@ -311,7 +344,7 @@ Solo para la **jefatura de área**: quien tiene un grupo con la capacidad *Jefat
 
 - Arriba: personas activas, tickets abiertos, SLA vencidos y ausentes hoy (vacaciones o licencia en Dotación).
 - La lista muestra el grupo de cada persona, cómo está hoy (oficina, teletrabajo, guardia, vacaciones, licencia), sus tickets abiertos y los vencidos.
-- Al elegir a una persona: su semana, sus tickets (se abren con un clic), cambiarle el grupo y darla de baja o reactivarla.
+- Al elegir a una persona: su semana, sus tickets (se abren con un clic), sus **metas** (crear una nueva y confirmar las que cuentan para el bono), cambiarle el grupo y darla de baja o reactivarla.
 - **Agregar persona:** nombre, usuario, correo y un grupo del área. La app genera una contraseña temporal que se muestra **una sola vez**: entrégasela tú. La persona la cambia al primer ingreso.
 - La jefatura solo asigna grupos de sus áreas, nunca da permisos de administrador y no toca a administradores ni a quien tiene grupos de otras áreas. Todo queda en Auditoría.
 - **Guardias** (pestaña): las guardias del área, quién está en cada una (sumar o sacar personas del área) y «Nueva guardia». Abajo, la misma línea de tiempo de Administración para asignar fechas, generar la rotación y poner reemplazos.
@@ -346,7 +379,7 @@ Solo para administradores. El menú se agrupa así:
 | | **Equipos** | Equipos, contratas, guardias, integrantes y cobertura territorial, con acciones en lote (detalle abajo). |
 | Sistema | **Marca** | Nombre, logo, favicon y fuente. |
 | | **Módulos** y **Funcionalidades** | Qué partes del sistema están encendidas (SOC, NOC y la Ticketera se encienden y apagan en Módulos). |
-| | **GLPI** | Con «Sincronización con GLPI» encendida: la conexión con GLPI y su prueba (si falla, dice la causa probable y qué hacer), qué se trae y cómo se reparte (tipo, área dueña, entidad → cliente), la importación automática y **Revisar ahora**, que muestra qué se crea, qué cambia (antes → después), qué se da de baja y qué se salta antes de **Importar**. Un equipo que ya existe en la app con la misma serie se salta; **Vincular** hace que desde ahí lo actualice GLPI. Si la automática falla, o si de una vez desaparece más del 10 % de lo importado (no lo da de baja), avisa en la campana a los administradores. |
+| | **GLPI** | Con «Sincronización con GLPI» encendida: la conexión con GLPI y su prueba (si falla, dice la causa probable y qué hacer), qué se trae y cómo se reparte (tipo, área dueña, entidad → cliente), la importación automática y **Revisar ahora**, que muestra qué se crea, qué cambia (antes → después), qué se da de baja y qué se salta antes de **Importar**. Un equipo que ya existe en la app con la misma serie se salta; **Vincular** hace que desde ahí lo actualice GLPI. Si la automática falla, o si de una vez desaparece más del 10 % de lo importado (no lo da de baja), avisa en la campana a los administradores. Abajo, **Tickets de GLPI**: encenderlo, la primera carga (abiertos y cerrados de los últimos 90 días), cada cuánto (5 o 15 minutos, o solo a mano), **Tus entidades** (cuáles traer y su cliente; una sin cliente hereda el de su entidad madre), **Tus grupos técnicos** (a qué área va cada uno; sin área no se traen), **Sincronizar ahora** y las últimas corridas. Si fallan tres corridas automáticas seguidas, avisa en la campana a los administradores. |
 | | **Respaldos** | Copias, restauración y exportación (ver [operacion.md](operacion.md)). |
 | | **Auditoría** | Quién hizo qué y cuándo, con filtros por categoría y por evento exacto, y exportación. |
 | | **Complementos** | Subir y publicar mini-aplicaciones. |

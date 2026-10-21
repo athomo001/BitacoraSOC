@@ -145,6 +145,10 @@ func (h *TicketsHandler) Merge(w http.ResponseWriter, r *http.Request) {
 		problemdetails.Write(w, r, 404, "not-found", "ticket no encontrado")
 		return
 	}
+	if isGlpiTicket(main) || isGlpiTicket(other) {
+		problemdetails.Write(w, r, http.StatusConflict, "glpi-readonly", glpiReadOnlyMessage)
+		return
+	}
 	// Tickets por área (9.1): los dos tienen que ser de un área que el usuario trabaja.
 	if scope, err := loadTicketScope(ctx, h.Queries); err != nil || !scope.canWork(main.AreaID) || !scope.canWork(other.AreaID) {
 		problemdetails.Write(w, r, 404, "not-found", "ticket no encontrado")
@@ -268,6 +272,8 @@ func (h *TicketsHandler) validParent(ctx context.Context, child, parent db.Ticke
 	switch {
 	case child.ID == parent.ID:
 		return "invalid-parent", "un ticket no puede ser su propio padre"
+	case isGlpiTicket(child) || isGlpiTicket(parent):
+		return "glpi-readonly", glpiReadOnlyMessage
 	case parent.ParentID.Valid:
 		return "nested-parent", parent.TicketNumber + " ya es hijo de otro: solo hay un nivel"
 	case parent.MergedIntoID.Valid || child.MergedIntoID.Valid:

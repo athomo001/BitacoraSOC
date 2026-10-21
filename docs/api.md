@@ -564,6 +564,50 @@ Importación de equipos desde GLPI (spec/16 §5.1, 9.6). Solo admin y solo con `
 | `POST` | `/api/glpi/link` | `{assetId, itemtype, glpiId}`: un equipo de la app (misma serie) pasa a venir de GLPI |
 | `GET` | `/api/glpi/runs` | Las últimas 20 importaciones |
 
+**Tickets de GLPI en la Ticketera** (10d.1, spec/18). Se traen solo para mirar, con el usuario de solo lectura. Entran los tickets de las entidades marcadas (con sus hijas) asignados a un grupo técnico con área, y siempre lo enlazado a mano (un número de GLPI en una entrada de la Bitácora o en un incidente de Escalamiento).
+
+| Método | Ruta | Notas |
+| --- | --- | --- |
+| `GET` | `/api/glpi/tickets/config` | `{enabled, every: off\|5m\|15m, sinceDays, entities, clients, groupAreas, firstLoadPending, nextAutoAt, connected}` |
+| `PUT` | `/api/glpi/tickets/config` | `{enabled, every, sinceDays, entities: [id], clients: {entidad: clienteId\|null}, groupAreas: {grupo: areaId\|null}}`; el cliente se guarda en el mismo mapeo del inventario. Si cambian las entidades o los grupos, la próxima corrida repite la primera carga |
+| `GET` | `/api/glpi/tickets/catalog` | Entidades (con `parentId`) y grupos técnicos de GLPI, con `openCount` (abiertos ya traídos); `502 glpi-unreachable` si no conecta |
+| `POST` | `/api/glpi/tickets/sync` | «Sincronizar ahora»: `202`, la corrida sigue en segundo plano; `409 glpi-tickets-off` si está apagado, `409 glpi-busy` si ya hay una |
+| `GET` | `/api/glpi/tickets/runs` | Las últimas 20 corridas: `{trigger, firstLoad, running, ok, created, updated, skipped, deleted, message}` |
+
+### Gestión CSM
+
+Spec/16 §4.4 (9.4). Ven Gestión el perfil Gestión, las jefaturas y el admin; si no, `403 forbidden`. Las acciones son tareas de la Agenda (`POST /api/agenda/tasks` con `clientId`, `actionKind: meeting|committee|contact|report|other`, `isKey` y `ticketId`). Las metas de una persona las ven la persona, la jefatura de su área, quien la creó y el admin.
+
+| Método | Ruta | Acceso |
+| --- | --- | --- |
+| `GET` | `/api/management/meta` | Gestión — objetivo del SLA, CSM posibles y las personas a las que el usuario puede ponerles metas |
+| `PUT` | `/api/management/settings` | Admin — `{slaTarget}` (50 a 100) |
+| `GET` | `/api/management/clients` | Gestión — la cartera: semáforo calculado (`health: {state, reasons, tickets, contact, keyTasks}`), CSM, renovación y próxima acción |
+| `GET` | `/api/management/clients/{id}` | Gestión — la ficha: cifras del mes, tickets abiertos con su SLA, acciones, metas, comunicaciones, línea de tiempo y pasos de la renovación |
+| `PUT` | `/api/management/clients/{id}` | Gestión — `{csmUserId, serviceStart, renewal, slaTarget}` (vacío = sin dato; sin `slaTarget`, el global) |
+| `GET` | `/api/management/clients/{id}/summary` | Gestión — `?period=month\|prev\|90`: SLA, tiempos medios, incidentes resueltos por área y prioridad, y metas |
+| `POST` | `/api/management/clients/{id}/summary/send` | Gestión — `{period, to}`: el mismo resumen por correo, a los dominios válidos de Reportes |
+| `GET` | `/api/management/indicators` | Gestión — `?by=client\|area&period=month\|prev\|90`: tareas a tiempo, tickets en SLA, atrasos abiertos, tiempos medios, tendencia de 6 meses y carga por área (las jefaturas ven sus áreas) |
+| `GET` | `/api/management/tickets/{id}/actions` | Gestión — las acciones de seguimiento de un ticket |
+| `GET` | `/api/goals` | Sesión — `?mine=1` (Agenda → Mis metas), `?person=` (Mi equipo) o `?client=`; sin filtro, solo Gestión |
+| `POST` | `/api/goals` | Gestión — `{name, scope: client\|area\|person, clientId, areaId, personId, ownerId, kind, bonus, dueDate o estimateBizDays, evidenceRequired, steps}`; las de una persona, su jefatura o el admin |
+| `GET` | `/api/goals/{id}` | Quien ve la meta — con hitos, historial y certificado |
+| `PUT` | `/api/goals/{id}` | Quien la creó, la jefatura o el admin |
+| `DELETE` | `/api/goals/{id}` | Quien la creó, la jefatura o el admin |
+| `POST` | `/api/goals/{id}/milestones` | `{name, ticketId \| taskId}`: un hito enlazado se marca solo cuando el ticket se resuelve o la tarea se hace |
+| `PUT` | `/api/goals/{id}/milestones/{mid}` | Igual; cambiar el enlace lo deja sin marcar |
+| `DELETE` | `/api/goals/{id}/milestones/{mid}` | Quien edita la meta |
+| `POST` | `/api/goals/{id}/milestones/{mid}/done` | `{done}` — el responsable, a mano (`409 milestone-linked` si está enlazado) |
+| `POST` | `/api/goals/{id}/{action}` | `risk {risk}`, `complete` (`409 evidence-missing` sin el certificado), `confirm` (la jefatura, en las que cuentan para el bono) o `reopen {dueDate}` |
+| `POST` | `/api/goals/{id}/evidence` | El certificado: multipart `file` (PDF o imagen, hasta 10 MB) o `{url}` |
+| `GET` | `/api/goals/{id}/evidence/{eid}` | Descarga el archivo |
+| `DELETE` | `/api/goals/{id}/evidence/{eid}` | Mientras la meta no esté cumplida |
+| `GET` | `/api/playbooks` | Gestión — plantillas con sus acciones (quién y cuántos días antes o después) |
+| `POST` | `/api/playbooks` | Gestión — `{name, description, anchor: apply\|date\|renewal, items}` |
+| `PUT` | `/api/playbooks/{id}` | Gestión — en las que vienen con la app no cambia `anchor` |
+| `DELETE` | `/api/playbooks/{id}` | Gestión — la desactiva (`409` en las que vienen con la app) |
+| `POST` | `/api/playbooks/{id}/apply` | Gestión — `{clientId, anchorDate}` (la fecha solo en `date`; `renewal` usa la del cliente): crea las tareas de la Agenda |
+
 ### Agenda
 
 Quién: ve las tareas de sus áreas, las que creó y las que le asignaron (admin y perfil Gestión, todas). Asigna a sí mismo y a los niveles de abajo de su área; la jefatura, a todo su área; Gestión y las jefaturas, también a otras áreas. Una ocurrencia de un nivel la toma cualquiera de ese nivel; la de una guardia, quien esté de guardia. Omite el responsable o quien la asignó. Cada cambio publica el evento en vivo `agenda.changed`.
@@ -665,6 +709,8 @@ Tipos de notificación: `agenda.assigned`, `agenda.warn`, `agenda.due`, `agenda.
 | `POST` | `/api/maintenance-windows/series-windows/{id}/{action}` | `skip` / `apply`: admin o analista (saltar una vez o volver a aplicarla). `approve` / `unapprove` (la que cae en feriado): la jefatura (del área de la ventana, o cualquiera si no es de un área) o el admin |
 
 ### Ticketera
+
+Los tickets traídos de GLPI (spec/18) llevan `source: "glpi"` y `glpi: {id, url, syncedAt, deleted, linkedOnly, group, technician}`; se filtran con `GET /api/tickets?source=app|glpi`. Son solo para mirar: cualquier escritura sobre uno responde `409 glpi-readonly` (enlazar una entrada de la Bitácora sí se puede) y la app no manda correos por ellos. En su detalle, cada comentario trae `glpiKind: followup|task|solution` y las tareas su `glpiTimeSeconds`; los eliminados en GLPI salen de la cola.
 
 | Método | Ruta | Acceso |
 | --- | --- | --- |

@@ -1,0 +1,138 @@
+<section class="adm-card mi__filters">
+  <button type="button" class="seg" [attr.aria-pressed]="by() === 'client'" (click)="by.set('client')">{{ i18n.t('mg.i.byClient') }}</button>
+  <button type="button" class="seg" [attr.aria-pressed]="by() === 'area'" (click)="by.set('area')">{{ i18n.t('mg.i.byArea') }}</button>
+  <span class="mi__sep" aria-hidden="true"></span>
+  @for (p of periods; track p) {
+    <button type="button" class="seg" [attr.aria-pressed]="period() === p" (click)="period.set(p)">{{ i18n.t(periodKey(p)) }}</button>
+  }
+  @if (meta().admin) {
+    <label class="mi__target"><span class="adm-hint">{{ i18n.t('mg.i.sla.setTarget') }}</span>
+      <input class="adm-input mono" type="number" min="50" max="100" name="slaTarget" [value]="target()" (input)="target.set(val($event))" (change)="saveTarget()" />%</label>
+  }
+  <button type="button" class="adm-btn mi__push" (click)="exportSummary()"><mat-icon>ios_share</mat-icon>{{ i18n.t('mg.export') }}</button>
+</section>
+
+@if (error(); as e) { <p class="adm-error" role="alert">{{ e }}</p> }
+
+@if (data(); as d) {
+  <div class="mi__charts">
+    <section class="adm-card">
+      <div class="adm-card__head mi__head">
+        <h3 class="adm-card__title"><mat-icon>show_chart</mat-icon>{{ i18n.t('mg.i.trend') }}</h3>
+        <span class="adm-hint">{{ i18n.tf('mg.i.trendHint', d.slaTarget) }}</span>
+      </div>
+      <div class="mi__legend">
+        @for (s of series(); track s.id) {
+          <button type="button" class="mi__lg" [attr.aria-pressed]="focus() === s.id" (click)="setFocus(s.id)"><i [style.background]="s.color"></i>{{ s.name }}</button>
+        }
+      </div>
+      <div class="mi__chart" #chart (pointerleave)="hover.set(null)">
+        <svg [attr.viewBox]="'0 0 ' + width() + ' ' + chartH" role="img" [attr.aria-label]="i18n.tf('mg.i.trendAria', d.slaTarget)">
+          <rect [attr.x]="bandX()" [attr.y]="mT - 6" [attr.width]="bandW()" [attr.height]="chartH - mT - mB + 6" rx="4" class="mi__band"></rect>
+          <rect [attr.x]="mL" [attr.y]="y(d.slaTarget)" [attr.width]="width() - mL - right()" [attr.height]="y(yLo()) - y(d.slaTarget)" class="mi__below"></rect>
+          @for (v of ticks(); track v) {
+            <line [attr.x1]="mL" [attr.x2]="width() - right()" [attr.y1]="y(v)" [attr.y2]="y(v)" class="mi__grid"></line>
+            @if (v !== d.slaTarget) { <text [attr.x]="mL - 6" [attr.y]="y(v) + 4" text-anchor="end">{{ v }} %</text> }
+          }
+          <line [attr.x1]="mL" [attr.x2]="width() - right()" [attr.y1]="y(d.slaTarget)" [attr.y2]="y(d.slaTarget)" class="mi__target-line"></line>
+          <text [attr.x]="mL - 6" [attr.y]="y(d.slaTarget) + 4" text-anchor="end" class="mi__strong">{{ d.slaTarget }} %</text>
+          <text [attr.x]="mL + 6" [attr.y]="y(d.slaTarget) + 14" class="mi__warn">{{ i18n.t('mg.i.belowTarget') }}</text>
+          @for (m of d.months; track m; let i = $index) {
+            <text [attr.x]="x(i)" [attr.y]="chartH - 8" text-anchor="middle" [class.mi__strong]="selectedMonths().includes(i)">{{ month(m) }}</text>
+          }
+          @if (hover() !== null) {
+            <line [attr.x1]="x(hover()!)" [attr.x2]="x(hover()!)" [attr.y1]="mT - 6" [attr.y2]="chartH - mB" class="mi__cross"></line>
+          }
+          @for (s of series(); track s.id) {
+            <g [attr.opacity]="focus() && focus() !== s.id ? 0.18 : 1">
+              <path [attr.d]="path(s)" fill="none" [attr.stroke]="s.color" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></path>
+              @for (p of points(s); track p.i) {
+                <circle [attr.cx]="x(p.i)" [attr.cy]="y(p.v)" [attr.r]="p.i === hover() ? 5.5 : 4" [attr.fill]="s.color" class="mi__dot"></circle>
+              }
+            </g>
+          }
+          @if (direct()) {
+            @for (e of ends(); track e.s.id) {
+              <text class="mi__dl" [attr.x]="width() - right() + 10" [attr.y]="e.y + 4" [attr.opacity]="focus() && focus() !== e.s.id ? 0.35 : 1">{{ e.s.name }} {{ e.v }} %</text>
+            }
+          }
+          @for (m of d.months; track m; let i = $index) {
+            <rect [attr.x]="x(i) - half()" [attr.y]="mT - 6" [attr.width]="half() * 2" [attr.height]="chartH - mT - mB + 6" fill="transparent" (pointerenter)="hover.set(i)"></rect>
+          }
+        </svg>
+        @if (hover() !== null) {
+          @let i = hover()!;
+          <div class="mi__tip" [style.left.px]="tipLeft(i)" role="status">
+            <b>{{ monthTitle(d.months[i]) }}</b>
+            @for (r of tipRows(i); track r.s.id) {
+              <span class="mi__tr"><i [style.background]="r.s.color"></i><span>{{ r.s.name }}</span>
+                <b [class.text-warn]="r.v < d.slaTarget">@if (r.v < d.slaTarget) { <mat-icon>warning</mat-icon> }{{ r.v }} %</b></span>
+            } @empty { <span class="adm-hint">{{ i18n.t('mg.noData') }}</span> }
+            <span class="adm-hint">{{ i18n.tf('mg.i.target', d.slaTarget) }}</span>
+          </div>
+        }
+      </div>
+      <div class="mi__below-list">
+        @if (below().length) {
+          <span class="adm-label">{{ i18n.tf('mg.i.below', periodIn()) }}</span>
+          @for (r of below(); track r.id) { <span class="pill tone-warn"><mat-icon>warning</mat-icon>{{ r.name }} · {{ r.slaPct }} %</span> }
+        } @else {
+          <span class="pill tone-ok"><mat-icon>check_circle</mat-icon>{{ i18n.tf('mg.i.allAbove', periodIn()) }}</span>
+        }
+      </div>
+    </section>
+
+    <section class="adm-card">
+      <div class="adm-card__head mi__head">
+        <h3 class="adm-card__title"><mat-icon>stacked_bar_chart</mat-icon>{{ i18n.t('mg.i.load') }}</h3>
+        <span class="adm-hint">{{ i18n.tf('mg.i.loadHint', periodIn()) }}</span>
+      </div>
+      <div class="mi__lrows">
+        <div class="mi__lrow mi__lrow--head"><span>{{ i18n.t('mg.i.col.area') }}</span><span>{{ i18n.t('mg.i.col.tickets') }}</span><span class="mi__r">{{ i18n.t('mg.i.col.share') }}</span><span class="mi__r">{{ i18n.t('mg.i.col.sla') }}</span></div>
+        @for (l of d.load; track l.id) {
+          <div class="mi__lrow" [title]="l.name + ': ' + l.tickets + ' (' + loadPct(l.tickets) + ' %) · SLA ' + pct(l.slaPct)">
+            <span>{{ l.name }}</span>
+            <span class="mi__bar"><i [style.width.%]="(l.tickets / loadMax()) * 100"></i></span>
+            <span class="mi__r mi__v">{{ l.tickets }} <span class="adm-hint">· {{ loadPct(l.tickets) }} %</span></span>
+            <span class="mi__r" [class.text-warn]="l.slaPct >= 0 && l.slaPct < d.slaTarget">@if (l.slaPct >= 0 && l.slaPct < d.slaTarget) { <mat-icon>warning</mat-icon> }{{ pct(l.slaPct) }}</span>
+          </div>
+        }
+      </div>
+      <p class="adm-hint mi__foot">{{ i18n.tf('mg.i.loadFoot', loadTotal()) }}</p>
+    </section>
+  </div>
+
+  <section class="adm-card">
+    <div class="adm-table-wrap">
+      <table class="adm-table">
+        <thead><tr>
+          <th>{{ i18n.t(by() === 'client' ? 'mg.col.client' : 'mg.i.col.area') }}</th>
+          <th>{{ i18n.t('mg.i.inChart') }}</th>
+          <th class="adm-num">{{ i18n.t('mg.i.onTime') }}</th>
+          <th class="adm-num">{{ i18n.t('mg.i.sla') }}</th>
+          <th class="adm-num">{{ i18n.t('mg.i.late') }}</th>
+          <th class="adm-num mi__hs">{{ i18n.t('mg.i.response') }}</th>
+          <th class="adm-num mi__hs">{{ i18n.t('mg.i.resolution') }}</th>
+        </tr></thead>
+        <tbody>
+          @for (r of d.rows; track r.id) {
+            <tr>
+              <td><b>{{ r.name }}</b></td>
+              <td><label class="mi__pick"><input type="checkbox" [checked]="isChosen(r.id)" [disabled]="!isChosen(r.id) && chosen().size >= 5" [attr.aria-label]="r.name" (change)="toggle(r.id)" />
+                @if (colorOf(r.id); as c) { <i [style.background]="c"></i> }</label></td>
+              <td class="adm-num"><span class="mi__meter"><span class="meter"><span [style.width.%]="r.onTimePct < 0 ? 0 : r.onTimePct"></span></span><b>{{ pct(r.onTimePct) }}</b></span></td>
+              <td class="adm-num"><span class="mi__meter"><span class="mi__sla" [style.--target]="r.slaTarget + '%'"><i [class.mi__sla--warn]="r.slaPct >= 0 && r.slaPct < r.slaTarget" [style.width.%]="r.slaPct < 0 ? 0 : r.slaPct"></i></span>
+                <b [class.text-warn]="r.slaPct >= 0 && r.slaPct < r.slaTarget">{{ pct(r.slaPct) }}</b></span></td>
+              <td class="adm-num" [class.text-bad]="r.openLate"><b>{{ r.openLate }}</b></td>
+              <td class="adm-num mono mi__hs">{{ dur(r.avgResponseSecs) }}</td>
+              <td class="adm-num mono mi__hs">{{ dur(r.avgResolutionSecs) }}</td>
+            </tr>
+          } @empty {
+            <tr><td colspan="7" class="adm-empty">{{ i18n.t('mg.i.empty') }}</td></tr>
+          }
+        </tbody>
+      </table>
+    </div>
+    <p class="adm-hint mi__foot">{{ i18n.t('mg.i.compare') }} {{ i18n.t('mg.i.foot') }}</p>
+  </section>
+}

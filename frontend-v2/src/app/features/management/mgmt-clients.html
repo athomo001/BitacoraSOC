@@ -1,0 +1,186 @@
+<div class="mc">
+  <section class="adm-card mc__left">
+    <div class="adm-tabs" role="tablist" [attr.aria-label]="i18n.t('mg.scope.all')">
+      <button type="button" role="tab" class="adm-tab" [attr.aria-selected]="scope() === 'all'" (click)="setScope('all')">{{ i18n.t('mg.scope.all') }} <span class="adm-cnt">{{ clients().length }}</span></button>
+      <button type="button" role="tab" class="adm-tab" [attr.aria-selected]="scope() === 'mine'" (click)="setScope('mine')">{{ i18n.t('mg.scope.mine') }} <span class="adm-cnt">{{ mineCount() }}</span></button>
+    </div>
+    <div class="mc__bar">
+      <input class="adm-input" type="search" name="mgSearch" [placeholder]="i18n.t('mg.search')" [attr.aria-label]="i18n.t('mg.search')" [value]="query()" (input)="query.set(val($event))" />
+    </div>
+    <div class="mc__bar">
+      <span class="adm-hint">{{ i18n.t('mg.sortBy') }}</span>
+      <button type="button" class="seg" [attr.aria-pressed]="sort() === 'attn'" (click)="sort.set('attn')">{{ i18n.t('mg.sort.attn') }}</button>
+      <button type="button" class="seg" [attr.aria-pressed]="sort() === 'renew'" (click)="sort.set('renew')">{{ i18n.t('mg.sort.renew') }}</button>
+    </div>
+    <div class="mc__row mc__row--head" aria-hidden="true">
+      <span></span><span>{{ i18n.t('mg.col.client') }}</span>
+      <span class="mc__num" [title]="i18n.t('mg.col.ticketsHint')">{{ i18n.t('mg.col.tickets') }}</span>
+      <span class="mc__num" [title]="i18n.t('mg.col.slaHint')">{{ i18n.t('mg.col.sla') }}</span>
+      <span class="mc__num" [title]="i18n.t('mg.col.lateHint')">{{ i18n.t('mg.col.late') }}</span>
+    </div>
+    @for (c of list(); track c.id) {
+      <button type="button" class="mc__row" [attr.aria-current]="selected() === c.id" (click)="select(c.id)">
+        <mat-icon class="text-{{ healthTone[c.health.state] }}" [attr.aria-label]="i18n.t(healthKey(c.health.state))">{{ healthIcon[c.health.state] }}</mat-icon>
+        <span class="mc__cell">
+          <b>{{ c.name }}</b>@if (scope() === 'all' && !c.mine && c.csmName) { <span class="adm-hint"> ({{ c.csmName }})</span> }
+          <span class="mc__line">
+            <span class="adm-hint" [title]="allReasons(c)">{{ reason(c) }}</span>
+            @if (c.renewalDays != null && (c.renewalDays <= 90 || sort() === 'renew')) {
+              <span class="mc__renew text-{{ c.renewalDays <= 30 ? 'bad' : c.renewalDays <= 90 ? 'warn' : 'neutral' }}">{{ c.renewalDays < 0 ? i18n.t('mg.renewPast') : i18n.tf('mg.renewIn', c.renewalDays) }}</span>
+            } @else if (c.renewalDays == null && sort() === 'renew') {
+              <span class="mc__renew">{{ i18n.t('mg.noRenewal') }}</span>
+            }
+          </span>
+        </span>
+        <span class="mc__num" [class.mc__zero]="!c.openTickets">{{ c.openTickets }}</span>
+        <span class="mc__num" [class.text-bad]="c.breached" [class.mc__zero]="!c.breached">{{ c.breached }}</span>
+        <span class="mc__num" [class.text-warn]="c.lateActions" [class.mc__zero]="!c.lateActions">{{ c.lateActions }}</span>
+      </button>
+    } @empty {
+      <p class="adm-empty">{{ i18n.t('mg.empty') }}</p>
+    }
+  </section>
+
+  <section class="adm-card mc__right">
+    @if (error(); as e) { <p class="adm-error mc__pad" role="alert">{{ e }}</p> }
+    @if (detail(); as d) {
+      @let c = d.client;
+      <div class="mc__head">
+        <div><h2>{{ c.name }}</h2><span class="adm-hint">{{ c.csmName ? i18n.tf('mg.csm', c.csmName) : i18n.t('mg.noCsm') }}</span>
+          <button type="button" class="mc__link" (click)="editAccount()"><mat-icon>edit</mat-icon>{{ i18n.t('mg.account') }}</button></div>
+        <span class="mc__btns">
+          <button type="button" class="adm-btn" (click)="exportSummary()"><mat-icon>ios_share</mat-icon>{{ i18n.t('mg.export') }}</button>
+          <button type="button" class="adm-btn" (click)="newGoal()"><mat-icon>flag</mat-icon>{{ i18n.t('mg.newGoal') }}</button>
+          <button type="button" class="adm-btn adm-btn--primary" (click)="newAction()"><mat-icon>add_task</mat-icon>{{ i18n.t('mg.newAction') }}</button>
+        </span>
+      </div>
+
+      <div class="mc__status">
+        <div class="mc__health">
+          <p class="mc__state"><mat-icon class="text-{{ healthTone[c.health.state] }}">{{ healthIcon[c.health.state] }}</mat-icon>
+            <span><b>{{ i18n.t(healthKey(c.health.state)) }}</b>@if (c.health.reasons[0]) {: {{ reason(c) }}}</span></p>
+          <dl class="mc__comps">
+            <dt><mat-icon class="text-{{ healthTone[c.health.tickets.state] }}">{{ healthIcon[c.health.tickets.state] }}</mat-icon>{{ i18n.t('mg.c.tickets') }}</dt><dd>{{ ticketsText(c) }}</dd>
+            <dt><mat-icon class="text-{{ healthTone[c.health.contact.state] }}">{{ healthIcon[c.health.contact.state] }}</mat-icon>{{ i18n.t('mg.c.contact') }}</dt><dd>{{ contact(c) }}</dd>
+            <dt><mat-icon class="text-{{ healthTone[c.health.keyTasks.state] }}">{{ healthIcon[c.health.keyTasks.state] }}</mat-icon>{{ i18n.t('mg.c.key') }}</dt><dd>{{ keyText(c) }}</dd>
+          </dl>
+        </div>
+        <div class="mc__rn">
+          @if (renewal(); as r) {
+            <p class="mc__rnh">{{ i18n.tf('mg.rn.head', date(r.date, true)) }}
+              <b class="text-{{ r.tone || 'neutral' }}">{{ r.days < 0 ? i18n.tf('mg.rn.past', -r.days) : i18n.tf('mg.rn.left', r.days) }}</b></p>
+            @if (r.progress === null && !r.steps.length) {
+              <p class="adm-hint mc__flat">{{ i18n.tf('mg.rn.opens', date(r.opens, true)) }}</p>
+              <button type="button" class="mc__link" [disabled]="busy()" (click)="applyRenewal()"><mat-icon>playlist_add</mat-icon>{{ i18n.t('mg.rn.apply') }}</button>
+            } @else {
+              @if (r.progress !== null) {
+                <div class="mc__axis" aria-hidden="true">
+                  <span class="mc__tk" style="left: 0"><span class="mc__tkl">{{ i18n.t('mg.rn.days90') }}</span></span>
+                  <span class="mc__tk" style="left: 33.33%"><span class="mc__tkl">60</span></span>
+                  <span class="mc__tk" style="left: 66.67%"><span class="mc__tkl">30</span></span>
+                  <span class="mc__tk mc__tk--end" style="left: 100%"><span class="mc__tkl">{{ date(r.date) }}</span></span>
+                  <i class="mc__fill mc__fill--{{ r.tone || 'neutral' }}" [style.width.%]="r.progress"></i>
+                  <span class="mc__now" [style.left.%]="r.progress"></span>
+                </div>
+              }
+              @if (r.steps.length) {
+                <div class="mc__rncols">
+                  @for (s of r.steps; track s.name) {
+                    <div class="mc__rnstep mc__rnstep--{{ s.state }}"><mat-icon>{{ s.state === 'done' ? 'check_circle' : s.state === 'next' ? 'arrow_forward' : 'radio_button_unchecked' }}</mat-icon>
+                      <span>{{ s.name }}<span class="adm-hint mc__block">{{ s.state === 'done' && s.closedAt ? i18n.tf('mg.rn.done', (s.closedAt | date: 'd MMM') ?? '') : date(s.due) }}</span></span></div>
+                  }
+                </div>
+                <button type="button" class="mc__link" (click)="goPlaybook('renewal')"><mat-icon>library_add_check</mat-icon>{{ i18n.t('mg.rn.see') }}</button>
+              } @else {
+                <button type="button" class="adm-btn mc__start" [class.adm-btn--primary]="r.tone === 'bad'" [disabled]="busy()" (click)="applyRenewal()"><mat-icon>playlist_add</mat-icon>{{ i18n.t('mg.rn.apply') }}</button>
+              }
+            }
+          } @else {
+            <p class="mc__rnh">{{ i18n.t('mg.rn.none') }}</p>
+            <p class="adm-hint mc__flat">{{ i18n.t('mg.rn.noneHint') }}</p>
+            <button type="button" class="mc__link" (click)="editAccount()"><mat-icon>event</mat-icon>{{ i18n.t('mg.rn.add') }}</button>
+          }
+        </div>
+      </div>
+
+      <div class="mc__figs">
+        <span><span class="adm-hint">{{ i18n.t('mg.f.onTime') }}</span><b>{{ pct(d.figures.onTimePct) }}</b></span>
+        <span><span class="adm-hint">{{ i18n.t('mg.f.sla') }}</span><b [class.text-warn]="d.figures.slaPct >= 0 && d.figures.slaPct < d.figures.slaTarget">{{ pct(d.figures.slaPct) }}</b><span class="adm-hint">{{ i18n.tf('mg.f.target', d.figures.slaTarget) }}</span></span>
+        <span><span class="adm-hint">{{ i18n.t('mg.f.late') }}</span><b [class.text-bad]="d.figures.openLate">{{ d.figures.openLate }}</b></span>
+        <span [title]="i18n.t('mg.f.responseHint')"><span class="adm-hint">{{ i18n.t('mg.f.response') }}</span><b>{{ dur(d.figures.avgResponseSecs) }}</b></span>
+        <span [title]="i18n.t('mg.f.resolutionHint')"><span class="adm-hint">{{ i18n.t('mg.f.resolution') }}</span><b>{{ dur(d.figures.avgResolutionSecs) }}</b></span>
+      </div>
+
+      <div class="adm-tabs" role="tablist">
+        <button type="button" role="tab" class="adm-tab" [attr.aria-selected]="tab() === 'summary'" (click)="tab.set('summary')">{{ i18n.t('mg.ct.summary') }}</button>
+        <button type="button" role="tab" class="adm-tab" [attr.aria-selected]="tab() === 'timeline'" (click)="tab.set('timeline')">{{ i18n.t('mg.ct.timeline') }}</button>
+        <button type="button" class="mc__link mc__push" (click)="goPlaybook('qbr')"><mat-icon>library_add_check</mat-icon>{{ i18n.t('mg.applyPb') }}</button>
+      </div>
+
+      @if (tab() === 'timeline') {
+        <div class="mc__tl">
+          @for (e of d.timeline; track $index) {
+            <div class="mc__ev"><mat-icon>{{ tlIcon(e) }}</mat-icon><span>{{ tlText(e) }}</span><span class="adm-hint mono">{{ e.at | date: 'dd/MM HH:mm' }}</span></div>
+          } @empty {
+            <p class="mc__none">{{ i18n.t('mg.tl.empty') }}</p>
+          }
+        </div>
+      } @else if (clear()) {
+        <div class="mc__clear"><mat-icon class="text-ok">check_circle</mat-icon>
+          <div><b>{{ i18n.t('mg.clear') }}</b><p class="adm-hint">{{ i18n.t('mg.clearHint') }}</p>
+            <div class="mc__btns">
+              <button type="button" class="adm-btn" (click)="goPlaybook('qbr')"><mat-icon>event</mat-icon>{{ i18n.t('mg.q.qbr') }}</button>
+              <button type="button" class="adm-btn" (click)="goPlaybook('onboarding')"><mat-icon>person_add</mat-icon>{{ i18n.t('mg.q.onboarding') }}</button>
+              <button type="button" class="adm-btn" (click)="newGoal()"><mat-icon>flag</mat-icon>{{ i18n.t('mg.newGoal') }}</button>
+              <button type="button" class="adm-btn" (click)="newAction(undefined, true)"><mat-icon>groups</mat-icon>{{ i18n.t('mg.q.meeting') }}</button>
+            </div></div>
+        </div>
+      } @else {
+        <section class="mc__sec">
+          <h3>{{ i18n.t('mg.s.tickets') }} <span class="mc__n">{{ d.tickets.length }}</span></h3>
+          @for (t of d.tickets; track t.id) {
+            <div class="mc__tr mc__tr--t">
+              <span class="mc__main"><a class="mono mc__tid" routerLink="/tickets" [queryParams]="{ id: t.id }">{{ t.number }}</a>{{ t.title }}</span>
+              <span class="mc__area">{{ t.area }}</span>
+              <b class="mono">{{ prioShort[t.priority] }}</b>
+              <span class="mc__when text-{{ slaTone(t) }}">{{ slaText(t) }}</span>
+              <button type="button" class="adm-icon-btn" [title]="i18n.tf('mg.a.follow', t.number)" [attr.aria-label]="i18n.tf('mg.a.follow', t.number)" (click)="newAction(t)"><mat-icon>add_task</mat-icon></button>
+            </div>
+          } @empty { <p class="mc__none">{{ i18n.t('mg.s.noTickets') }}</p> }
+        </section>
+        <section class="mc__sec">
+          <h3>{{ i18n.t('mg.s.actions') }} <span class="mc__n">{{ d.actions.length }}</span></h3>
+          @for (a of d.actions; track a.occurrenceId) {
+            <div class="mc__tr mc__tr--a">
+              <span class="mc__main"><span>{{ a.name }}@if (a.key) { <span class="mc__key" [title]="i18n.t('mg.a.keyHint')"><mat-icon>vpn_key</mat-icon>{{ i18n.t('mg.a.key') }}</span> }</span>
+                <span class="adm-hint">{{ who(a) }}</span></span>
+              <span class="mc__area">{{ a.kind ? i18n.t(kindKey(a.kind)) : '' }}</span>
+              <span class="mc__when" [class.text-bad]="a.late">{{ a.late ? i18n.tf('mg.a.late', date(a.due)) : date(a.due) }}</span>
+            </div>
+          } @empty { <p class="mc__none">{{ i18n.t('mg.s.noActions') }}</p> }
+        </section>
+        <section class="mc__sec">
+          <h3>{{ i18n.t('mg.s.goals') }} <span class="mc__n">{{ d.goals.length }}</span></h3>
+          @for (g of d.goals; track g.id) {
+            <div class="mc__tr mc__tr--g">
+              <span class="mc__main">{{ g.name }}<span class="adm-hint">{{ g.milestones ? i18n.tf('mg.g.progress', g.milestonesDone + ' ' + i18n.t('mg.g.of') + ' ' + g.milestones) : i18n.t('mg.g.noSteps') }}</span></span>
+              <span class="meter mc__gbar"><span [style.width.%]="g.milestones ? (g.milestonesDone / g.milestones) * 100 : 0"></span></span>
+              <span class="mc__when text-{{ goalTone[g.state] }}">{{ i18n.t(goalStateKey(g.state)) }}</span>
+            </div>
+          } @empty { <p class="mc__none">{{ i18n.t('mg.s.noGoals') }}</p> }
+        </section>
+      }
+      @if (tab() === 'summary' && (!clear() || d.comms.length)) {
+        <section class="mc__sec">
+          <h3>{{ i18n.t('mg.s.comms') }}</h3>
+          @for (m of d.comms; track $index) {
+            <div class="mc__tr mc__tr--c"><span class="mc__main">{{ m.title }}<span class="adm-hint">{{ i18n.t(commKey(m.kind)) }}</span></span><span class="mc__when">{{ m.at | date: 'd MMM' }}</span></div>
+          } @empty { <p class="mc__none">{{ i18n.t('mg.s.noComms') }}</p> }
+        </section>
+      }
+      <div class="mc__end"></div>
+    } @else if (!error()) {
+      <p class="adm-empty">…</p>
+    }
+  </section>
+</div>

@@ -41,7 +41,7 @@ func (q *Queries) CountOrgContacts(ctx context.Context, organizationID uuid.UUID
 }
 
 const createOrganization = `-- name: CreateOrganization :one
-INSERT INTO organizations (name, code, type) VALUES ($1, $2, $3) RETURNING id, name, code, type, active, created_at, via_organization_id, archived_at
+INSERT INTO organizations (name, code, type) VALUES ($1, $2, $3) RETURNING id, name, code, type, active, created_at, via_organization_id, archived_at, csm_user_id, service_start_date, renewal_date, sla_target
 `
 
 type CreateOrganizationParams struct {
@@ -62,6 +62,10 @@ func (q *Queries) CreateOrganization(ctx context.Context, arg CreateOrganization
 		&i.CreatedAt,
 		&i.ViaOrganizationID,
 		&i.ArchivedAt,
+		&i.CsmUserID,
+		&i.ServiceStartDate,
+		&i.RenewalDate,
+		&i.SlaTarget,
 	)
 	return i, err
 }
@@ -230,7 +234,7 @@ func (q *Queries) DeleteTeamWithoutHistory(ctx context.Context, arg DeleteTeamWi
 }
 
 const findOrganizationByNameOrCode = `-- name: FindOrganizationByNameOrCode :one
-SELECT id, name, code, type, active, created_at, via_organization_id, archived_at FROM organizations
+SELECT id, name, code, type, active, created_at, via_organization_id, archived_at, csm_user_id, service_start_date, renewal_date, sla_target FROM organizations
 WHERE active AND (lower(name) = lower($1::text) OR lower(code) = lower($1::text))
 ORDER BY (lower(code) = lower($1::text)) DESC
 LIMIT 1
@@ -250,12 +254,16 @@ func (q *Queries) FindOrganizationByNameOrCode(ctx context.Context, ref string) 
 		&i.CreatedAt,
 		&i.ViaOrganizationID,
 		&i.ArchivedAt,
+		&i.CsmUserID,
+		&i.ServiceStartDate,
+		&i.RenewalDate,
+		&i.SlaTarget,
 	)
 	return i, err
 }
 
 const getOrganization = `-- name: GetOrganization :one
-SELECT id, name, code, type, active, created_at, via_organization_id, archived_at FROM organizations WHERE id = $1
+SELECT id, name, code, type, active, created_at, via_organization_id, archived_at, csm_user_id, service_start_date, renewal_date, sla_target FROM organizations WHERE id = $1
 `
 
 func (q *Queries) GetOrganization(ctx context.Context, id uuid.UUID) (Organization, error) {
@@ -270,6 +278,10 @@ func (q *Queries) GetOrganization(ctx context.Context, id uuid.UUID) (Organizati
 		&i.CreatedAt,
 		&i.ViaOrganizationID,
 		&i.ArchivedAt,
+		&i.CsmUserID,
+		&i.ServiceStartDate,
+		&i.RenewalDate,
+		&i.SlaTarget,
 	)
 	return i, err
 }
@@ -520,7 +532,7 @@ func (q *Queries) ListOrganizationTypes(ctx context.Context) ([]ListOrganization
 }
 
 const listOrganizations = `-- name: ListOrganizations :many
-SELECT o.id, o.name, o.code, o.type, o.active, o.created_at, o.via_organization_id, o.archived_at, v.name AS via_name
+SELECT o.id, o.name, o.code, o.type, o.active, o.created_at, o.via_organization_id, o.archived_at, o.csm_user_id, o.service_start_date, o.renewal_date, o.sla_target, v.name AS via_name
 FROM organizations o
 JOIN organization_types t ON t.code = o.type
 LEFT JOIN organizations v ON v.id = o.via_organization_id
@@ -546,6 +558,10 @@ type ListOrganizationsRow struct {
 	CreatedAt         pgtype.Timestamptz `json:"created_at"`
 	ViaOrganizationID pgtype.UUID        `json:"via_organization_id"`
 	ArchivedAt        pgtype.Timestamptz `json:"archived_at"`
+	CsmUserID         pgtype.UUID        `json:"csm_user_id"`
+	ServiceStartDate  pgtype.Date        `json:"service_start_date"`
+	RenewalDate       pgtype.Date        `json:"renewal_date"`
+	SlaTarget         pgtype.Int4        `json:"sla_target"`
 	ViaName           pgtype.Text        `json:"via_name"`
 }
 
@@ -568,6 +584,10 @@ func (q *Queries) ListOrganizations(ctx context.Context, arg ListOrganizationsPa
 			&i.CreatedAt,
 			&i.ViaOrganizationID,
 			&i.ArchivedAt,
+			&i.CsmUserID,
+			&i.ServiceStartDate,
+			&i.RenewalDate,
+			&i.SlaTarget,
 			&i.ViaName,
 		); err != nil {
 			return nil, err
@@ -754,7 +774,7 @@ UPDATE organizations SET
   active = COALESCE($5, active),
   via_organization_id = CASE WHEN $6::boolean THEN $7::uuid ELSE via_organization_id END
 WHERE id = $1
-RETURNING id, name, code, type, active, created_at, via_organization_id, archived_at
+RETURNING id, name, code, type, active, created_at, via_organization_id, archived_at, csm_user_id, service_start_date, renewal_date, sla_target
 `
 
 type UpdateOrganizationParams struct {
@@ -787,6 +807,10 @@ func (q *Queries) UpdateOrganization(ctx context.Context, arg UpdateOrganization
 		&i.CreatedAt,
 		&i.ViaOrganizationID,
 		&i.ArchivedAt,
+		&i.CsmUserID,
+		&i.ServiceStartDate,
+		&i.RenewalDate,
+		&i.SlaTarget,
 	)
 	return i, err
 }

@@ -14,6 +14,14 @@
   /* Fondos y Superficies (Gris Grafito Profundo / OLED) */
   --bg-app: #0d1117;
   --bg-surface: #161b22;
+
+  /* Series de gráficos (Gestión → Indicadores): orden fijo, validadas con
+     dataviz/validate_palette.js contra la superficie de cada tema. */
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+  --series-5: #d55181;
   --bg-surface-hover: #21262d;
   --border-subtle: #30363d;
   --border-active: #58a6ff;
@@ -71,6 +79,11 @@
 }
 
 [data-theme="light"] {
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+  --series-5: #e87ba4;
   --bg-app: #f6f8fa;
   --bg-surface: #fff;
   --bg-surface-hover: #eaeef2;
@@ -104,6 +117,11 @@
    Contraste ≈ 7:1 en texto secundario, estados y acento. El efecto pixel
    (bordes, fuente, barras de título) vive en styles/theme-pixel.css. */
 [data-theme="pink"] {
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+  --series-5: #e87ba4;
   --bg-app: #fcf1f7;
   --bg-surface: #fffafd;
   --bg-surface-hover: #f5e6f7;

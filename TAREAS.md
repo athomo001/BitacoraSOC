@@ -5,8 +5,8 @@ Lo hecho, lo que está en revisión y lo que falta hasta el corte. Marca con `[x
 ## Hitos
 
 - [x] Núcleo 2.0 completo (fases 1 a 13)
-- [ ] Áreas TI, Infra y CSM (9.1 a 9.7 hechas; falta la Gestión CSM)
-- [ ] Gestión CSM (la segunda etapa de áreas ya está hecha)
+- [x] Áreas TI, Infra y CSM (9.1 a 9.7 hechas)
+- [x] Gestión CSM (9.4, 2026-10-20; falta revisarla en la app)
 - [ ] Wiki y orquestador
 - [ ] Ensayo de paridad 2
 - [ ] Corte a producción y fin del rollback
@@ -18,18 +18,22 @@ Lo hecho, lo que está en revisión y lo que falta hasta el corte. Marca con `[x
 - [ ] Revisar en la app colas por área, Inventario y Agenda (9.1, 9.2, 9.3) — Dueño
 - [ ] Revisar en la app las Notificaciones (9.5) — Dueño
 - [ ] Probar la importación desde GLPI contra el GLPI real (9.6) — Dueño
+- [ ] Probar los tickets de GLPI contra el GLPI real (10d.1): `migrate … up` para la 000050, darle al usuario de solo lectura permiso para ver tickets, grupos y usuarios, marcar tus entidades y grupos en Administración → GLPI y «Sincronizar ahora» — Dueño
 - [ ] Revisión humana del shadow-diff del escalamiento — Equipo SOC
 - [ ] Revisar en la app la segunda etapa (9.7): flujos, calendario en Outlook, resumen mensual y ventanas que se repiten — Dueño
 - [x] Gestión CSM (9.4): el CSM validó el diseño y mandó feedback (2026-10-19); spec ajustado en `16` §4.4 — CSM
 - [x] Gestión CSM (9.4): diseño rehecho con el feedback del CSM (2026-10-19)
 - [ ] Tema Rosa con efecto 8-bit (construido el 2026-10-19, ver CHANGELOG): revisarlo en la app — Dueño
-- [ ] Gestión CSM (9.4): en pausa; el diseño rehecho (<https://claude.ai/artifact/MkPD5Eipnsgiy95BPQudob>) se envió a la CSM el 2026-10-19 y se implementa si lo aprueba — CSM
+- [x] Gestión CSM (9.4): la CSM aprobó el diseño rehecho (<https://claude.ai/artifact/MkPD5Eipnsgiy95BPQudob>) — CSM
+- [ ] Revisar en la app la Gestión CSM (9.4): antes correr `migrate … up` para la 000051; ponerle a cada cliente su CSM, inicio del servicio y renovación (Gestión → ficha → Datos de la cuenta) — Dueño y CSM
 
 ## Por hacer
 
 ### Áreas
-- [ ] Decidir las 7 preguntas de la Gestión CSM (`16` §4.4.10; incluye quién crea las metas por persona y quién confirma una certificación para el bono) — Dueño
-- [ ] Comunicaciones internas del CSM y la tarea «avisar al cliente» (espera a la 9.4)
+- [x] Decidir las 7 preguntas de la Gestión CSM (`16` §4.4.10): quedaron las propuestas (2026-10-20) — Dueño
+- [x] Tarea «avisar al cliente» de una ventana de mantenimiento (9.4, 2026-10-20)
+- [ ] Comunicaciones internas del CSM: notas que solo ve CSM (`16` §4.7)
+- [ ] Gestión CSM: aviso antes del vencimiento de una meta y metas cumplidas por persona en el Resumen mensual
 
 ### Paridad con el legacy (revisión y decisiones del dueño, 2026-10-16)
 - [x] Correo «no se hizo el checklist de inicio»: igual al legacy (09:30, a la guardia N1 no hábil y a los N2)
@@ -52,7 +56,8 @@ Lo hecho, lo que está en revisión y lo que falta hasta el corte. Marca con `[x
 - [x] 10a RACI por cliente (hecho el 2026-10-20; ver «En curso»)
 - [ ] 10b Logs a SIEM/SOAR y API externa — falta saber a qué SIEM
 - [ ] 10c SSO con Microsoft 365 — un admin del tenant registra la app en Entra ID
-- [ ] 10d GLPI en ambos sentidos (tickets) — en pausa (2026-10-20); para retomar: aprobar el diseño <https://claude.ai/artifact/6Dt6kJj7pWf3QPE5ZuxaVi> y responder las 3 preguntas de `spec/18` §5 — Dueño
+- [x] 10d.1 Tickets de GLPI en la Ticketera, solo para mirar (2026-10-20; ver «En curso»)
+- [ ] 10d.2 De la app a GLPI: comentar en un ticket de GLPI y «Crear en GLPI» — se diseña cuando la 10d.1 esté probada con el GLPI real
 - [ ] 10e Pedidos especiales — validar el concepto con el dueño
 - [ ] 10f Reportes avanzados — elegir qué parte primero
 - [ ] 10g Carga CSV masiva — definir de qué más
@@ -91,3 +96,4 @@ Lo hecho, lo que está en revisión y lo que falta hasta el corte. Marca con `[x
 - [x] Segunda etapa de áreas (9.7): flujos entre áreas, calendario en Outlook, resumen mensual y ventanas que se repiten
 - [x] Documentación: instalación, operación, API, modelo de datos y guía de uso
 - [x] RACI por cliente como el legacy, con las notas que el ETL perdía (2026-10-20)
+- [x] Tickets de GLPI en la Ticketera, solo para mirar (10d.1, 2026-10-20)

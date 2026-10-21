@@ -1,0 +1,161 @@
+@if (goal(); as g) {
+  <header class="gt__head">
+    <div class="gt__title">
+      <h2>{{ g.name }}</h2>
+      @if (g.createdByName) { <span class="adm-hint">{{ i18n.tf('mg.g.createdBy', g.createdByName) }}</span> }
+    </div>
+    <span class="gt__state text-{{ goalTone[g.state] }}"><mat-icon>{{ goalIcon[g.state] }}</mat-icon>{{ i18n.t(goalStateKey(g.state)) }}</span>
+  </header>
+
+  <dl class="gt__facts">
+    @if (g.scope === 'person') {
+      <dt>{{ i18n.t('mg.g.person') }}</dt><dd>{{ g.personName }}@if (g.personAreas?.length) { <span class="adm-hint">({{ g.personAreas!.join(', ') }})</span> }</dd>
+      @if (g.kind) { <dt>{{ i18n.t('mg.g.kind') }}</dt><dd>{{ i18n.t(kindKey(g.kind)) }}</dd> }
+      @if (g.bonus) { <dt>{{ i18n.t('mg.g.bonus') }}</dt><dd class="gt__bono">{{ i18n.t(bonusKey(g.bonus)) }}</dd> }
+    } @else {
+      <dt>{{ i18n.t('mg.g.client') }}</dt><dd>{{ g.clientName || '—' }}</dd>
+      <dt>{{ i18n.t('mg.g.area') }}</dt><dd>{{ g.areaName || '—' }}</dd>
+      <dt>{{ i18n.t('mg.g.owner') }}</dt><dd>{{ g.ownerName || '—' }}</dd>
+    }
+    <dt>{{ i18n.t('mg.g.date') }}</dt>
+    <dd><b class="mono">{{ date(g.dueDate) }}</b>
+      <span class="adm-hint">{{ g.bizDaysLeft < 0 ? i18n.tf('mg.g.overdue', -g.bizDaysLeft) : i18n.tf('mg.g.left', g.bizDaysLeft) }}@if (g.estimateBizDays) {, {{ i18n.tf('mg.g.estimate', g.estimateBizDays) }}}</span></dd>
+    <dt>{{ i18n.t('mg.g.advance') }}</dt>
+    <dd class="gt__adv"><span class="meter"><span [style.width.%]="pct()"></span></span>
+      <span class="adm-hint">{{ g.milestones ? i18n.tf('mg.g.progress', g.milestonesDone + ' ' + i18n.t('mg.g.of') + ' ' + g.milestones) : i18n.t('mg.g.noStepsHint') }}</span></dd>
+  </dl>
+  @if (g.scope === 'person') { <p class="gt__vis"><mat-icon>visibility</mat-icon>{{ i18n.tf('mg.g.vis', g.personName ?? '') }}</p> }
+  @if (g.state === 'risk' && g.autoRisk) { <p class="gt__note gt__note--warn">{{ i18n.t('mg.g.riskNote') }}</p> }
+  @if (g.milestones && g.milestonesDone === g.milestones && evidenceMissing()) { <p class="gt__note gt__note--warn">{{ i18n.t('mg.g.evNote') }}</p> }
+  @if (g.state === 'confirm') { <p class="gt__note gt__note--info">{{ i18n.t('mg.g.confirmNote') }}</p> }
+  @if (g.confirmedAt && g.confirmedByName) { <p class="gt__note gt__note--ok">{{ i18n.tf('mg.g.confirmed', g.confirmedByName) }}</p> }
+
+  <section class="gt__sec">
+    <h3>{{ i18n.t('mg.g.steps') }}@if (g.milestones) { <span class="gt__n">{{ g.milestonesDone }} {{ i18n.t('mg.g.of') }} {{ g.milestones }}</span> }
+      @if ((g.canEdit || g.canMark) && !closed()) {
+        <button type="button" class="adm-btn gt__push" [attr.aria-expanded]="adding()" (click)="startAdd()"><mat-icon>add</mat-icon>{{ i18n.t('mg.g.addStep') }}</button>
+      }
+    </h3>
+    @if (adding()) {
+      <div class="gt__add">
+        <input class="adm-input" name="stepName" maxlength="200" [placeholder]="i18n.t('mg.g.stepName')" [value]="stepName()" (input)="stepName.set(val($event))" />
+        <div class="gt__chips"><span class="adm-hint">{{ i18n.t('mg.g.linkTo') }}</span>
+          <button type="button" class="seg" [attr.aria-pressed]="link() === 'none'" (click)="setLink('none')">{{ i18n.t('mg.g.link.none') }}</button>
+          <button type="button" class="seg" [attr.aria-pressed]="link() === 'ticket'" (click)="setLink('ticket')"><mat-icon>confirmation_number</mat-icon>{{ i18n.t('mg.g.link.ticket') }}</button>
+          <button type="button" class="seg" [attr.aria-pressed]="link() === 'task'" (click)="setLink('task')"><mat-icon>event</mat-icon>{{ i18n.t('mg.g.link.task') }}</button>
+        </div>
+        @if (link() === 'ticket') {
+          <input class="adm-input mono" name="stepTicket" [placeholder]="i18n.t('mg.g.ticketNumber')" [value]="ticketNumber()" (input)="ticketNumber.set(val($event))" />
+        } @else if (link() === 'task') {
+          <select class="adm-input" name="stepTask" [attr.aria-label]="i18n.t('mg.g.taskPick')" (change)="taskId.set(val($event))">
+            <option value="" [selected]="!taskId()">{{ i18n.t('mg.g.taskPick') }}</option>
+            @for (t of tasks(); track t.id) { <option [value]="t.id">{{ t.label }}</option> }
+          </select>
+        }
+        <span class="adm-hint">{{ i18n.t(link() === 'none' ? 'mg.g.link.noneHint' : link() === 'ticket' ? 'mg.g.link.ticketHint' : 'mg.g.link.taskHint') }}</span>
+        <div class="gt__actions gt__end">
+          <button type="button" class="adm-btn" (click)="adding.set(false)">{{ i18n.t('mg.cancel') }}</button>
+          <button type="button" class="adm-btn adm-btn--primary" [disabled]="busy() || !stepName().trim() || (link() === 'ticket' && !ticketNumber().trim()) || (link() === 'task' && !taskId())" (click)="addStep()">{{ i18n.t('mg.g.addStepBtn') }}</button>
+        </div>
+      </div>
+    }
+    @if (g.steps?.length) {
+      <div class="gt__steps">
+        @for (s of g.steps; track s.id) {
+          @let linked = !!(s.ticketId || s.taskId);
+          <div class="gt__step" [class.gt__step--done]="s.doneAt">
+            <button type="button" class="gt__check" [attr.aria-pressed]="!!s.doneAt" [disabled]="busy() || linked || !g.canMark || closed()"
+              [title]="linked ? i18n.t('mg.g.auto') : ''" (click)="toggle(s)">
+              <mat-icon>{{ s.doneAt ? 'check_box' : linked ? 'link' : 'check_box_outline_blank' }}</mat-icon>
+              <span class="gt__sname">{{ s.name }}
+                @if (linked && !s.doneAt) { <span class="adm-hint gt__block"><mat-icon class="gt__lk">{{ s.ticketId ? 'confirmation_number' : 'event' }}</mat-icon>{{ linkText(s) }}</span> }
+              </span>
+              <span class="adm-hint">{{ s.doneAt ? doneText(s) : linked ? i18n.t('mg.g.auto') : '' }}</span>
+            </button>
+            @if (g.canEdit && !closed()) {
+              <button type="button" class="adm-icon-btn" [disabled]="busy()" [attr.aria-label]="i18n.tf('mg.g.removeStep', s.name)" (click)="removeStep(s)"><mat-icon>close</mat-icon></button>
+            }
+          </div>
+        }
+      </div>
+    } @else if (!adding()) {
+      <p class="gt__none">{{ i18n.t('mg.g.noSteps') }}</p>
+    }
+  </section>
+
+  @if (g.evidenceRequired || g.evidence?.length) {
+    <section class="gt__sec">
+      <h3>{{ i18n.t('mg.g.evidence') }}</h3>
+      @for (e of g.evidence; track e.id) {
+        <div class="gt__ev"><mat-icon class="gt__evic">{{ e.url ? 'link' : 'description' }}</mat-icon>
+          <span>
+            @if (e.url) { <a class="mono" [href]="e.url" target="_blank" rel="noopener noreferrer">{{ e.url }}</a> }
+            @else { <button type="button" class="gt__linkbtn" (click)="download(e.id, e.fileName)">{{ e.fileName }}</button> }
+            <span class="adm-hint gt__block">{{ i18n.tf('mg.g.evBy', (e.at | date: 'dd/MM/yyyy') ?? '') }}@if (e.uploadedByName) { · {{ e.uploadedByName }} }</span>
+          </span>
+          @if (g.canMark && g.state !== 'done') {
+            <button type="button" class="adm-icon-btn" [disabled]="busy()" [attr.aria-label]="i18n.t('mg.g.evRemove')" (click)="removeEvidence(e.id)"><mat-icon>close</mat-icon></button>
+          }
+        </div>
+      } @empty {
+        <div class="gt__ev"><mat-icon class="gt__evic">upload_file</mat-icon>
+          <span>{{ i18n.t('mg.g.evMissing') }}<span class="adm-hint gt__block">{{ i18n.t('mg.g.evMissingHint') }}</span></span>
+        </div>
+      }
+      @if (g.canMark && !closed()) {
+        <div class="gt__evadd">
+          <label class="adm-btn gt__file"><mat-icon>upload_file</mat-icon>{{ i18n.t('mg.g.evUpload') }}
+            <input type="file" accept="application/pdf,image/png,image/jpeg,image/webp" (change)="onFile($event)" /></label>
+          <input class="adm-input mono" name="evUrl" maxlength="500" [placeholder]="i18n.t('mg.g.evUrl')" [value]="evUrl()" (input)="evUrl.set(val($event))" />
+          <button type="button" class="adm-btn" [disabled]="busy() || !evUrl().trim()" (click)="addUrl()">{{ i18n.t('mg.g.evAddUrl') }}</button>
+        </div>
+      }
+    </section>
+  }
+
+  @if (error(); as e) { <p class="adm-error gt__pad" role="alert">{{ e }}</p> }
+
+  <div class="gt__actions gt__pad">
+    @if (g.canConfirm) {
+      <button type="button" class="adm-btn adm-btn--primary" [disabled]="busy()" (click)="confirm()"><mat-icon>verified</mat-icon>{{ i18n.t('mg.g.confirm') }}</button>
+    }
+    @if (closed() && g.canEdit) {
+      @if (reopening()) {
+        <input class="adm-input mono gt__date" type="date" name="reopenDate" [attr.aria-label]="i18n.t('mg.g.newDate')" [value]="newDate()" (input)="newDate.set(val($event))" />
+        <button type="button" class="adm-btn adm-btn--primary" [disabled]="busy() || !newDate()" (click)="reopen()">{{ i18n.t('mg.g.reopen') }}</button>
+        <button type="button" class="adm-btn" (click)="reopening.set(false)">{{ i18n.t('mg.cancel') }}</button>
+      } @else {
+        <button type="button" class="adm-btn adm-btn--primary" (click)="reopening.set(true)"><mat-icon>restart_alt</mat-icon>{{ i18n.t('mg.g.reopen') }}</button>
+      }
+    }
+    @if (!closed() && g.state !== 'confirm' && g.canMark) {
+      <button type="button" class="adm-btn" [disabled]="busy()" (click)="setRisk(!g.manualRisk)">{{ i18n.t(g.manualRisk ? 'mg.g.unrisk' : 'mg.g.markRisk') }}</button>
+      <button type="button" class="adm-btn" [disabled]="busy() || evidenceMissing()" [title]="evidenceMissing() ? i18n.t('mg.g.needEvidence') : ''" (click)="complete()">{{ i18n.t('mg.g.markDone') }}</button>
+    }
+    @if (g.canEdit) {
+      <button type="button" class="adm-btn" (click)="edit()"><mat-icon>edit</mat-icon>{{ i18n.t('mg.g.edit') }}</button>
+      @if (confirmDelete()) {
+        <span class="gt__confirm">{{ i18n.tf('mg.g.deleteConfirm', g.name) }}
+          <button type="button" class="adm-btn" (click)="confirmDelete.set(false)">{{ i18n.t('mg.cancel') }}</button>
+          <button type="button" class="adm-btn adm-btn--danger" [disabled]="busy()" (click)="remove()">{{ i18n.t('mg.g.delete') }}</button></span>
+      } @else {
+        <button type="button" class="adm-btn" (click)="confirmDelete.set(true)"><mat-icon>delete</mat-icon>{{ i18n.t('mg.g.delete') }}</button>
+      }
+    }
+  </div>
+
+  @if (g.events?.length) {
+    <section class="gt__sec">
+      <h3>{{ i18n.t('mg.g.history') }}</h3>
+      <div class="gt__tl">
+        @for (e of g.events; track $index) {
+          <div class="gt__evt"><span>{{ e.text }}@if (e.userName) { <span class="adm-hint"> · {{ e.userName }}</span> }</span><span class="adm-hint mono">{{ e.at | date: 'dd/MM HH:mm' }}</span></div>
+        }
+      </div>
+    </section>
+  }
+} @else if (error(); as e) {
+  <p class="adm-error gt__pad" role="alert">{{ e }}</p>
+} @else {
+  <p class="adm-empty">…</p>
+}

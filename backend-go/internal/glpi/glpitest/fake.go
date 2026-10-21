@@ -8,13 +8,15 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
 )
 
 // Server es el GLPI falso. Rows: itemtype → filas, tal como las devuelve
-// GLPI (con "is_deleted": 1 las de la papelera).
+// GLPI (con "is_deleted": 1 las de la papelera). También sub-ítems
+// ("Ticket/7/ITILFollowup"); uno sin filas responde vacío.
 type Server struct {
 	*httptest.Server
 	AppToken  string
@@ -25,6 +27,8 @@ type Server struct {
 	Fail   map[string]string // itemtype → código de error (403)
 	Killed int
 	Calls  []string
+	// Searches: las consultas recibidas en search/<itemtype>.
+	Searches []url.Values
 }
 
 // New arranca el GLPI falso. Ciérralo con Close.
@@ -94,12 +98,27 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusForbidden, code, "You don't have permission to perform this action.")
 		return
 	}
+	q := r.URL.Query()
+	if itemtype, ok := strings.CutPrefix(path, "search/"); ok {
+		s.search(w, itemtype, q)
+		return
+	}
+	parts := strings.Split(path, "/")
+	if len(parts) == 2 { // un ítem por su número
+		for _, row := range s.Rows[parts[0]] {
+			if fmt.Sprint(row["id"]) == parts[1] {
+				_ = json.NewEncoder(w).Encode(row)
+				return
+			}
+		}
+		writeErr(w, http.StatusNotFound, "ERROR_ITEM_NOT_FOUND", "Item not found")
+		return
+	}
 	rows, ok := s.Rows[path]
-	if !ok && strings.Contains(path, "/") {
+	if !ok && len(parts) != 3 && strings.Contains(path, "/") {
 		writeErr(w, http.StatusNotFound, "ERROR_RESOURCE_NOT_FOUND_NOR_COMMONDBTM", "resource not found")
 		return
 	}
-	q := r.URL.Query()
 	deleted := q.Get("is_deleted") == "true"
 	var list []map[string]any
 	for _, row := range rows {
@@ -138,4 +157,40 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusPartialContent)
 	}
 	_ = json.NewEncoder(w).Encode(page)
+}
+
+// search imita search/<itemtype>: devuelve el número (opción 2) de las filas
+// de ese itemtype, las de la papelera con is_deleted=1. Si la búsqueda pide
+// «cambiados después de» (criteria[1][value]), compara con date_mod; las
+// entidades no se filtran (la app las vuelve a revisar).
+func (s *Server) search(w http.ResponseWriter, itemtype string, q url.Values) {
+	s.Searches = append(s.Searches, q)
+	deleted := q.Get("is_deleted") == "1"
+	after := q.Get("criteria[1][value]")
+	data := []map[string]any{}
+	for _, row := range s.Rows[itemtype] {
+		if (fmt.Sprint(row["is_deleted"]) == "1") != deleted {
+			continue
+		}
+		if after != "" && fmt.Sprint(row["date_mod"]) <= after {
+			continue
+		}
+		data = append(data, map[string]any{"2": row["id"]})
+	}
+	total := len(data)
+	start, end := 0, 49
+	if rg := q.Get("range"); rg != "" {
+		a, b, _ := strings.Cut(rg, "-")
+		start, _ = strconv.Atoi(a)
+		end, _ = strconv.Atoi(b)
+	}
+	if start >= total {
+		data = []map[string]any{}
+	} else {
+		if end >= total {
+			end = total - 1
+		}
+		data = data[start : end+1]
+	}
+	_ = json.NewEncoder(w).Encode(map[string]any{"totalcount": total, "count": len(data), "data": data})
 }

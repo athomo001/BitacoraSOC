@@ -117,6 +117,8 @@ WHERE (sqlc.narg('ticket_type')::ticket_type IS NULL OR t.ticket_type = sqlc.nar
   AND (sqlc.narg('visible_areas')::uuid[] IS NULL OR t.area_id = ANY(sqlc.narg('visible_areas')::uuid[]) OR t.requested_area_id = ANY(sqlc.narg('visible_areas')::uuid[]))
   AND (sqlc.narg('queue_areas')::uuid[] IS NULL OR t.area_id = ANY(sqlc.narg('queue_areas')::uuid[]))
   AND (sqlc.narg('asked_areas')::uuid[] IS NULL OR (t.requested_area_id = ANY(sqlc.narg('asked_areas')::uuid[]) AND NOT t.area_id = ANY(sqlc.narg('asked_areas')::uuid[])))
+  AND (sqlc.narg('source')::text IS NULL OR t.source = sqlc.narg('source')::text)
+  AND NOT t.glpi_deleted
 ORDER BY (t.status IN ('resolved', 'closed', 'cancelled')), t.priority, t.updated_at DESC
 LIMIT sqlc.arg('page_size') OFFSET sqlc.arg('page_offset');
 
@@ -131,7 +133,9 @@ WHERE (sqlc.narg('ticket_type')::ticket_type IS NULL OR t.ticket_type = sqlc.nar
   AND (NOT sqlc.arg('open_only')::bool OR t.status NOT IN ('resolved', 'closed', 'cancelled'))
   AND (sqlc.narg('visible_areas')::uuid[] IS NULL OR t.area_id = ANY(sqlc.narg('visible_areas')::uuid[]) OR t.requested_area_id = ANY(sqlc.narg('visible_areas')::uuid[]))
   AND (sqlc.narg('queue_areas')::uuid[] IS NULL OR t.area_id = ANY(sqlc.narg('queue_areas')::uuid[]))
-  AND (sqlc.narg('asked_areas')::uuid[] IS NULL OR (t.requested_area_id = ANY(sqlc.narg('asked_areas')::uuid[]) AND NOT t.area_id = ANY(sqlc.narg('asked_areas')::uuid[])));
+  AND (sqlc.narg('asked_areas')::uuid[] IS NULL OR (t.requested_area_id = ANY(sqlc.narg('asked_areas')::uuid[]) AND NOT t.area_id = ANY(sqlc.narg('asked_areas')::uuid[])))
+  AND (sqlc.narg('source')::text IS NULL OR t.source = sqlc.narg('source')::text)
+  AND NOT t.glpi_deleted;
 
 -- name: TicketQueueSummary :one
 -- Resumen de la cola para la cabecera. "Vencido" = abierto, no en pausa y
@@ -143,7 +147,8 @@ SELECT
   count(*) FILTER (WHERE status = 'pending_vendor')::bigint AS paused_count,
   count(*) FILTER (WHERE resolved_at >= sqlc.arg('resolved_since')::timestamptz)::bigint AS resolved_today_count
 FROM tickets
-WHERE sqlc.narg('visible_areas')::uuid[] IS NULL OR area_id = ANY(sqlc.narg('visible_areas')::uuid[]) OR requested_area_id = ANY(sqlc.narg('visible_areas')::uuid[]);
+WHERE NOT glpi_deleted
+  AND (sqlc.narg('visible_areas')::uuid[] IS NULL OR area_id = ANY(sqlc.narg('visible_areas')::uuid[]) OR requested_area_id = ANY(sqlc.narg('visible_areas')::uuid[]));
 
 -- name: GetTicketView :one
 SELECT sqlc.embed(t), o.name AS client_name, tm.name AS team_name, u.username AS assignee_username,
@@ -168,9 +173,12 @@ FROM ticket_tasks tt JOIN users u ON u.id = tt.user_id
 WHERE tt.ticket_id = $1 ORDER BY tt.performed_at DESC;
 
 -- name: ListTicketEntriesWithAuthor :many
+-- En un ticket de GLPI también las entradas con su número de GLPI (spec/18).
 SELECT e.id, e.entry_type, e.content, e.created_at, u.username
 FROM entries e JOIN users u ON u.id = e.user_id
-WHERE e.ticket_id = $1 ORDER BY e.created_at DESC;
+WHERE e.ticket_id = sqlc.arg('ticket_id')::uuid
+   OR (sqlc.narg('glpi_ticket_id')::text IS NOT NULL AND e.glpi_ticket_id = sqlc.narg('glpi_ticket_id')::text)
+ORDER BY e.created_at DESC;
 
 -- name: MarkTicketResponded :exec
 -- Primera acción del equipo = cumple el SLA de respuesta (solo la primera cuenta).
@@ -314,8 +322,9 @@ RETURNING *;
 UPDATE tickets SET asset_id = sqlc.narg('asset_id'), territorial_unit_id = sqlc.narg('territorial_unit_id'), updated_at = now() WHERE id = $1;
 
 -- name: GetTicketAreas :one
--- Tickets por área (000039): de qué cola es y qué área lo pidió.
-SELECT area_id, requested_area_id FROM tickets WHERE id = $1;
+-- Tickets por área (000039): de qué cola es y qué área lo pidió; source:
+-- los de GLPI son solo para mirar (spec/18).
+SELECT area_id, requested_area_id, source FROM tickets WHERE id = $1;
 
 -- name: DeriveTicket :exec
 -- Derivar a otra área: entra a esa cola como nuevo, sin equipo ni responsable.

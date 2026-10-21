@@ -40,10 +40,11 @@ type Item struct {
 // Key identifica un ítem de GLPI («Computer:1042»).
 func Key(itemtype string, id int) string { return itemtype + ":" + strconv.Itoa(id) }
 
-// Entity es una entidad de GLPI.
+// Entity es una entidad de GLPI. ParentID: la entidad madre (-1 o 0 en la raíz).
 type Entity struct {
-	ID   int    `json:"id"`
-	Name string `json:"name"`
+	ID       int    `json:"id"`
+	Name     string `json:"name"`
+	ParentID int    `json:"parentId"`
 }
 
 // Snapshot es todo lo que se leyó de GLPI en una corrida.
@@ -74,7 +75,11 @@ func Entities(ctx context.Context, s *Session) ([]Entity, error) {
 		if name == "" {
 			name = Str(r["name"])
 		}
-		out = append(out, Entity{ID: Int(r["id"]), Name: name})
+		parent := -1
+		if id := Int(r["id"]); id != 0 {
+			parent = Int(r["entities_id"])
+		}
+		out = append(out, Entity{ID: Int(r["id"]), Name: name, ParentID: parent})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out, nil

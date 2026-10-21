@@ -622,3 +622,67 @@ button.td__entry:hover .td__entry-text {
 .td__entry-ref {
   margin: 4px 0 0;
 }
+
+/* Tickets traídos de GLPI (spec/18): se ven y se enlazan, se editan en GLPI. */
+.td__glpi {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 5px;
+  border: 1px solid var(--status-system);
+  border-radius: 4px;
+  background: var(--status-system-bg);
+  color: var(--status-system);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.td__glpi-open {
+  margin-left: auto;
+  text-decoration: none;
+}
+
+.td__glpi-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--status-system);
+  border-radius: 6px;
+  background: var(--status-system-bg);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.td__glpi-banner mat-icon {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  color: var(--status-system);
+  font-size: 16px;
+}
+
+.td__desc,
+.td__plain {
+  margin: 0;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.td__desc {
+  padding: 8px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  background: var(--bg-app);
+  font-size: 12px;
+}
+
+.td__comment--glpi-private {
+  border-left-color: var(--status-warning);
+  background: var(--status-warning-bg);
+}
+
+.td__comment--solution {
+  border-left-color: var(--status-ok);
+}

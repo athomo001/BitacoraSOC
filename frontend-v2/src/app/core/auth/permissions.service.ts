@@ -8,6 +8,8 @@ interface Capabilities {
   capabilities: string[];
   /** Todas las áreas de sus grupos (cualquier perfil). */
   areas?: string[];
+  /** Perfiles de sus grupos (operativo, resolutor, gestion). */
+  profiles?: string[];
 }
 
 /**
@@ -39,6 +41,8 @@ export class PermissionsService {
   readonly ownAreas = computed(() => (this._caps()?.areas ?? []).filter((a) => a !== 'soc' && a !== 'noc'));
   /** Turnos y Escalamiento: Operativo, o gente de un área propia (9e). */
   readonly areaOps = computed(() => this.operational() || this.ownAreas().length > 0);
+  /** Gestión CSM (spec/16 §4.4): el perfil Gestión, las jefaturas y el admin (pregunta 1 del dueño). */
+  readonly management = computed(() => this.isAdmin() || !!this._caps()?.profiles?.includes('gestion') || !!this._caps()?.capabilities.includes('area:lead'));
   readonly canWriteDirectory = this.can('directory:write');
   readonly canDeleteDirectory = this.can('directory:delete');
 

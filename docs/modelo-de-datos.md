@@ -2,7 +2,7 @@
 
 > Generado por `backend-go/cmd/er-docs` desde `backend-go/sql/schema/0001_init_schema.sql`, el esquema que usa sqlc, con todas las migraciones aplicadas. **No se edita a mano**: si cambia el esquema, se regenera con `go run ./cmd/er-docs` desde `backend-go/`.
 
-103 tablas en PostgreSQL, agrupadas en 15 dominios. Notación pata de gallo: `||` uno, `|o` / `o|` cero o uno, `o{` cero o muchos. La etiqueta de cada línea es la columna que hace la referencia.
+112 tablas en PostgreSQL, agrupadas en 16 dominios. Notación pata de gallo: `||` uno, `|o` / `o|` cero o uno, `o{` cero o muchos. La etiqueta de cada línea es la columna que hace la referencia.
 
 - Cada entidad muestra todas sus columnas salvo `created_at` y `updated_at`. `PK` clave primaria, `FK` referencia a otra tabla, `UK` valor único.
 - Las tablas de otros dominios aparecen como cajas sin columnas: son la misma tabla, dibujada donde se une.
@@ -14,20 +14,21 @@ Correspondencia con el legacy (MongoDB): [modelo-er-legacy-2.0.md](modelo-er-leg
 ## Índice
 
 1. [Usuarios, acceso y permisos](#1-usuarios-acceso-y-permisos) — 9 tablas
-2. [Territorio, organizaciones y activos](#2-territorio-organizaciones-y-activos) — 14 tablas
+2. [Territorio, organizaciones y activos](#2-territorio-organizaciones-y-activos) — 15 tablas
 3. [Directorio de contactos](#3-directorio-de-contactos) — 2 tablas
 4. [Ticketera](#4-ticketera) — 8 tablas
 5. [Equipos y escalamiento](#5-equipos-y-escalamiento) — 15 tablas
 6. [Turnos, guardias y dotación](#6-turnos-guardias-y-dotación) — 11 tablas
 7. [Agenda](#7-agenda) — 8 tablas
-8. [Notificaciones y avisos con acuse](#8-notificaciones-y-avisos-con-acuse) — 6 tablas
-9. [Checklists](#9-checklists) — 4 tablas
-10. [Bitácora](#10-bitácora) — 5 tablas
-11. [Reportes y avisos por cliente](#11-reportes-y-avisos-por-cliente) — 5 tablas
-12. [Auditoría, notas y alertas de sala](#12-auditoría-notas-y-alertas-de-sala) — 4 tablas
-13. [Configuración y respaldos](#13-configuración-y-respaldos) — 6 tablas
-14. [Complementos](#14-complementos) — 4 tablas
-15. [Ingesta de alertas (después del corte)](#15-ingesta-de-alertas-después-del-corte) — 2 tablas
+8. [Gestión CSM](#8-gestión-csm) — 8 tablas
+9. [Notificaciones y avisos con acuse](#9-notificaciones-y-avisos-con-acuse) — 6 tablas
+10. [Checklists](#10-checklists) — 4 tablas
+11. [Bitácora](#11-bitácora) — 5 tablas
+12. [Reportes y avisos por cliente](#12-reportes-y-avisos-por-cliente) — 5 tablas
+13. [Auditoría, notas y alertas de sala](#13-auditoría-notas-y-alertas-de-sala) — 4 tablas
+14. [Configuración y respaldos](#14-configuración-y-respaldos) — 6 tablas
+15. [Complementos](#15-complementos) — 4 tablas
+16. [Ingesta de alertas (después del corte)](#16-ingesta-de-alertas-después-del-corte) — 2 tablas
 
 ---
 
@@ -163,6 +164,10 @@ erDiagram
         boolean active
         uuid via_organization_id FK
         timestamptz archived_at
+        uuid csm_user_id FK
+        date service_start_date
+        date renewal_date
+        int sla_target
     }
     SERVICES {
         uuid id PK
@@ -276,6 +281,14 @@ erDiagram
         timestamptz last_test_at
         boolean last_test_ok
         jsonb last_test
+        boolean tickets_enabled
+        text tickets_every
+        int tickets_since_days
+        text tickets_cursor
+        jsonb ticket_entities
+        jsonb group_areas
+        timestamptz tickets_last_auto_at
+        date tickets_failure_notified_on
     }
     GLPI_IMPORT_RUNS {
         uuid id PK
@@ -291,6 +304,20 @@ erDiagram
         int skipped
         int unchanged
         int held_back
+        text message
+    }
+    GLPI_TICKET_RUNS {
+        uuid id PK
+        text trigger
+        uuid user_id FK
+        boolean first_load
+        timestamptz started_at
+        timestamptz finished_at
+        boolean ok
+        int created
+        int updated
+        int skipped
+        int deleted
         text message
     }
 
@@ -317,6 +344,8 @@ erDiagram
     USERS |o--o{ ASSET_EVENTS : "user_id"
     USERS |o--o{ ASSET_RESPONSIBLES : "user_id"
     USERS |o--o{ GLPI_IMPORT_RUNS : "user_id"
+    USERS |o--o{ GLPI_TICKET_RUNS : "user_id"
+    USERS |o--o{ ORGANIZATIONS : "csm_user_id"
 ```
 
 ---
@@ -408,6 +437,15 @@ erDiagram
         uuid territorial_unit_id FK
         uuid area_id FK
         uuid requested_area_id FK
+        text source
+        int glpi_id
+        text glpi_date_mod
+        timestamptz glpi_synced_at
+        boolean glpi_deleted
+        boolean glpi_linked_only
+        int glpi_group_id
+        text glpi_group_name
+        text glpi_technician
     }
     TICKET_COMMENTS {
         uuid id PK
@@ -417,6 +455,9 @@ erDiagram
         text content
         boolean is_public
         text origin
+        int glpi_id
+        text glpi_kind
+        int glpi_time_seconds
     }
     TICKET_TASKS {
         uuid id PK
@@ -934,6 +975,10 @@ erDiagram
         int flow_position
         boolean flow_after
         int flow_days
+        text action_kind
+        boolean is_key
+        uuid ticket_id FK
+        uuid playbook_application_id FK
     }
     AGENDA_OCCURRENCES {
         uuid id PK
@@ -1003,8 +1048,10 @@ erDiagram
     LEVELS |o--o{ AGENDA_TASKS : "assignee_level_id"
     ORGANIZATIONS |o--o{ AGENDA_FLOWS : "organization_id"
     ORGANIZATIONS |o--o{ AGENDA_TASKS : "organization_id"
+    PLAYBOOK_APPLICATIONS |o--o{ AGENDA_TASKS : "playbook_application_id"
     REPORT_HISTORY |o--o{ AGENDA_OCCURRENCES : "report_history_id"
     TEAMS |o--o{ AGENDA_TASKS : "assignee_team_id"
+    TICKETS |o--o{ AGENDA_TASKS : "ticket_id"
     USERS |o--o{ AGENDA_OCCURRENCES : "absent_user_id"
     USERS |o--o{ AGENDA_OCCURRENCES : "user_id"
     USERS |o--o{ AGENDA_TASKS : "assignee_user_id"
@@ -1013,7 +1060,118 @@ erDiagram
 
 ---
 
-## 8. Notificaciones y avisos con acuse
+## 8. Gestión CSM
+
+Metas de un cliente, un área o una persona, con hitos (a mano o enlazados a un ticket o a una tarea, que se marcan solos), su historial y el certificado; las plantillas de acciones con cada vez que se aplicaron a un cliente, y el objetivo del SLA. Las acciones son tareas de la Agenda con `action_kind`, `is_key` y `ticket_id`; la cartera (CSM a cargo, inicio del servicio, renovación) vive en `organizations`.
+
+```mermaid
+erDiagram
+    GOALS {
+        uuid id PK
+        text name
+        text scope
+        uuid client_id FK
+        uuid area_id FK
+        uuid person_user_id FK
+        uuid owner_user_id FK
+        text kind
+        text bonus_rank
+        date due_date
+        int estimate_biz_days
+        boolean evidence_required
+        boolean manual_risk
+        timestamptz completed_at
+        uuid completed_by FK
+        timestamptz confirmed_at
+        uuid confirmed_by FK
+        uuid created_by FK
+    }
+    GOAL_MILESTONES {
+        uuid id PK
+        uuid goal_id FK
+        int position
+        text name
+        uuid ticket_id FK
+        uuid agenda_task_id FK
+        timestamptz done_at
+        uuid done_by FK
+        text done_by_name
+        text done_source
+    }
+    GOAL_EVENTS {
+        uuid id PK
+        uuid goal_id FK
+        text text
+        uuid user_id FK
+    }
+    GOAL_EVIDENCE {
+        uuid id PK
+        uuid goal_id FK
+        text file_name
+        text mime_type
+        int size_bytes
+        bytea file_data
+        text url
+        uuid uploaded_by FK
+    }
+    PLAYBOOKS {
+        uuid id PK
+        text name
+        text description
+        text anchor
+        text system_key UK
+        boolean active
+        uuid created_by FK
+    }
+    PLAYBOOK_ITEMS {
+        uuid id PK
+        uuid playbook_id FK
+        int position
+        text name
+        text action_kind
+        boolean is_key
+        text assignee
+        uuid area_id FK
+        uuid level_id FK
+        uuid team_id FK
+        int offset_days
+        text offset_unit
+    }
+    PLAYBOOK_APPLICATIONS {
+        uuid id PK
+        uuid playbook_id FK
+        uuid client_id FK
+        date anchor_date
+        uuid applied_by FK
+        timestamptz applied_at
+    }
+    MANAGEMENT_SETTINGS {
+        boolean id PK
+        int sla_target
+        date started_on
+    }
+
+    AGENDA_TASKS |o--o{ GOAL_MILESTONES : "agenda_task_id"
+    AREAS |o--o{ GOALS : "area_id"
+    AREAS |o--o{ PLAYBOOK_ITEMS : "area_id"
+    GOALS ||--o{ GOAL_EVENTS : "goal_id"
+    GOALS ||--o{ GOAL_EVIDENCE : "goal_id"
+    GOALS ||--o{ GOAL_MILESTONES : "goal_id"
+    LEVELS |o--o{ PLAYBOOK_ITEMS : "level_id"
+    ORGANIZATIONS |o--o{ GOALS : "client_id"
+    ORGANIZATIONS ||--o{ PLAYBOOK_APPLICATIONS : "client_id"
+    PLAYBOOKS ||--o{ PLAYBOOK_APPLICATIONS : "playbook_id"
+    PLAYBOOKS ||--o{ PLAYBOOK_ITEMS : "playbook_id"
+    TEAMS |o--o{ PLAYBOOK_ITEMS : "team_id"
+    TICKETS |o--o{ GOAL_MILESTONES : "ticket_id"
+    USERS |o--o{ GOALS : "owner_user_id"
+    USERS |o--o{ GOALS : "person_user_id"
+    USERS |o--o{ GOAL_EVENTS : "user_id"
+```
+
+---
+
+## 9. Notificaciones y avisos con acuse
 
 La campana de cada persona, sus preferencias, lo que fija el admin, los avisos de la Agenda ya enviados y los avisos con acuse de lectura con quién los leyó.
 
@@ -1077,7 +1235,7 @@ erDiagram
 
 ---
 
-## 9. Checklists
+## 10. Checklists
 
 Plantillas de checklist de inicio y cierre de turno y sus ejecuciones.
 
@@ -1129,7 +1287,7 @@ erDiagram
 
 ---
 
-## 10. Bitácora
+## 11. Bitácora
 
 Entradas, comentarios, adjuntos, borradores y eventos del sistema.
 
@@ -1199,7 +1357,7 @@ erDiagram
 
 ---
 
-## 11. Reportes y avisos por cliente
+## 12. Reportes y avisos por cliente
 
 Historial de reportes enviados, tipos de operación, eventos del informe y las reglas de aviso por cliente con su acuse.
 
@@ -1270,7 +1428,7 @@ erDiagram
 
 ---
 
-## 12. Auditoría, notas y alertas de sala
+## 13. Auditoría, notas y alertas de sala
 
 Registro de auditoría (solo se agrega), notas del admin y personales, y alertas programadas en pantalla.
 
@@ -1334,7 +1492,7 @@ erDiagram
 
 ---
 
-## 13. Configuración y respaldos
+## 14. Configuración y respaldos
 
 Configuración única de la instalación, correo, marca, funcionalidades activables y respaldos.
 
@@ -1452,7 +1610,7 @@ erDiagram
 
 ---
 
-## 14. Complementos
+## 15. Complementos
 
 Complementos instalados, sus archivos y su almacenamiento.
 
@@ -1514,7 +1672,7 @@ erDiagram
 
 ---
 
-## 15. Ingesta de alertas (después del corte)
+## 16. Ingesta de alertas (después del corte)
 
 Tablas creadas para la ingesta de alertas del backlog posterior al corte; todavía sin uso.
 

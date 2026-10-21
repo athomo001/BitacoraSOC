@@ -218,12 +218,13 @@ func (q *Queries) ListDueTicketMails(ctx context.Context, now pgtype.Timestamptz
 }
 
 const listOpenTicketsForSLAMail = `-- name: ListOpenTicketsForSLAMail :many
-SELECT id, ticket_number, ticket_type, scope, client_id, asset_id, service_id, assigned_team_id, assigned_user_id, assigned_contact_id, status, impact, urgency, priority, title, description, sla_response_due_at, sla_resolution_due_at, sla_on_hold_since, sla_paused_seconds, first_responded_at, resolved_at, closed_at, reopened_count, reopened_at, public_tracking_token, public_tracking_enabled, public_tracking_pin, created_by, created_at, updated_at, parent_id, merged_into_id, affects_client, notify_to, notify_cc, sla_response_breach_notified_at, sla_resolution_warn_notified_at, sla_resolution_breach_notified_at, territorial_unit_id, area_id, requested_area_id FROM tickets
-WHERE status NOT IN ('resolved', 'closed', 'cancelled') AND merged_into_id IS NULL
+SELECT id, ticket_number, ticket_type, scope, client_id, asset_id, service_id, assigned_team_id, assigned_user_id, assigned_contact_id, status, impact, urgency, priority, title, description, sla_response_due_at, sla_resolution_due_at, sla_on_hold_since, sla_paused_seconds, first_responded_at, resolved_at, closed_at, reopened_count, reopened_at, public_tracking_token, public_tracking_enabled, public_tracking_pin, created_by, created_at, updated_at, parent_id, merged_into_id, affects_client, notify_to, notify_cc, sla_response_breach_notified_at, sla_resolution_warn_notified_at, sla_resolution_breach_notified_at, territorial_unit_id, area_id, requested_area_id, source, glpi_id, glpi_date_mod, glpi_synced_at, glpi_deleted, glpi_linked_only, glpi_group_id, glpi_group_name, glpi_technician FROM tickets
+WHERE status NOT IN ('resolved', 'closed', 'cancelled') AND merged_into_id IS NULL AND source = 'app'
   AND (sla_response_breach_notified_at IS NULL OR sla_resolution_warn_notified_at IS NULL OR sla_resolution_breach_notified_at IS NULL)
 `
 
-// Tickets abiertos a los que todavía les falta algún aviso de SLA.
+// Tickets abiertos a los que todavía les falta algún aviso de SLA. Los de
+// GLPI no: sus avisos los manda GLPI (spec/18).
 func (q *Queries) ListOpenTicketsForSLAMail(ctx context.Context) ([]Ticket, error) {
 	rows, err := q.db.Query(ctx, listOpenTicketsForSLAMail)
 	if err != nil {
@@ -276,6 +277,15 @@ func (q *Queries) ListOpenTicketsForSLAMail(ctx context.Context) ([]Ticket, erro
 			&i.TerritorialUnitID,
 			&i.AreaID,
 			&i.RequestedAreaID,
+			&i.Source,
+			&i.GlpiID,
+			&i.GlpiDateMod,
+			&i.GlpiSyncedAt,
+			&i.GlpiDeleted,
+			&i.GlpiLinkedOnly,
+			&i.GlpiGroupID,
+			&i.GlpiGroupName,
+			&i.GlpiTechnician,
 		); err != nil {
 			return nil, err
 		}
@@ -477,7 +487,7 @@ UPDATE tickets SET
   notify_cc = CASE WHEN $2::bool THEN $4::text[] ELSE notify_cc END,
   updated_at = now()
 WHERE id = $5
-RETURNING id, ticket_number, ticket_type, scope, client_id, asset_id, service_id, assigned_team_id, assigned_user_id, assigned_contact_id, status, impact, urgency, priority, title, description, sla_response_due_at, sla_resolution_due_at, sla_on_hold_since, sla_paused_seconds, first_responded_at, resolved_at, closed_at, reopened_count, reopened_at, public_tracking_token, public_tracking_enabled, public_tracking_pin, created_by, created_at, updated_at, parent_id, merged_into_id, affects_client, notify_to, notify_cc, sla_response_breach_notified_at, sla_resolution_warn_notified_at, sla_resolution_breach_notified_at, territorial_unit_id, area_id, requested_area_id
+RETURNING id, ticket_number, ticket_type, scope, client_id, asset_id, service_id, assigned_team_id, assigned_user_id, assigned_contact_id, status, impact, urgency, priority, title, description, sla_response_due_at, sla_resolution_due_at, sla_on_hold_since, sla_paused_seconds, first_responded_at, resolved_at, closed_at, reopened_count, reopened_at, public_tracking_token, public_tracking_enabled, public_tracking_pin, created_by, created_at, updated_at, parent_id, merged_into_id, affects_client, notify_to, notify_cc, sla_response_breach_notified_at, sla_resolution_warn_notified_at, sla_resolution_breach_notified_at, territorial_unit_id, area_id, requested_area_id, source, glpi_id, glpi_date_mod, glpi_synced_at, glpi_deleted, glpi_linked_only, glpi_group_id, glpi_group_name, glpi_technician
 `
 
 type SetTicketMailRecipientsParams struct {
@@ -542,6 +552,15 @@ func (q *Queries) SetTicketMailRecipients(ctx context.Context, arg SetTicketMail
 		&i.TerritorialUnitID,
 		&i.AreaID,
 		&i.RequestedAreaID,
+		&i.Source,
+		&i.GlpiID,
+		&i.GlpiDateMod,
+		&i.GlpiSyncedAt,
+		&i.GlpiDeleted,
+		&i.GlpiLinkedOnly,
+		&i.GlpiGroupID,
+		&i.GlpiGroupName,
+		&i.GlpiTechnician,
 	)
 	return i, err
 }

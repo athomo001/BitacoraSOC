@@ -176,6 +176,28 @@
   font-weight: 600;
 }
 
+/* Ticket traído de GLPI (spec/18): se ve y se enlaza, se edita en GLPI. */
+.tk__glpi {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  padding: 0 5px;
+  border: 1px solid var(--status-system);
+  border-radius: 4px;
+  background: var(--status-system-bg);
+  color: var(--status-system);
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  vertical-align: 1px;
+}
+
+.tk__label {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
 .tk__prio {
   justify-content: center;
   padding-inline: 0;

@@ -8,6 +8,7 @@ import { Ticket, TicketDetail } from '../../core/tickets/tickets.service';
 import { SetupService } from '../../core/setup/setup.service';
 import { PermissionsService } from '../../core/auth/permissions.service';
 import { provideRouter } from '@angular/router';
+import { SystemFeaturesService } from '../../core/system-features/system-features.service';
 
 const clock = (state: string, percent: number, remainingSeconds: number) => ({ state, percent, remainingSeconds, elapsedSeconds: 0, dueAt: '2026-09-27T07:15:00Z' });
 
@@ -18,7 +19,7 @@ function ticket(overrides: Partial<Ticket>): Ticket {
     title: 'Corte FO Nodo Puerto Montt', description: 'x', slaPausedSeconds: 0, reopenedCount: 0, onHoldSince: null,
     sla: { resolution: clock('on_time', 30, 10_500) as Ticket['sla']['resolution'] }, allowedTransitions: ['assigned', 'cancelled'],
     createdAt: '', updatedAt: '', childCount: 0,
-    areaId: 'a-soc', areaCode: 'soc', areaName: 'SOC', requestedAreaId: 'a-soc', requestedAreaCode: 'soc', requestedAreaName: 'SOC', canWork: true, ...overrides,
+    areaId: 'a-soc', areaCode: 'soc', areaName: 'SOC', requestedAreaId: 'a-soc', requestedAreaCode: 'soc', requestedAreaName: 'SOC', canWork: true, source: 'app', ...overrides,
   };
 }
 
@@ -251,6 +252,55 @@ describe('TicketsComponent', () => {
       '/api/tickets/t1/images/a',
       '/api/tickets/t1/images/b',
     ]);
+  });
+
+  it('sin la sincronización con GLPI no aparece el filtro de origen', async () => {
+    const { el } = await render();
+    expect(el.querySelector('.tk__filters')?.textContent).not.toContain('Origen');
+  });
+
+  it('GLPI (spec/18): filtra por origen y el ticket de GLPI se ve solo para mirar', async () => {
+    TestBed.inject(SystemFeaturesService).apply({ code: 'glpi_sync', isEnabled: true });
+    const { fixture, el } = await render();
+    const glpiSeg = [...el.querySelectorAll<HTMLButtonElement>('.tk__filters .seg')].find((b) => b.textContent?.trim() === 'GLPI')!;
+    glpiSeg.click();
+    const req = httpMock.expectOne((r) => r.url === '/api/tickets');
+    expect(req.request.params.get('source')).toBe('glpi');
+    const glpiTicket = ticket({
+      id: 'g1', ticketNumber: 'GLPI-48213', source: 'glpi', canWork: false, allowedTransitions: [], description: 'El enlace se cae.\nLentitud en caja.',
+      glpi: { id: 48213, url: 'https://glpi.test/front/ticket.form.php?id=48213', syncedAt: '2026-10-20T12:00:00Z', deleted: false, linkedOnly: false, group: 'Redes', technician: 'Diego Muñoz' },
+    });
+    req.flush({ data: { items: [glpiTicket], total: 1, summary: LIST.summary } });
+    await settle();
+    fixture.detectChanges();
+    expect(el.querySelector('.tk__row:not(.tk__row--head) .tk__glpi')?.textContent).toBe('GLPI');
+    (el.querySelector('.tk__row:not(.tk__row--head)') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    httpMock.expectOne('/api/tickets/g1').flush({
+      data: {
+        ...detail(glpiTicket), publicTrackingToken: null,
+        comments: [
+          { id: 'c1', authorName: 'Diego Muñoz', content: 'El proveedor confirma falla.', isPublic: false, createdAt: '2026-10-20T12:15:00Z', images: [], origin: '', glpiKind: 'followup' },
+          { id: 'c2', authorName: 'Diego Muñoz', content: 'Pruebas de latencia.', isPublic: true, createdAt: '2026-10-20T11:40:00Z', images: [], origin: '', glpiKind: 'task', glpiTimeSeconds: 2700 },
+        ],
+      },
+    });
+    await settle();
+    fixture.detectChanges();
+    expect(el.querySelector('.td__glpi-open')?.getAttribute('href')).toBe('https://glpi.test/front/ticket.form.php?id=48213');
+    expect(el.querySelector('.td__glpi-banner')?.textContent).toContain('Este ticket vive en GLPI y se edita allá.');
+    expect(el.querySelector('.td__desc')?.textContent).toContain('Lentitud en caja.');
+    expect(el.querySelector('.td__facts')?.textContent).toContain('Diego Muñoz');
+    expect(el.querySelector('.td__facts')?.textContent).toContain('grupo «Redes»');
+    const comments = el.querySelectorAll('.td__comment');
+    expect(comments[0].classList).toContain('td__comment--glpi-private');
+    expect(comments[0].textContent).toContain('Nota interna de GLPI');
+    expect(comments[1].textContent).toContain('Tarea');
+    // Ni comentar, ni correos, ni enlace público, ni acciones de estado.
+    expect(el.querySelector('.td__composer')).toBeNull();
+    expect(el.querySelector('app-ticket-mail')).toBeNull();
+    expect(el.querySelector('.td__public')).toBeNull();
+    expect(el.querySelector('.td__actions')?.textContent).not.toContain('Lo pidió tu área');
   });
 
   it('cambiar el filtro vuelve a pedir la cola con el tipo', async () => {

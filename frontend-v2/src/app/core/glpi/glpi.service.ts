@@ -104,6 +104,54 @@ export interface GlpiRun {
   message: string;
 }
 
+export type GlpiTicketsEvery = 'off' | '5m' | '15m';
+
+/** Tickets de GLPI en la Ticketera (10d.1, spec/18): qué se trae y cada cuánto. */
+export interface GlpiTicketsConfig {
+  enabled: boolean;
+  every: GlpiTicketsEvery;
+  sinceDays: number;
+  /** Entidades marcadas («Traer»), con sus hijas. */
+  entities: number[];
+  /** Entidad → cliente: el mismo mapeo del inventario. */
+  clients: Record<string, string>;
+  /** Grupo técnico de GLPI → área de la app; sin área no se trae. */
+  groupAreas: Record<string, string>;
+  firstLoadPending: boolean;
+  nextAutoAt?: string;
+  connected: boolean;
+}
+
+export interface GlpiTicketsConfigInput {
+  enabled: boolean;
+  every: GlpiTicketsEvery;
+  sinceDays: number;
+  entities: number[];
+  clients: Record<string, string | null>;
+  groupAreas: Record<string, string | null>;
+}
+
+export interface GlpiTicketsCatalog {
+  entities: { id: number; name: string; parentId: number }[];
+  groups: { id: number; name: string; openCount: number }[];
+}
+
+export interface GlpiTicketRun {
+  id: string;
+  trigger: 'manual' | 'auto';
+  userName?: string;
+  firstLoad: boolean;
+  startedAt: string;
+  finishedAt?: string;
+  running: boolean;
+  ok: boolean;
+  created: number;
+  updated: number;
+  skipped: number;
+  deleted: number;
+  message: string;
+}
+
 /** Importación de equipos desde GLPI (spec/16 §5.1, 9.6): Administración → GLPI. */
 @Injectable({ providedIn: 'root' })
 export class GlpiService {
@@ -139,5 +187,26 @@ export class GlpiService {
 
   async runs(): Promise<GlpiRun[]> {
     return (await firstValueFrom(this.http.get<ApiEnvelope<GlpiRun[]>>('/api/glpi/runs'))).data;
+  }
+
+  async ticketsConfig(): Promise<GlpiTicketsConfig> {
+    return (await firstValueFrom(this.http.get<ApiEnvelope<GlpiTicketsConfig>>('/api/glpi/tickets/config'))).data;
+  }
+
+  async saveTicketsConfig(input: GlpiTicketsConfigInput): Promise<GlpiTicketsConfig> {
+    return (await firstValueFrom(this.http.put<ApiEnvelope<GlpiTicketsConfig>>('/api/glpi/tickets/config', input))).data;
+  }
+
+  async ticketsCatalog(): Promise<GlpiTicketsCatalog> {
+    return (await firstValueFrom(this.http.get<ApiEnvelope<GlpiTicketsCatalog>>('/api/glpi/tickets/catalog'))).data;
+  }
+
+  /** «Sincronizar ahora»: la corrida sigue en segundo plano; se mira en ticketRuns(). */
+  async syncTickets(): Promise<void> {
+    await firstValueFrom(this.http.post('/api/glpi/tickets/sync', {}));
+  }
+
+  async ticketRuns(): Promise<GlpiTicketRun[]> {
+    return (await firstValueFrom(this.http.get<ApiEnvelope<GlpiTicketRun[]>>('/api/glpi/tickets/runs'))).data;
   }
 }

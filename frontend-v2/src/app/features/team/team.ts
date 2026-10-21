@@ -10,6 +10,7 @@ import { AdminGuardsComponent } from '../admin/admin-guards';
 import { AdminEscalationComponent } from '../admin/admin-escalation';
 import { TeamGuardsComponent } from './team-guards';
 import { TeamMonthlyComponent } from './team-monthly';
+import { PersonGoalsComponent } from '../management/person-goals';
 
 import '../../core/i18n/packs/team';
 
@@ -33,7 +34,7 @@ const CONDITION_STYLE: Record<TeamCondition, { icon: string; tone: string }> = {
 @Component({
   selector: 'app-team',
   standalone: true,
-  imports: [FormsModule, RouterLink, MatIconModule, AdminGuardsComponent, AdminEscalationComponent, TeamGuardsComponent, TeamMonthlyComponent],
+  imports: [FormsModule, RouterLink, MatIconModule, AdminGuardsComponent, AdminEscalationComponent, TeamGuardsComponent, TeamMonthlyComponent, PersonGoalsComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <header class="tm__head no-print">
@@ -201,6 +202,8 @@ const CONDITION_STYLE: Record<TeamCondition, { icon: string; tone: string }> = {
                   <p class="adm-small adm-muted">{{ i18n.t('team.noTickets') }}</p>
                 }
               </div>
+              <!-- Metas de la persona (Gestión CSM, 9.4): las pone y confirma la jefatura. -->
+              <app-person-goals [personId]="p.id" />
               @if (p.editable) {
                 @if (confirming()) {
                   <div class="tm__confirm" role="alert">

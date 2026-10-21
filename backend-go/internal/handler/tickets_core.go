@@ -219,6 +219,9 @@ func (h *TicketsHandler) AddEntryCommentToTicket(ctx context.Context, ticketID u
 	if err != nil {
 		return err
 	}
+	if isGlpiTicket(ticket) {
+		return nil // GLPI manda en sus tickets: el comentario queda en la entrada
+	}
 	if _, err = h.addTicketComment(ctx, h.Queries, ticket, user, content, isPublic); err != nil {
 		return err
 	}

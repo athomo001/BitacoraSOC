@@ -6,7 +6,8 @@ import { I18nService } from '../../core/i18n/i18n.service';
 import { MessageKey } from '../../core/i18n/messages';
 import { problemDetail } from '../../core/http-error';
 import { SseService } from '../../core/sse/sse.service';
-import { QueueSummary, SlaClock, Ticket, TicketFilters, TicketQueue, TicketScope, TicketType, TicketsService } from '../../core/tickets/tickets.service';
+import { QueueSummary, SlaClock, Ticket, TicketFilters, TicketQueue, TicketScope, TicketSource, TicketType, TicketsService } from '../../core/tickets/tickets.service';
+import { SystemFeaturesService } from '../../core/system-features/system-features.service';
 import { CLOCK_TONE, PRIORITY_SHORT, PRIORITY_TONE, STATUS_TONE, clockText } from '../../core/tickets/ticket-view';
 import { TicketDetailComponent } from './ticket-detail';
 
@@ -32,6 +33,7 @@ export class TicketsComponent implements OnInit {
   private readonly injector = inject(Injector);
   private readonly destroyRef = inject(DestroyRef);
   private readonly route = inject(ActivatedRoute, { optional: true });
+  private readonly features = inject(SystemFeaturesService);
 
   protected readonly tickets = signal<Ticket[]>([]);
   protected readonly summary = signal<QueueSummary>({ open: 0, breached: 0, paused: 0, resolvedToday: 0 });
@@ -56,6 +58,9 @@ export class TicketsComponent implements OnInit {
   protected readonly error = signal<string | null>(null);
   protected readonly typeFilter = signal<TicketType | null>(null);
   protected readonly openOnly = signal(false);
+  /** Origen (spec/18): solo con la sincronización con GLPI encendida. */
+  protected readonly glpiOn = computed(() => this.features.isEnabled('glpi_sync'));
+  protected readonly sourceFilter = signal<TicketSource | null>(null);
   /** Tickets por área (9.1): qué cola se mira y las áreas del usuario. */
   protected readonly scope = signal<TicketScope | null>(null);
   protected readonly queue = signal<TicketQueue | null>(null);
@@ -124,7 +129,10 @@ export class TicketsComponent implements OnInit {
 
   protected async load(): Promise<void> {
     this.error.set(null);
-    const filters: TicketFilters = { ticketType: this.typeFilter() ?? undefined, openOnly: this.openOnly(), q: this.query, queue: this.queue() ?? undefined };
+    const filters: TicketFilters = {
+      ticketType: this.typeFilter() ?? undefined, openOnly: this.openOnly(), q: this.query, queue: this.queue() ?? undefined,
+      source: this.glpiOn() ? (this.sourceFilter() ?? undefined) : undefined,
+    };
     try {
       const result = await this.api.list(filters);
       this.tickets.set(result.items);
@@ -139,6 +147,11 @@ export class TicketsComponent implements OnInit {
 
   protected setType(type: TicketType | null): void {
     this.typeFilter.set(type);
+    void this.load();
+  }
+
+  protected setSource(source: TicketSource | null): void {
+    this.sourceFilter.set(source);
     void this.load();
   }
 

@@ -166,7 +166,7 @@ func run(logger *slog.Logger) error {
 	directoryHandler := &handler.DirectoryHandler{Pool: pool, Queries: queries, Crypto: cryptoBox, AuditLog: auditLog}
 	smtpConfigHandler := &handler.SMTPConfigHandler{Queries: queries, Crypto: cryptoBox, AuditLog: auditLog}
 	// Importación de equipos desde GLPI (spec/16 §5.1, 9.6), detrás de glpi_sync.
-	glpiHandler := &handler.GlpiHandler{Queries: queries, Crypto: cryptoBox, AuditLog: auditLog, Notify: notifier, Inventory: inventoryHandler}
+	glpiHandler := &handler.GlpiHandler{Queries: queries, Crypto: cryptoBox, AuditLog: auditLog, Notify: notifier, Inventory: inventoryHandler, Hub: hub}
 	escalationHandler := &handler.EscalationHandler{DB: pool, Queries: queries, Crypto: cryptoBox, AuditLog: auditLog, Modules: &repository.ModuleAccess{Queries: queries}}
 	teamsHandler := &handler.TeamsHandler{Pool: pool, Queries: queries, AuditLog: auditLog, NOCEnabled: func(r *http.Request) bool {
 		flags, err := (&repository.ModuleAccess{Queries: queries}).InstanceFlags(r.Context())
@@ -347,6 +347,37 @@ func run(logger *slog.Logger) error {
 	mux.Handle("PATCH /api/levels/{id}", admin(areasHandler.RenameLevel))
 	// Mi equipo: jefatura de área (spec/16 §3.5, 9d).
 	teamHandler := &handler.TeamHandler{Queries: queries, Pool: pool, AuditLog: auditLog, Notify: notifier}
+	// Gestión CSM (spec/16 §4.4, 9.4): Clientes, Metas, Indicadores y
+	// Plantillas. El handler decide quién la ve (perfil Gestión, jefaturas y
+	// admin); las metas de una persona las ve también la persona (Agenda → Mis metas).
+	managementHandler := &handler.ManagementHandler{Queries: queries, Pool: pool, AuditLog: auditLog, Hub: hub, Agenda: agendaHandler, Notify: notifier}
+	mux.Handle("GET /api/management/meta", authed(managementHandler.Meta))
+	mux.Handle("PUT /api/management/settings", admin(managementHandler.UpdateSettings))
+	mux.Handle("GET /api/management/clients", authed(managementHandler.Clients))
+	mux.Handle("GET /api/management/clients/{id}", authed(managementHandler.Client))
+	mux.Handle("PUT /api/management/clients/{id}", authed(managementHandler.UpdateClient))
+	mux.Handle("GET /api/management/clients/{id}/summary", authed(managementHandler.Summary))
+	mux.Handle("POST /api/management/clients/{id}/summary/send", authed(managementHandler.SendSummary))
+	mux.Handle("GET /api/management/indicators", authed(managementHandler.Indicators))
+	mux.Handle("GET /api/management/tickets/{id}/actions", authed(managementHandler.TicketActions))
+	mux.Handle("GET /api/goals", authed(managementHandler.Goals))
+	mux.Handle("POST /api/goals", authed(managementHandler.CreateGoal))
+	mux.Handle("GET /api/goals/{id}", authed(managementHandler.Goal))
+	mux.Handle("PUT /api/goals/{id}", authed(managementHandler.UpdateGoal))
+	mux.Handle("DELETE /api/goals/{id}", authed(managementHandler.DeleteGoal))
+	mux.Handle("POST /api/goals/{id}/milestones", authed(managementHandler.AddMilestone))
+	mux.Handle("PUT /api/goals/{id}/milestones/{mid}", authed(managementHandler.UpdateMilestone))
+	mux.Handle("DELETE /api/goals/{id}/milestones/{mid}", authed(managementHandler.DeleteMilestone))
+	mux.Handle("POST /api/goals/{id}/milestones/{mid}/done", authed(managementHandler.MarkMilestone))
+	mux.Handle("POST /api/goals/{id}/evidence", authed(managementHandler.AddEvidence))
+	mux.Handle("GET /api/goals/{id}/evidence/{eid}", authed(managementHandler.Evidence))
+	mux.Handle("DELETE /api/goals/{id}/evidence/{eid}", authed(managementHandler.DeleteEvidence))
+	mux.Handle("POST /api/goals/{id}/{action}", authed(managementHandler.GoalAction))
+	mux.Handle("GET /api/playbooks", authed(managementHandler.Playbooks))
+	mux.Handle("POST /api/playbooks", authed(managementHandler.SavePlaybook))
+	mux.Handle("PUT /api/playbooks/{id}", authed(managementHandler.SavePlaybook))
+	mux.Handle("DELETE /api/playbooks/{id}", authed(managementHandler.DeletePlaybook))
+	mux.Handle("POST /api/playbooks/{id}/apply", authed(managementHandler.ApplyPlaybook))
 	mux.Handle("GET /api/team/areas", withCapability(handler.CapAreaLead, teamHandler.Areas))
 	mux.Handle("GET /api/team", withCapability(handler.CapAreaLead, teamHandler.Get))
 	mux.Handle("GET /api/team/people/{id}/tickets", withCapability(handler.CapAreaLead, teamHandler.PersonTickets))
@@ -426,6 +457,12 @@ func run(logger *slog.Logger) error {
 	mux.Handle("POST /api/glpi/import", admin(glpiHandler.RequireEnabled(glpiHandler.Import)))
 	mux.Handle("POST /api/glpi/link", admin(glpiHandler.RequireEnabled(glpiHandler.Link)))
 	mux.Handle("GET /api/glpi/runs", admin(glpiHandler.RequireEnabled(glpiHandler.Runs)))
+	// Tickets de GLPI en la Ticketera (10d.1, spec/18): solo para mirar.
+	mux.Handle("GET /api/glpi/tickets/config", admin(glpiHandler.RequireEnabled(glpiHandler.GetTicketsConfig)))
+	mux.Handle("PUT /api/glpi/tickets/config", admin(glpiHandler.RequireEnabled(glpiHandler.PutTicketsConfig)))
+	mux.Handle("GET /api/glpi/tickets/catalog", admin(glpiHandler.RequireEnabled(glpiHandler.TicketsCatalog)))
+	mux.Handle("POST /api/glpi/tickets/sync", admin(glpiHandler.RequireEnabled(glpiHandler.SyncTickets)))
+	mux.Handle("GET /api/glpi/tickets/runs", admin(glpiHandler.RequireEnabled(glpiHandler.TicketRuns)))
 	// Agenda (spec/16 §4.3, 9.3): tareas y recurrentes en días hábiles. Todos
 	// los perfiles; el handler decide qué ve y a quién asigna cada uno.
 	mux.Handle("GET /api/agenda/meta", authed(agendaHandler.Meta))
@@ -791,7 +828,9 @@ func run(logger *slog.Logger) error {
 		sender, _, err := handler.BuildMailSender(ctx, queries, cryptoBox)
 		return sender, err
 	}}
-	teamHandler.Reports = reportsHandler // el resumen mensual usa sus destinatarios válidos
+	teamHandler.Reports = reportsHandler                            // el resumen mensual usa sus destinatarios válidos
+	managementHandler.Reports = reportsHandler                      // «Exportar resumen» por correo, mismos destinatarios válidos
+	escalationHandler.ClientNotice = managementHandler.WindowNotice // ventana de un cliente → «Avisar al cliente» al CSM
 	mux.Handle("POST /api/reports/{kind}/preview", authed(reportsHandler.Preview))
 	mux.Handle("POST /api/reports/{kind}/send", operator(reportsHandler.Send))
 	mux.Handle("GET /api/reports/recipients", authed(reportsHandler.Recipients))
@@ -832,6 +871,7 @@ func run(logger *slog.Logger) error {
 	// empiezan o terminan, avisos con acuse programados y limpieza de la campana.
 	go scheduler.Run(ctx, 5*time.Minute, agendaHandler.Alerts)
 	go scheduler.Run(ctx, time.Minute, agendaHandler.Digest)
+	go scheduler.Run(ctx, time.Minute, managementHandler.SyncTick)
 	go scheduler.Run(ctx, time.Minute, notifier.Windows)
 	// Ventanas que se repiten: crea las de los próximos 60 días.
 	go scheduler.Run(ctx, time.Hour, escalationHandler.GenerateSeries)
@@ -841,6 +881,7 @@ func run(logger *slog.Logger) error {
 	go scheduler.Run(ctx, time.Hour, notifier.Purge)
 	// GLPI: la importación automática (cada noche a las 02:00 o cada 6 horas).
 	go scheduler.Run(ctx, time.Minute, glpiHandler.AutoTick)
+	go scheduler.Run(ctx, time.Minute, glpiHandler.TicketsAutoTick)
 	// Correos de cumpleaños (comentario del dueño #21): una vez al día, desde la hora configurada.
 	birthdaysHandler := &handler.BirthdaysHandler{Queries: queries, Crypto: cryptoBox, AuditLog: auditLog}
 	mux.Handle("GET /api/config/birthday-emails", admin(birthdaysHandler.GetConfig))

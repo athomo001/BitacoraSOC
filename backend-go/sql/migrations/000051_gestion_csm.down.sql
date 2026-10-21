@@ -1,0 +1,20 @@
+ALTER TABLE agenda_tasks DROP COLUMN playbook_application_id;
+DROP TABLE playbook_applications;
+DROP TABLE playbook_items;
+DROP TABLE playbooks;
+DROP TABLE goal_evidence;
+DROP TABLE goal_events;
+DROP TABLE goal_milestones;
+DROP TABLE goals;
+DROP TABLE management_settings;
+DROP INDEX idx_agenda_tasks_org;
+DROP INDEX idx_agenda_tasks_ticket;
+ALTER TABLE agenda_tasks
+  DROP COLUMN action_kind,
+  DROP COLUMN is_key,
+  DROP COLUMN ticket_id;
+ALTER TABLE organizations
+  DROP COLUMN csm_user_id,
+  DROP COLUMN service_start_date,
+  DROP COLUMN renewal_date,
+  DROP COLUMN sla_target;

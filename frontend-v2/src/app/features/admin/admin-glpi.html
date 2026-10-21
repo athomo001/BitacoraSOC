@@ -280,4 +280,6 @@
       <p class="adm-empty">{{ i18n.t('glpi.run.none') }}</p>
     }
   </section>
+
+  <app-admin-glpi-tickets (clientsSaved)="refreshEntities()" />
 }

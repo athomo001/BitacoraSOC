@@ -14,7 +14,7 @@ function ticket(overrides: Partial<Ticket>): Ticket {
     title: 'Servidor de archivos sin espacio', description: 'x', slaPausedSeconds: 0, reopenedCount: 0, onHoldSince: null,
     sla: {}, allowedTransitions: ['assigned'], createdAt: '', updatedAt: '', childCount: 0,
     areaId: 'a-infra', areaCode: 'infra', areaName: 'Infraestructura', requestedAreaId: 'a-ti', requestedAreaCode: 'ti', requestedAreaName: 'TI',
-    canWork: true, ...overrides,
+    canWork: true, source: 'app', ...overrides,
   };
 }
 

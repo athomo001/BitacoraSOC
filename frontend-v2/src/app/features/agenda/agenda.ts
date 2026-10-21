@@ -10,11 +10,16 @@ import { problemDetail } from '../../core/http-error';
 import { AgendaTaskFormComponent } from './task-form';
 import { AgendaManagedComponent } from './agenda-managed';
 import { AgendaFlowsComponent } from './agenda-flows';
+import { Goal, ManagementService } from '../../core/management/management.service';
+import { GoalDetailComponent } from '../management/goal-detail';
+import { GOAL_ICON, GOAL_TONE, goalStateKey } from '../management/mgmt-format';
+
+import '../../core/i18n/packs/management';
 import {
   AgendaBucket, addDays, bucketOf, dueText, fmtDay, isoDay, monthLabel, parseDay, recurrenceText, weekdayNames,
 } from './agenda-format';
 
-type Tab = 'mine' | 'calendar' | 'managed' | 'flows';
+type Tab = 'mine' | 'goals' | 'calendar' | 'managed' | 'flows';
 type Action = 'done' | 'skip' | 'handover' | null;
 
 const BUCKETS: { id: AgendaBucket; key: MessageKey; tone: string }[] = [
@@ -40,7 +45,7 @@ interface CalCell { iso: string; day: number; off: boolean; out: boolean; today:
 @Component({
   selector: 'app-agenda',
   standalone: true,
-  imports: [MatIconModule, AgendaTaskFormComponent, AgendaManagedComponent, AgendaFlowsComponent],
+  imports: [MatIconModule, AgendaTaskFormComponent, AgendaManagedComponent, AgendaFlowsComponent, GoalDetailComponent],
   templateUrl: './agenda.html',
   styleUrl: './agenda.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -52,6 +57,7 @@ export class AgendaComponent implements OnInit {
   private readonly orgs = inject(OrganizationsService);
   private readonly sse = inject(SseService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly mgmt = inject(ManagementService);
 
   protected readonly buckets = BUCKETS;
   protected readonly skipReasons = SKIP_REASONS;
@@ -80,6 +86,13 @@ export class AgendaComponent implements OnInit {
   protected readonly calItems = signal<AgendaOccurrence[]>([]);
   protected readonly calWindows = signal<CalendarWindow[]>([]);
   protected readonly clients = signal<Organization[]>([]);
+
+  /** Mis metas (Gestión CSM, 9.4): las de la persona y las que tiene a su cargo. */
+  protected readonly goals = signal<Goal[]>([]);
+  protected readonly goalId = signal<string | null>(null);
+  protected readonly goalTone = GOAL_TONE;
+  protected readonly goalIcon = GOAL_ICON;
+  protected readonly goalStateKey = goalStateKey;
 
   /** Sube al guardar una tarea: Gestión se recarga. */
   protected readonly refreshTick = signal(0);
@@ -152,7 +165,7 @@ export class AgendaComponent implements OnInit {
     }
     await this.reload();
     const stop = this.sse.connect((type) => {
-      if (type === 'agenda.changed') void this.reload(true);
+      if (type === 'agenda.changed' || (type === 'management.changed' && this.tab() === 'goals')) void this.reload(true);
     });
     this.destroyRef.onDestroy(stop);
     void this.orgs.list({ clients: true, active: true }).then((c) => this.clients.set(c), () => this.clients.set([]));
@@ -169,6 +182,12 @@ export class AgendaComponent implements OnInit {
           const fresh = sel ? list.find((o) => o.id === sel.id) : undefined;
           if (fresh) this.selected.set(fresh);
           else if (!this.form() && (!sel || !quiet)) this.selected.set(list.find((o) => o.status === 'pending') ?? null);
+          break;
+        }
+        case 'goals': {
+          const list = await this.mgmt.goals({ mine: true });
+          this.goals.set(list);
+          if (!list.some((g) => g.id === this.goalId())) this.goalId.set(list.find((g) => g.state !== 'done')?.id ?? list[0]?.id ?? null);
           break;
         }
         case 'calendar': {

@@ -1290,28 +1290,32 @@ type AgendaSetting struct {
 }
 
 type AgendaTask struct {
-	ID              uuid.UUID          `json:"id"`
-	Name            string             `json:"name"`
-	Description     string             `json:"description"`
-	AreaID          uuid.UUID          `json:"area_id"`
-	OrganizationID  pgtype.UUID        `json:"organization_id"`
-	AssigneeKind    string             `json:"assignee_kind"`
-	AssigneeUserID  pgtype.UUID        `json:"assignee_user_id"`
-	AssigneeLevelID pgtype.UUID        `json:"assignee_level_id"`
-	AssigneeTeamID  pgtype.UUID        `json:"assignee_team_id"`
-	Recurrence      []byte             `json:"recurrence"`
-	WarnDays        []int32            `json:"warn_days"`
-	Steps           []string           `json:"steps"`
-	DocUrl          pgtype.Text        `json:"doc_url"`
-	ReportKind      pgtype.Text        `json:"report_kind"`
-	Active          bool               `json:"active"`
-	CreatedBy       pgtype.UUID        `json:"created_by"`
-	CreatedAt       pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
-	FlowID          pgtype.UUID        `json:"flow_id"`
-	FlowPosition    pgtype.Int4        `json:"flow_position"`
-	FlowAfter       bool               `json:"flow_after"`
-	FlowDays        int32              `json:"flow_days"`
+	ID                    uuid.UUID          `json:"id"`
+	Name                  string             `json:"name"`
+	Description           string             `json:"description"`
+	AreaID                uuid.UUID          `json:"area_id"`
+	OrganizationID        pgtype.UUID        `json:"organization_id"`
+	AssigneeKind          string             `json:"assignee_kind"`
+	AssigneeUserID        pgtype.UUID        `json:"assignee_user_id"`
+	AssigneeLevelID       pgtype.UUID        `json:"assignee_level_id"`
+	AssigneeTeamID        pgtype.UUID        `json:"assignee_team_id"`
+	Recurrence            []byte             `json:"recurrence"`
+	WarnDays              []int32            `json:"warn_days"`
+	Steps                 []string           `json:"steps"`
+	DocUrl                pgtype.Text        `json:"doc_url"`
+	ReportKind            pgtype.Text        `json:"report_kind"`
+	Active                bool               `json:"active"`
+	CreatedBy             pgtype.UUID        `json:"created_by"`
+	CreatedAt             pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt             pgtype.Timestamptz `json:"updated_at"`
+	FlowID                pgtype.UUID        `json:"flow_id"`
+	FlowPosition          pgtype.Int4        `json:"flow_position"`
+	FlowAfter             bool               `json:"flow_after"`
+	FlowDays              int32              `json:"flow_days"`
+	ActionKind            pgtype.Text        `json:"action_kind"`
+	IsKey                 bool               `json:"is_key"`
+	TicketID              pgtype.UUID        `json:"ticket_id"`
+	PlaybookApplicationID pgtype.UUID        `json:"playbook_application_id"`
 }
 
 type AlertIngestionRule struct {
@@ -1837,24 +1841,32 @@ type EscalationStep struct {
 }
 
 type GlpiConfig struct {
-	ID                    bool               `json:"id"`
-	ApiUrl                string             `json:"api_url"`
-	AppTokenEncrypted     pgtype.Text        `json:"app_token_encrypted"`
-	UserTokenEncrypted    pgtype.Text        `json:"user_token_encrypted"`
-	VerifyTls             bool               `json:"verify_tls"`
-	TimeoutSeconds        int32              `json:"timeout_seconds"`
-	ImportComputers       bool               `json:"import_computers"`
-	ImportNetwork         bool               `json:"import_network"`
-	AreaID                pgtype.UUID        `json:"area_id"`
-	ComputerTypes         []byte             `json:"computer_types"`
-	Entities              []byte             `json:"entities"`
-	AutoMode              string             `json:"auto_mode"`
-	LastAutoAt            pgtype.Timestamptz `json:"last_auto_at"`
-	LastFailureNotifiedOn pgtype.Date        `json:"last_failure_notified_on"`
-	LastTestAt            pgtype.Timestamptz `json:"last_test_at"`
-	LastTestOk            pgtype.Bool        `json:"last_test_ok"`
-	LastTest              []byte             `json:"last_test"`
-	UpdatedAt             pgtype.Timestamptz `json:"updated_at"`
+	ID                       bool               `json:"id"`
+	ApiUrl                   string             `json:"api_url"`
+	AppTokenEncrypted        pgtype.Text        `json:"app_token_encrypted"`
+	UserTokenEncrypted       pgtype.Text        `json:"user_token_encrypted"`
+	VerifyTls                bool               `json:"verify_tls"`
+	TimeoutSeconds           int32              `json:"timeout_seconds"`
+	ImportComputers          bool               `json:"import_computers"`
+	ImportNetwork            bool               `json:"import_network"`
+	AreaID                   pgtype.UUID        `json:"area_id"`
+	ComputerTypes            []byte             `json:"computer_types"`
+	Entities                 []byte             `json:"entities"`
+	AutoMode                 string             `json:"auto_mode"`
+	LastAutoAt               pgtype.Timestamptz `json:"last_auto_at"`
+	LastFailureNotifiedOn    pgtype.Date        `json:"last_failure_notified_on"`
+	LastTestAt               pgtype.Timestamptz `json:"last_test_at"`
+	LastTestOk               pgtype.Bool        `json:"last_test_ok"`
+	LastTest                 []byte             `json:"last_test"`
+	UpdatedAt                pgtype.Timestamptz `json:"updated_at"`
+	TicketsEnabled           bool               `json:"tickets_enabled"`
+	TicketsEvery             string             `json:"tickets_every"`
+	TicketsSinceDays         int32              `json:"tickets_since_days"`
+	TicketsCursor            pgtype.Text        `json:"tickets_cursor"`
+	TicketEntities           []byte             `json:"ticket_entities"`
+	GroupAreas               []byte             `json:"group_areas"`
+	TicketsLastAutoAt        pgtype.Timestamptz `json:"tickets_last_auto_at"`
+	TicketsFailureNotifiedOn pgtype.Date        `json:"tickets_failure_notified_on"`
 }
 
 type GlpiImportRun struct {
@@ -1872,6 +1884,78 @@ type GlpiImportRun struct {
 	Unchanged   int32              `json:"unchanged"`
 	HeldBack    int32              `json:"held_back"`
 	Message     string             `json:"message"`
+}
+
+type GlpiTicketRun struct {
+	ID         uuid.UUID          `json:"id"`
+	Trigger    string             `json:"trigger"`
+	UserID     pgtype.UUID        `json:"user_id"`
+	FirstLoad  bool               `json:"first_load"`
+	StartedAt  pgtype.Timestamptz `json:"started_at"`
+	FinishedAt pgtype.Timestamptz `json:"finished_at"`
+	Ok         bool               `json:"ok"`
+	Created    int32              `json:"created"`
+	Updated    int32              `json:"updated"`
+	Skipped    int32              `json:"skipped"`
+	Deleted    int32              `json:"deleted"`
+	Message    string             `json:"message"`
+}
+
+type Goal struct {
+	ID               uuid.UUID          `json:"id"`
+	Name             string             `json:"name"`
+	Scope            string             `json:"scope"`
+	ClientID         pgtype.UUID        `json:"client_id"`
+	AreaID           pgtype.UUID        `json:"area_id"`
+	PersonUserID     pgtype.UUID        `json:"person_user_id"`
+	OwnerUserID      pgtype.UUID        `json:"owner_user_id"`
+	Kind             pgtype.Text        `json:"kind"`
+	BonusRank        pgtype.Text        `json:"bonus_rank"`
+	DueDate          pgtype.Date        `json:"due_date"`
+	EstimateBizDays  pgtype.Int4        `json:"estimate_biz_days"`
+	EvidenceRequired bool               `json:"evidence_required"`
+	ManualRisk       bool               `json:"manual_risk"`
+	CompletedAt      pgtype.Timestamptz `json:"completed_at"`
+	CompletedBy      pgtype.UUID        `json:"completed_by"`
+	ConfirmedAt      pgtype.Timestamptz `json:"confirmed_at"`
+	ConfirmedBy      pgtype.UUID        `json:"confirmed_by"`
+	CreatedBy        pgtype.UUID        `json:"created_by"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
+}
+
+type GoalEvent struct {
+	ID        uuid.UUID          `json:"id"`
+	GoalID    uuid.UUID          `json:"goal_id"`
+	Text      string             `json:"text"`
+	UserID    pgtype.UUID        `json:"user_id"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
+type GoalEvidence struct {
+	ID         uuid.UUID          `json:"id"`
+	GoalID     uuid.UUID          `json:"goal_id"`
+	FileName   pgtype.Text        `json:"file_name"`
+	MimeType   pgtype.Text        `json:"mime_type"`
+	SizeBytes  pgtype.Int4        `json:"size_bytes"`
+	FileData   []byte             `json:"file_data"`
+	Url        pgtype.Text        `json:"url"`
+	UploadedBy pgtype.UUID        `json:"uploaded_by"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+}
+
+type GoalMilestone struct {
+	ID           uuid.UUID          `json:"id"`
+	GoalID       uuid.UUID          `json:"goal_id"`
+	Position     int32              `json:"position"`
+	Name         string             `json:"name"`
+	TicketID     pgtype.UUID        `json:"ticket_id"`
+	AgendaTaskID pgtype.UUID        `json:"agenda_task_id"`
+	DoneAt       pgtype.Timestamptz `json:"done_at"`
+	DoneBy       pgtype.UUID        `json:"done_by"`
+	DoneByName   pgtype.Text        `json:"done_by_name"`
+	DoneSource   pgtype.Text        `json:"done_source"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
 }
 
 type Holiday struct {
@@ -1943,6 +2027,13 @@ type MaintenanceWindowSeries struct {
 	CreatedBy             uuid.UUID          `json:"created_by"`
 	CreatedAt             pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt             pgtype.Timestamptz `json:"updated_at"`
+}
+
+type ManagementSetting struct {
+	ID        bool               `json:"id"`
+	SlaTarget int32              `json:"sla_target"`
+	StartedOn pgtype.Date        `json:"started_on"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
 }
 
 type MessageTemplate struct {
@@ -2025,6 +2116,10 @@ type Organization struct {
 	CreatedAt         pgtype.Timestamptz `json:"created_at"`
 	ViaOrganizationID pgtype.UUID        `json:"via_organization_id"`
 	ArchivedAt        pgtype.Timestamptz `json:"archived_at"`
+	CsmUserID         pgtype.UUID        `json:"csm_user_id"`
+	ServiceStartDate  pgtype.Date        `json:"service_start_date"`
+	RenewalDate       pgtype.Date        `json:"renewal_date"`
+	SlaTarget         pgtype.Int4        `json:"sla_target"`
 }
 
 type OrganizationType struct {
@@ -2058,6 +2153,42 @@ type PersonalNote struct {
 	UserID    uuid.UUID          `json:"user_id"`
 	Content   string             `json:"content"`
 	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+}
+
+type Playbook struct {
+	ID          uuid.UUID          `json:"id"`
+	Name        string             `json:"name"`
+	Description string             `json:"description"`
+	Anchor      string             `json:"anchor"`
+	SystemKey   pgtype.Text        `json:"system_key"`
+	Active      bool               `json:"active"`
+	CreatedBy   pgtype.UUID        `json:"created_by"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+}
+
+type PlaybookApplication struct {
+	ID         uuid.UUID          `json:"id"`
+	PlaybookID uuid.UUID          `json:"playbook_id"`
+	ClientID   uuid.UUID          `json:"client_id"`
+	AnchorDate pgtype.Date        `json:"anchor_date"`
+	AppliedBy  pgtype.UUID        `json:"applied_by"`
+	AppliedAt  pgtype.Timestamptz `json:"applied_at"`
+}
+
+type PlaybookItem struct {
+	ID         uuid.UUID   `json:"id"`
+	PlaybookID uuid.UUID   `json:"playbook_id"`
+	Position   int32       `json:"position"`
+	Name       string      `json:"name"`
+	ActionKind pgtype.Text `json:"action_kind"`
+	IsKey      bool        `json:"is_key"`
+	Assignee   string      `json:"assignee"`
+	AreaID     pgtype.UUID `json:"area_id"`
+	LevelID    pgtype.UUID `json:"level_id"`
+	TeamID     pgtype.UUID `json:"team_id"`
+	OffsetDays int32       `json:"offset_days"`
+	OffsetUnit string      `json:"offset_unit"`
 }
 
 type PublicShareLink struct {
@@ -2392,17 +2523,29 @@ type Ticket struct {
 	TerritorialUnitID             pgtype.UUID        `json:"territorial_unit_id"`
 	AreaID                        uuid.UUID          `json:"area_id"`
 	RequestedAreaID               uuid.UUID          `json:"requested_area_id"`
+	Source                        string             `json:"source"`
+	GlpiID                        pgtype.Int4        `json:"glpi_id"`
+	GlpiDateMod                   pgtype.Text        `json:"glpi_date_mod"`
+	GlpiSyncedAt                  pgtype.Timestamptz `json:"glpi_synced_at"`
+	GlpiDeleted                   bool               `json:"glpi_deleted"`
+	GlpiLinkedOnly                bool               `json:"glpi_linked_only"`
+	GlpiGroupID                   pgtype.Int4        `json:"glpi_group_id"`
+	GlpiGroupName                 pgtype.Text        `json:"glpi_group_name"`
+	GlpiTechnician                pgtype.Text        `json:"glpi_technician"`
 }
 
 type TicketComment struct {
-	ID         uuid.UUID          `json:"id"`
-	TicketID   uuid.UUID          `json:"ticket_id"`
-	UserID     pgtype.UUID        `json:"user_id"`
-	AuthorName string             `json:"author_name"`
-	Content    string             `json:"content"`
-	IsPublic   bool               `json:"is_public"`
-	CreatedAt  pgtype.Timestamptz `json:"created_at"`
-	Origin     string             `json:"origin"`
+	ID              uuid.UUID          `json:"id"`
+	TicketID        uuid.UUID          `json:"ticket_id"`
+	UserID          pgtype.UUID        `json:"user_id"`
+	AuthorName      string             `json:"author_name"`
+	Content         string             `json:"content"`
+	IsPublic        bool               `json:"is_public"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	Origin          string             `json:"origin"`
+	GlpiID          pgtype.Int4        `json:"glpi_id"`
+	GlpiKind        pgtype.Text        `json:"glpi_kind"`
+	GlpiTimeSeconds pgtype.Int4        `json:"glpi_time_seconds"`
 }
 
 type TicketImage struct {

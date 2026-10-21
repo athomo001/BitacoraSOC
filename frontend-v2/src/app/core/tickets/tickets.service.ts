@@ -64,6 +64,24 @@ export interface Ticket {
   createdByName?: string;
   /** false: lo pidió el área del usuario; lo ve y comenta, lo trabaja otra área. */
   canWork: boolean;
+  /** Dónde nació: los de GLPI se ven y se enlazan, pero se editan en GLPI (spec/18). */
+  source: TicketSource;
+  glpi?: TicketGlpi;
+}
+
+export type TicketSource = 'app' | 'glpi';
+
+/** Un ticket traído de GLPI: su número, «Abrir en GLPI» y cuándo se trajo. */
+export interface TicketGlpi {
+  id: number;
+  url?: string;
+  syncedAt?: string;
+  /** Borrado o en la papelera de GLPI. */
+  deleted: boolean;
+  /** Llegó porque alguien lo enlazó a mano, no por las entidades y grupos marcados. */
+  linkedOnly: boolean;
+  group?: string;
+  technician?: string;
 }
 
 export interface TicketArea { id: string; code: string; name: string; resolves: boolean; }
@@ -85,7 +103,12 @@ export interface TicketPlace {
 
 export interface TicketImage { id: string; fileName: string; sizeBytes: number; createdAt: string; }
 /** origin: '' propio, 'parent:TKT-…' (del padre), 'child:TKT-…' (de un hijo), 'merged:TKT-…' (de un ticket unido). */
-export interface TicketComment { id: string; authorName: string; content: string; isPublic: boolean; createdAt: string; images: TicketImage[]; origin: string; }
+export interface TicketComment {
+  id: string; authorName: string; content: string; isPublic: boolean; createdAt: string; images: TicketImage[]; origin: string;
+  /** En un ticket de GLPI: seguimiento, tarea (con su tiempo) o solución. */
+  glpiKind?: 'followup' | 'task' | 'solution';
+  glpiTimeSeconds?: number;
+}
 export interface TicketTask { id: string; username: string; content: string; timeSpentSeconds: number; isPublic: boolean; performedAt: string; }
 export interface TicketEntry { id: string; entryType: string; content: string; authorUsername: string; createdAt: string; }
 
@@ -131,7 +154,7 @@ export interface PublicTicket {
   mergedInto?: string;
 }
 
-export interface TicketFilters { ticketType?: TicketType; openOnly?: boolean; q?: string; queue?: TicketQueue; }
+export interface TicketFilters { ticketType?: TicketType; openOnly?: boolean; q?: string; queue?: TicketQueue; source?: TicketSource; }
 
 export interface NewTicket {
   ticketType: TicketType;
@@ -219,6 +242,7 @@ export class TicketsService {
     if (filters.openOnly) params['openOnly'] = 'true';
     if (filters.q?.trim()) params['q'] = filters.q.trim();
     if (filters.queue) params['queue'] = filters.queue;
+    if (filters.source) params['source'] = filters.source;
     return (await firstValueFrom(this.http.get<ApiEnvelope<TicketList>>('/api/tickets', { params }))).data;
   }
 

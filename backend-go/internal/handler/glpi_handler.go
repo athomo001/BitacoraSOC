@@ -37,7 +37,8 @@ import (
 
 const glpiFeature = "glpi_sync"
 
-// GlpiHandler atiende /api/glpi/* y la importación automática.
+// GlpiHandler atiende /api/glpi/*: la importación de equipos (aquí) y los
+// tickets de GLPI en la Ticketera (glpi_tickets.go), con sus corridas automáticas.
 type GlpiHandler struct {
 	Queries   *db.Queries
 	Crypto    *crypto.Box
@@ -47,8 +48,13 @@ type GlpiHandler struct {
 	Now       func() time.Time
 	// Open abre la sesión con GLPI (en las pruebas, un GLPI falso).
 	Open func(context.Context, glpi.Config) (*glpi.Session, error)
+	// Hub avisa por SSE que llegaron tickets de GLPI (la Ticketera se refresca).
+	Hub eventPublisher
+	// SyncWait: «Sincronizar ahora» espera a que termine (en las pruebas).
+	SyncWait bool
 
-	running sync.Mutex
+	running        sync.Mutex
+	ticketsRunning sync.Mutex
 }
 
 func (h *GlpiHandler) now() time.Time {

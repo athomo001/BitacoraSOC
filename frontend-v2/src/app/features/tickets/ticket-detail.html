@@ -5,14 +5,30 @@
       <button type="button" class="mono td__number td__copy" [title]="i18n.t('tickets.copyNumber')" (click)="copyNumber(t.ticketNumber, $event)">@if (copiedNumber() === t.ticketNumber) {<span class="td__copied" role="status">{{ i18n.t('tickets.copied') }}</span>} @else {<span>{{ t.ticketNumber }}</span>}</button>
       <span class="pill mono" [class]="'tone-' + priorityTone[t.priority]">{{ priorityShort[t.priority] }}</span>
       <span class="pill">{{ i18n.t(typeKey(t)) }} · {{ t.scope.toUpperCase() }}</span>
+      @if (t.glpi; as g) {
+        <span class="td__glpi">GLPI</span>
+        @if (g.url) { <a class="adm-btn td__glpi-open" [href]="g.url" target="_blank" rel="noopener"><mat-icon>open_in_new</mat-icon>{{ i18n.t('tickets.glpi.open') }}</a> }
+      }
     </div>
     <h2 class="td__title">{{ t.title }}</h2>
+    @if (t.glpi; as g) {
+      <p class="td__glpi-banner" role="note">
+        <mat-icon>lock</mat-icon>
+        <span>
+          <b>{{ i18n.t(g.deleted ? 'tickets.glpi.deleted' : 'tickets.glpi.lives') }}</b>
+          @if (g.syncedAt) { {{ i18n.t('tickets.glpi.synced') }} <span class="mono">{{ g.syncedAt | date: 'dd/MM HH:mm' }}</span>. }
+          @if (g.linkedOnly) { {{ i18n.t('tickets.glpi.linkedOnly') }} }
+        </span>
+      </p>
+      @if (t.description) { <p class="td__desc">{{ t.description }}</p> }
+    }
     <dl class="td__facts">
       <dt>{{ i18n.t('tickets.detail.client') }}</dt><dd>{{ t.clientName }}</dd>
       <!-- Tickets por área (9.1): la cola, quién lo pidió y derivar. -->
       <dt>{{ i18n.t('tickets.area') }}</dt>
       <dd class="td__people">
         <span class="pill tone-neutral">{{ t.areaName }}</span>
+        @if (t.glpi?.group; as group) { <span class="td__muted">{{ i18n.tf('tickets.glpi.group', group) }}</span> }
         @if (t.canWork && !t.mergedIntoId && isOpen(t)) {
           <button type="button" class="adm-btn" [disabled]="busy()" (click)="openDerive()"><mat-icon>alt_route</mat-icon>{{ i18n.t('tickets.derive') }}</button>
         }
@@ -35,6 +51,10 @@
           </span>
         </dd>
       }
+      @if (t.glpi; as g) {
+      <dt>{{ i18n.t('tickets.glpi.technician') }}</dt>
+      <dd>{{ t.assigneeUsername ?? g.technician ?? i18n.t('tickets.detail.unassigned') }}</dd>
+      } @else {
       <dt>{{ i18n.t('tickets.requestedBy') }}</dt>
       <dd>{{ t.requestedAreaName }}@if (t.createdByName) { · {{ t.createdByName }} }</dd>
       <dt>{{ i18n.t('tickets.detail.team') }}</dt>
@@ -94,6 +114,7 @@
           </select>
         }
       </dd>
+      }
       <dt>{{ i18n.t('tickets.detail.impactUrgency') }}</dt><dd>{{ i18n.t(levelKey(t.impact)) }} · {{ i18n.t(urgencyKey(t.urgency)) }}</dd>
     </dl>
   </header>
@@ -102,12 +123,17 @@
     <app-ticket-relations [detail]="d" (reload)="reloadAll()" (open)="navigate.emit($event)" />
   }
 
+  @if (management() && !t.mergedIntoId) {
+    <app-ticket-followups [ticket]="t" />
+  }
+
   <section class="td__block td__sla" [attr.aria-label]="i18n.t('tickets.detail.sla')">
     <div class="td__row">
       <span class="td__label">{{ i18n.t('tickets.detail.sla') }}</span>
       @if (t.status === 'pending_vendor') {
         <span class="pill tone-warn"><mat-icon>pause_circle</mat-icon>{{ i18n.t('tickets.detail.pausedBadge') }}</span>
       }
+      @if (t.glpi) { <span class="td__muted">{{ i18n.t('tickets.glpi.sla') }}</span> }
     </div>
     @if (t.sla.response; as c) {
       <div class="td__clock" [class]="'td__clock text-' + clockTone(c)">
@@ -133,7 +159,7 @@
       }
     </div>
     <div class="td__actions">
-      @if (!t.canWork) {
+      @if (!t.canWork && !t.glpi) {
         <span class="td__muted"><mat-icon>visibility</mat-icon> {{ i18n.tf('tickets.viewOnly', t.areaName) }}</span>
       }
       @for (a of t.canWork ? actions() : []; track a.to) {
@@ -143,7 +169,7 @@
       } @empty {
         @if (t.canWork) { <span class="td__muted">{{ i18n.t('tickets.detail.noActions') }}</span> }
       }
-      @if (canDelete()) {
+      @if (canDelete() && !t.glpi) {
         @if (confirmDelete()) {
           <span class="td__confirm" role="group">
             {{ i18n.tf('tickets.delete.confirm', t.ticketNumber) }}
@@ -168,6 +194,17 @@
     @switch (tab()) {
       @case ('activity') {
         @for (c of d.comments; track c.id) {
+          @if (c.glpiKind) {
+            <article class="td__comment" [class.td__comment--glpi-private]="!c.isPublic" [class.td__comment--solution]="c.glpiKind === 'solution'">
+              <div class="td__comment-meta">
+                <span class="mono">{{ c.createdAt | date: 'dd/MM HH:mm' }}</span><span>·</span><span>{{ c.authorName }}</span>
+                @if (c.glpiKind === 'task') { <span class="pill tone-neutral"><mat-icon>build</mat-icon>{{ i18n.t('tickets.glpi.task') }}@if (c.glpiTimeSeconds) { · <span class="mono">{{ duration(c.glpiTimeSeconds) }}</span> }</span> }
+                @if (c.glpiKind === 'solution') { <span class="pill tone-ok"><mat-icon>task_alt</mat-icon>{{ i18n.t('tickets.glpi.solution') }}</span> }
+                @if (!c.isPublic) { <span class="pill tone-warn td__vis"><mat-icon>lock</mat-icon>{{ i18n.t('tickets.glpi.private') }}</span> }
+              </div>
+              <p class="td__plain">{{ c.content }}</p>
+            </article>
+          } @else {
           <article class="td__comment" [class.td__comment--public]="c.isPublic">
             <div class="td__comment-meta">
               <span class="mono">{{ c.createdAt | date: 'dd/MM HH:mm' }}</span><span>·</span><span>{{ c.authorName }}</span>
@@ -189,6 +226,7 @@
               </div>
             }
           </article>
+          }
         } @empty {
           <p class="td__muted">{{ i18n.t('tickets.activity.empty') }}</p>
         }
@@ -242,6 +280,7 @@
     }
   </div>
 
+  @if (!t.glpi) {
   <form class="td__composer" [class.td__composer--drop]="dragging()" (submit)="$event.preventDefault(); addComment()"
     (dragover)="onDragOver($event)" (dragleave)="dragging.set(false)" (drop)="onDrop($event)">
     <textarea class="td__input td__textarea" name="comment" [(ngModel)]="comment" [placeholder]="i18n.t('tickets.comment.placeholder')" [attr.aria-label]="i18n.t('tickets.comment.placeholder')" (keydown.control.enter)="addComment()" (paste)="onPaste($event)"></textarea>
@@ -286,6 +325,7 @@
     <button type="button" class="td__btn td__btn--small" [disabled]="!publicUrl()" (click)="copyLink()"><mat-icon>content_copy</mat-icon>{{ i18n.t(copied() ? 'tickets.public.copied' : 'tickets.public.copy') }}</button>
     <button type="button" class="td__btn td__btn--small" [disabled]="busy()" (click)="regeneratePin()">{{ i18n.t('tickets.public.newPin') }}</button>
   </footer>
+  }
 
   @if (error()) {
     <p class="msg msg--error td__error" role="alert">{{ error() }}</p>

@@ -14,6 +14,7 @@ import type { InventoryKey } from './packs/inventory';
 import type { AgendaKey } from './packs/agenda';
 import type { NotificationsKey } from './packs/notifications';
 import type { GlpiKey } from './packs/glpi';
+import type { ManagementKey } from './packs/management';
 import type { RaciKey } from './packs/raci';
 
 const ES = {
@@ -170,6 +171,7 @@ const ES = {
   'esc.pool': 'Pool',
   'nav.reports': 'Reportes',
   'nav.team': 'Mi equipo',
+  'nav.management': 'Gestión',
   'nav.map': 'Mapa',
   'nav.inventory': 'Inventario',
   'nav.agenda': 'Agenda',
@@ -243,6 +245,7 @@ export type MessageKey =
   | AgendaKey
   | NotificationsKey
   | GlpiKey
+  | ManagementKey
   | RaciKey;
 
 /**

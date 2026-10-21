@@ -1,0 +1,96 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 8px;
+}
+
+mat-icon {
+  width: 16px;
+  height: 16px;
+  font-size: 16px;
+}
+
+.gt__head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.gt__head .adm-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.gt__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.gt__body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.gt__flat {
+  margin: 0;
+}
+
+.gt__line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+}
+
+.gt__days {
+  width: 72px;
+}
+
+.gt__off td:not(:first-child) {
+  color: var(--text-muted);
+}
+
+.gt__warn {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  background: var(--status-warning-bg);
+  color: var(--status-warning);
+  font-size: 12px;
+}
+
+.gt__stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.gt__stats div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.gt__stats b {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+@media (width <= 900px) {
+  .gt__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .gt__stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

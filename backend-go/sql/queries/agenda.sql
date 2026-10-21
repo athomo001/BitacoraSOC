@@ -52,15 +52,17 @@ ORDER BY 3;
 SELECT id, name, area_id FROM teams WHERE kind = 'oncall' AND active AND area_id IS NOT NULL ORDER BY name;
 
 -- name: CreateAgendaTask :one
+-- action_kind, is_key, ticket_id: acciones de la Gestión CSM (000051).
 INSERT INTO agenda_tasks (name, description, area_id, organization_id, assignee_kind, assignee_user_id,
-  assignee_level_id, assignee_team_id, recurrence, warn_days, steps, doc_url, report_kind, created_by)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+  assignee_level_id, assignee_team_id, recurrence, warn_days, steps, doc_url, report_kind, created_by,
+  action_kind, is_key, ticket_id, playbook_application_id)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
 RETURNING id;
 
 -- name: UpdateAgendaTask :exec
 UPDATE agenda_tasks SET name = $2, description = $3, area_id = $4, organization_id = $5, assignee_kind = $6,
   assignee_user_id = $7, assignee_level_id = $8, assignee_team_id = $9, recurrence = $10, warn_days = $11,
-  steps = $12, doc_url = $13, report_kind = $14, updated_at = now()
+  steps = $12, doc_url = $13, report_kind = $14, action_kind = $15, is_key = $16, ticket_id = $17, updated_at = now()
 WHERE id = $1;
 
 -- name: SetAgendaTaskActive :execrows
@@ -76,9 +78,11 @@ SELECT t.id, t.name, t.description, t.area_id, a.name AS area_name, t.organizati
   t.assignee_team_id, COALESCE(tm.name, '')::text AS assignee_team_name,
   t.recurrence, t.warn_days, t.steps, t.doc_url, t.report_kind, t.active,
   t.created_by, COALESCE(NULLIF(c.full_name, ''), c.username, '')::text AS created_by_name, t.created_at,
-  t.flow_id, t.flow_position, t.flow_after, t.flow_days
+  t.flow_id, t.flow_position, t.flow_after, t.flow_days,
+  t.action_kind, t.is_key, t.ticket_id, COALESCE(tk.ticket_number, '')::text AS ticket_number, t.playbook_application_id
 FROM agenda_tasks t
 JOIN areas a ON a.id = t.area_id
+LEFT JOIN tickets tk ON tk.id = t.ticket_id
 LEFT JOIN organizations o ON o.id = t.organization_id
 LEFT JOIN users u ON u.id = t.assignee_user_id
 LEFT JOIN levels l ON l.id = t.assignee_level_id

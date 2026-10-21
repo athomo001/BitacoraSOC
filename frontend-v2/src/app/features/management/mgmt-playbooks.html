@@ -1,0 +1,114 @@
+<div class="mp">
+  <section class="adm-card">
+    <div class="adm-card__head">
+      <h3 class="adm-card__title"><mat-icon>library_add_check</mat-icon>{{ i18n.t('mg.pb.title') }}</h3>
+      <button type="button" class="adm-btn adm-push" (click)="edit(null)"><mat-icon>add</mat-icon>{{ i18n.t('mg.pb.new') }}</button>
+    </div>
+    @for (p of list(); track p.id) {
+      <button type="button" class="mp__row" [attr.aria-current]="selected() === p.id" (click)="select(p.id)">
+        <span><b>{{ p.name }}</b><span class="adm-hint mp__block">{{ p.description }}</span></span>
+        <span class="pill tone-neutral">{{ i18n.tf('mg.pb.actions', p.items.length) }}</span>
+      </button>
+    }
+  </section>
+
+  <section class="adm-card">
+    @if (draft(); as d) {
+      <form class="mp__form" (submit)="$event.preventDefault(); save()">
+        <div class="field-grid">
+          <label class="field"><span>{{ i18n.t('mg.pb.name') }}</span>
+            <input name="pbName" maxlength="120" [value]="d.name" (input)="patch({ name: val($event) })" /></label>
+          <label class="field"><span>{{ i18n.t('mg.pb.desc') }}</span>
+            <input name="pbDesc" maxlength="300" [value]="d.description" (input)="patch({ description: val($event) })" /></label>
+        </div>
+        <div class="field"><span>{{ i18n.t('mg.pb.anchor') }}</span>
+          <div class="mp__chips">
+            @for (a of anchors; track a) {
+              <button type="button" class="seg" [attr.aria-pressed]="d.anchor === a" [disabled]="d.system && d.anchor !== a" (click)="patch({ anchor: a })">{{ i18n.t(anchorKey(a)) }}</button>
+            }
+          </div>
+        </div>
+        <div class="mp__items">
+          @for (it of d.items; track $index; let i = $index) {
+            <div class="mp__item">
+              <span class="adm-hint mono">{{ i + 1 }}.</span>
+              <input class="adm-input" [name]="'pbItem' + i" maxlength="200" [placeholder]="i18n.t('mg.pb.col.action')" [value]="it.name" (input)="patchItem(i, { name: val($event) })" />
+              <select class="adm-input" [name]="'pbWho' + i" [attr.aria-label]="i18n.t('mg.pb.col.who')" (change)="setWho(i, val($event))">
+                <option value="csm" [selected]="it.assignee === 'csm'">{{ i18n.t('mg.pb.csm') }}</option>
+                @for (a of areaOptions(); track a.id) {
+                  @if (a.levels.length) { <option [value]="'level:' + a.id" [selected]="whoValue(it) === 'level:' + a.id">{{ a.name }} · {{ i18n.t('mg.pb.level') }}</option> }
+                  @if (a.guards.length) { <option [value]="'guard:' + a.id" [selected]="whoValue(it) === 'guard:' + a.id">{{ a.name }} · {{ i18n.t('mg.pb.guard') }}</option> }
+                }
+              </select>
+              @if (it.assignee === 'level') {
+                <select class="adm-input" [name]="'pbLevel' + i" [attr.aria-label]="i18n.t('mg.pb.level')" (change)="patchItem(i, { levelId: val($event) })">
+                  @for (l of levelsOf(it.areaId); track l.id) { <option [value]="l.id" [selected]="it.levelId === l.id">{{ l.name }}</option> }
+                </select>
+              } @else if (it.assignee === 'guard') {
+                <select class="adm-input" [name]="'pbTeam' + i" [attr.aria-label]="i18n.t('mg.pb.guard')" (change)="patchItem(i, { teamId: val($event) })">
+                  @for (g of guardsOf(it.areaId); track g.id) { <option [value]="g.id" [selected]="it.teamId === g.id">{{ g.name }}</option> }
+                </select>
+              } @else { <span></span> }
+              <input class="adm-input mono mp__days" type="number" min="-400" max="400" [name]="'pbDays' + i" [attr.aria-label]="i18n.t('mg.pb.days')" [title]="i18n.t('mg.pb.days')" [value]="it.offsetDays" (input)="patchItem(i, { offsetDays: +val($event) })" />
+              <select class="adm-input" [name]="'pbUnit' + i" [attr.aria-label]="i18n.t('mg.pb.days')" (change)="patchItem(i, { offsetUnit: $any(val($event)) })">
+                <option value="biz" [selected]="it.offsetUnit === 'biz'">{{ i18n.t('mg.pb.unit.biz') }}</option>
+                <option value="cal" [selected]="it.offsetUnit === 'cal'">{{ i18n.t('mg.pb.unit.cal') }}</option>
+              </select>
+              <select class="adm-input" [name]="'pbKind' + i" [attr.aria-label]="i18n.t('mg.act.type')" (change)="patchItem(i, { actionKind: kindOf(val($event)) })">
+                <option value="" [selected]="!it.actionKind">{{ i18n.t('mg.pb.kindNone') }}</option>
+                @for (k of kinds; track k) { <option [value]="k" [selected]="it.actionKind === k">{{ i18n.t(kindKey(k)) }}</option> }
+              </select>
+              <label class="mp__key"><input type="checkbox" [checked]="it.isKey" (change)="patchItem(i, { isKey: !it.isKey })" />{{ i18n.t('mg.pb.key') }}</label>
+              <button type="button" class="adm-icon-btn" [disabled]="d.items.length === 1" [attr.aria-label]="i18n.tf('mg.pb.removeItem', it.name || (i + 1))" (click)="removeItem(i)"><mat-icon>close</mat-icon></button>
+            </div>
+          }
+        </div>
+        <span class="adm-hint">{{ i18n.t('mg.pb.days') }}</span>
+        <div class="mp__actions">
+          <button type="button" class="adm-btn" (click)="addItem()"><mat-icon>add</mat-icon>{{ i18n.t('mg.pb.addItem') }}</button>
+          @if (d.id && !d.system) { <button type="button" class="adm-btn adm-btn--danger" [disabled]="busy()" (click)="remove()"><mat-icon>delete</mat-icon>{{ i18n.t('mg.pb.delete') }}</button> }
+          <span class="adm-push"></span>
+          <button type="button" class="adm-btn" (click)="draft.set(null)">{{ i18n.t('mg.cancel') }}</button>
+          <button type="submit" class="adm-btn adm-btn--primary" [disabled]="!draftValid() || busy()"><mat-icon>save</mat-icon>{{ i18n.t('mg.pb.save') }}</button>
+        </div>
+        @if (error(); as e) { <p class="adm-error" role="alert">{{ e }}</p> }
+      </form>
+    } @else if (current(); as p) {
+      <div class="adm-card__head">
+        <h3 class="adm-card__title">{{ p.name }}</h3>
+        <span class="adm-hint adm-push">{{ p.description }}</span>
+        <button type="button" class="adm-btn" (click)="edit(p)"><mat-icon>edit</mat-icon>{{ i18n.t('mg.pb.edit') }}</button>
+      </div>
+      <div class="mp__line mp__line--head"><span></span><span>{{ i18n.t('mg.pb.col.action') }}</span><span>{{ i18n.t('mg.pb.col.who') }}</span><span>{{ i18n.t('mg.pb.col.when') }}</span></div>
+      @for (it of p.items; track it.id; let i = $index) {
+        <div class="mp__line">
+          <span class="adm-hint">{{ i + 1 }}.</span>
+          <span>{{ it.name }}@if (it.isKey) { <span class="mp__keytag"><mat-icon>vpn_key</mat-icon>{{ i18n.t('mg.a.key') }}</span> }</span>
+          <span><span class="pill tone-neutral">{{ who(it) }}</span></span>
+          <span class="adm-hint">{{ when(it, p.anchor) }}</span>
+        </div>
+      }
+      <div class="mp__apply">
+        <label class="adm-label" for="pbClient">{{ i18n.t('mg.pb.client') }}</label>
+        <select class="adm-input mp__auto" id="pbClient" name="pbClient" (change)="client.set(val($event)); result.set(null)">
+          @for (c of clients(); track c.id) { <option [value]="c.id" [selected]="client() === c.id">{{ c.name }}</option> }
+        </select>
+        @if (p.anchor === 'date') {
+          <label class="adm-label" for="pbDate">{{ i18n.t('mg.pb.date') }}</label>
+          <input class="adm-input mono mp__auto" id="pbDate" name="pbDate" type="date" [value]="anchorDate()" (input)="anchorDate.set(val($event))" />
+        }
+        @if (p.anchor === 'renewal' && currentClient()?.renewal; as r) {
+          <span class="mp__fake"><mat-icon>autorenew</mat-icon>{{ i18n.tf('mg.pb.renewal', date(r)) }}</span>
+        }
+        <button type="button" class="adm-btn adm-btn--primary adm-push" [disabled]="busy() || noRenewal() || (p.anchor === 'date' && !anchorDate()) || !currentClient()" (click)="apply()">
+          <mat-icon>playlist_add</mat-icon>{{ i18n.tf('mg.pb.apply', currentClient()?.name ?? '') }}</button>
+      </div>
+      @if (noRenewal()) { <p class="adm-hint mp__pad">{{ i18n.tf('mg.pb.noRenewal', currentClient()?.name ?? '') }}</p> }
+      @if (result(); as r) { <p class="mp__ok" role="status">{{ r }}</p> }
+      @if (error(); as e) { <p class="adm-error mp__pad" role="alert">{{ e }}</p> }
+      <p class="adm-hint mp__pad">{{ i18n.t('mg.pb.hint') }}</p>
+    } @else {
+      <p class="adm-empty">{{ i18n.t('mg.pb.empty') }}</p>
+    }
+  </section>
+</div>

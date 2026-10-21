@@ -4,6 +4,7 @@
     <span class="adm-muted">{{ i18n.t('ag.subtitle') }}</span>
     <span class="adm-push ag__tabs" role="tablist">
       <button type="button" role="tab" class="seg" [attr.aria-selected]="tab() === 'mine'" [attr.aria-pressed]="tab() === 'mine'" (click)="setTab('mine')"><mat-icon>checklist</mat-icon>{{ i18n.t('ag.tab.mine') }}</button>
+      <button type="button" role="tab" class="seg" [attr.aria-selected]="tab() === 'goals'" [attr.aria-pressed]="tab() === 'goals'" (click)="setTab('goals')"><mat-icon>flag</mat-icon>{{ i18n.t('mg.mine.tab') }}</button>
       <button type="button" role="tab" class="seg" [attr.aria-selected]="tab() === 'calendar'" [attr.aria-pressed]="tab() === 'calendar'" (click)="setTab('calendar')"><mat-icon>calendar_month</mat-icon>{{ i18n.t('ag.tab.calendar') }}</button>
       <button type="button" role="tab" class="seg" [attr.aria-selected]="tab() === 'managed'" [attr.aria-pressed]="tab() === 'managed'" (click)="setTab('managed')"><mat-icon>monitoring</mat-icon>{{ i18n.t('ag.tab.managed') }}</button>
       <button type="button" role="tab" class="seg" [attr.aria-selected]="tab() === 'flows'" [attr.aria-pressed]="tab() === 'flows'" (click)="setTab('flows')"><mat-icon>account_tree</mat-icon>{{ i18n.t('ag.tab.flows') }}</button>
@@ -15,7 +16,7 @@
 
   @if (error(); as e) { <p class="adm-error ag__error" role="alert">{{ e }}</p> }
 
-  <div class="ag__grid" [class.ag__grid--wide]="tab() !== 'mine' && !selected() && !form()">
+  <div class="ag__grid" [class.ag__grid--wide]="tab() !== 'mine' && !(tab() === 'goals' && goalId()) && !selected() && !form()">
     <section class="adm-card ag__main">
       @switch (tab()) {
         @case ('mine') {
@@ -57,6 +58,21 @@
             }
           } @empty {
             @if (loaded()) { <p class="adm-empty">{{ i18n.t('ag.empty.mine') }}</p> }
+          }
+        }
+
+        @case ('goals') {
+          @for (g of goals(); track g.id) {
+            <button type="button" class="ag__row" [attr.aria-current]="goalId() === g.id" (click)="goalId.set(g.id)">
+              <span class="ag__stripe tone-{{ goalTone[g.state] }}"></span>
+              <span class="ag__cell">
+                <span class="ag__name">{{ g.name }}@if (g.clientName) { <span class="pill tone-info">{{ g.clientName }}</span> }</span>
+                <span class="ag__sub"><mat-icon>flag</mat-icon>{{ g.milestones ? g.milestonesDone + '/' + g.milestones : i18n.t('mg.g.noSteps') }}</span>
+              </span>
+              <span class="ag__due"><b>{{ day(g.dueDate) }}</b><span class="text-{{ goalTone[g.state] }}">{{ i18n.t(goalStateKey(g.state)) }}</span></span>
+            </button>
+          } @empty {
+            @if (loaded()) { <p class="adm-empty">{{ i18n.t('mg.mine.empty') }}</p> }
           }
         }
 
@@ -121,7 +137,11 @@
       }
     </section>
 
-    @if (form(); as f) {
+    @if (tab() === 'goals') {
+      @if (goalId(); as id) {
+        <section class="adm-card ag__panel"><app-goal-detail [goalId]="id" (changed)="reload(true)" (deleted)="reload()" /></section>
+      }
+    } @else if (form(); as f) {
       <section class="adm-card ag__panel">
         @if (meta(); as m) {
           <app-agenda-task-form [meta]="m" [task]="f.task" (saved)="onSaved()" (cancelled)="closeForm()" (removed)="onSaved()" />

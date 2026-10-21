@@ -327,3 +327,42 @@ textarea.adm-input {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* Pestañas subrayadas dentro de una tarjeta (Gestión: Todas / Mis cuentas, Resumen / Línea de tiempo). */
+.adm-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.adm-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: -1px;
+  padding: 10px 10px 8px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.adm-tab[aria-selected="true"] {
+  border-bottom-color: var(--accent);
+  color: var(--text-primary);
+}
+
+.adm-cnt {
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--bg-surface-hover);
+  color: var(--text-secondary);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+}

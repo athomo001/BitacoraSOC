@@ -59,3 +59,24 @@ body {
     overflow: visible;
   }
 }
+
+/*
+ * «Descargar PDF» desde un diálogo (Gestión → Exportar resumen): se imprime
+ * solo el diálogo, sin la página de atrás ni el fondo oscuro.
+ */
+@media print {
+  body.print-dialog > :not(.cdk-overlay-container),
+  body.print-dialog .cdk-overlay-backdrop,
+  body.print-dialog .app-modal__header,
+  body.print-dialog .app-modal__footer {
+    /* stylelint-disable-next-line declaration-no-important */
+    display: none !important;
+  }
+
+  body.print-dialog .cdk-overlay-container,
+  body.print-dialog .cdk-global-overlay-wrapper,
+  body.print-dialog .cdk-overlay-pane {
+    position: static;
+    display: block;
+  }
+}

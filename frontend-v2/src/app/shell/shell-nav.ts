@@ -30,6 +30,8 @@ export interface ShellNavItem {
   requiresOperational?: boolean;
   /** Operativo, o gente de un área propia que ve sus guardias y escalamiento (9e). */
   requiresAreaOps?: boolean;
+  /** Gestión CSM: perfil Gestión, jefaturas y admin (9.4). */
+  requiresManagement?: boolean;
 }
 
 export const SHELL_NAV_ITEMS: readonly ShellNavItem[] = [
@@ -49,6 +51,8 @@ export const SHELL_NAV_ITEMS: readonly ShellNavItem[] = [
   { path: 'reports', labelKey: 'nav.reports', icon: 'outgoing_mail', shortcutDigit: '8', requiresOperational: true },
   // Complementos (spec/11 §7): un solo ítem con una pestaña por complemento.
   { path: 'complements', labelKey: 'nav.complements', icon: 'extension', shortcutDigit: '7', requiresFeature: 'complements', requiresComplements: true },
+  // Gestión CSM (spec/16 §4.4, 9.4): perfil Gestión, jefaturas y admin.
+  { path: 'management', labelKey: 'nav.management', icon: 'insights', requiresManagement: true },
   // Mi equipo (spec/16 §3.5, 9d): solo la jefatura de área.
   { path: 'team', labelKey: 'nav.team', icon: 'groups', shortcutDigit: '9', requiresCapability: 'area:lead' },
   { path: 'admin', labelKey: 'nav.admin', icon: 'settings', shortcutDigit: '5' },

@@ -95,6 +95,8 @@ type ticketDTO struct {
 	CreatedByID         *uuid.UUID `json:"createdById,omitempty"`
 	CreatedAt           time.Time  `json:"createdAt"`
 	UpdatedAt           time.Time  `json:"updatedAt"`
+	// Source: app | glpi (los de GLPI son solo para mirar, spec/18).
+	Source string `json:"source"`
 }
 
 func toTicketDTO(t db.Ticket, exposeToken bool) ticketDTO {
@@ -110,6 +112,7 @@ func toTicketDTO(t db.Ticket, exposeToken bool) ticketDTO {
 	d.ParentID, d.MergedIntoID, d.CreatedByID = uuidPtr(t.ParentID), uuidPtr(t.MergedIntoID), uuidPtr(t.CreatedBy)
 	d.TerritorialUnitID = uuidPtr(t.TerritorialUnitID)
 	d.AreaID, d.RequestedAreaID = t.AreaID, t.RequestedAreaID
+	d.Source = t.Source
 	if exposeToken && t.PublicTrackingToken.Valid {
 		v := t.PublicTrackingToken.String
 		d.PublicTrackingToken = &v
@@ -279,8 +282,11 @@ func (h *TicketsHandler) LinkEntry(w http.ResponseWriter, r *http.Request) {
 		problemdetails.Write(w, r, 500, "internal-error", "no se pudo vincular la entrada")
 		return
 	}
-	u, _ := middleware.UserFromContext(r.Context())
-	_, _ = h.Queries.CreateTicketComment(r.Context(), db.CreateTicketCommentParams{TicketID: ticket.ID, UserID: pgtype.UUID{Bytes: u.ID, Valid: true}, AuthorName: u.Username, Content: "Entrada de bitácora vinculada: " + entryID.String(), IsPublic: false})
+	// En un ticket de GLPI no se escribe: el enlace se ve en «Entradas» (spec/18).
+	if !isGlpiTicket(ticket) {
+		u, _ := middleware.UserFromContext(r.Context())
+		_, _ = h.Queries.CreateTicketComment(r.Context(), db.CreateTicketCommentParams{TicketID: ticket.ID, UserID: pgtype.UUID{Bytes: u.ID, Valid: true}, AuthorName: u.Username, Content: "Entrada de bitácora vinculada: " + entryID.String(), IsPublic: false})
+	}
 	if h.AuditLog != nil {
 		h.AuditLog.Log(r.Context(), "entry.ticket_linked", audit.LevelInfo, audit.Success(), map[string]any{"entryId": entryID.String(), "ticketId": ticket.ID.String()})
 	}
@@ -384,7 +390,11 @@ func (h *TicketsHandler) ResolveEntry(w http.ResponseWriter, r *http.Request) {
 			problemdetails.Write(w, r, 404, "not-found", "ticket vinculado no encontrado")
 			return
 		}
-		if strings.TrimSpace(req.ResolutionNotes) != "" {
+		if isGlpiTicket(ticket) && req.CloseLinkedTicket {
+			problemdetails.Write(w, r, http.StatusConflict, "glpi-readonly", glpiReadOnlyMessage)
+			return
+		}
+		if strings.TrimSpace(req.ResolutionNotes) != "" && !isGlpiTicket(ticket) {
 			_, _ = h.Queries.CreateTicketComment(r.Context(), db.CreateTicketCommentParams{TicketID: ticket.ID, UserID: pgtype.UUID{Bytes: actor.ID, Valid: true}, AuthorName: actor.Username, Content: strings.TrimSpace(req.ResolutionNotes), IsPublic: false})
 		}
 		if req.CloseLinkedTicket {

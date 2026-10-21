@@ -112,6 +112,11 @@ func (h *TicketsHandler) requireTicketAccess(w http.ResponseWriter, r *http.Requ
 		problemdetails.Write(w, r, http.StatusNotFound, "not-found", "ticket no encontrado")
 		return false
 	}
+	// Los de GLPI son solo para mirar: se editan en GLPI (spec/18).
+	if t.Source == ticketSourceGlpi && r.Method != http.MethodGet {
+		problemdetails.Write(w, r, http.StatusConflict, "glpi-readonly", glpiReadOnlyMessage)
+		return false
+	}
 	if !scope.canWork(t.AreaID) && !viewOnlyRequest(r) {
 		problemdetails.Write(w, r, http.StatusForbidden, "ticket-other-area", "este ticket lo trabaja otra área: puedes verlo y comentarlo")
 		return false

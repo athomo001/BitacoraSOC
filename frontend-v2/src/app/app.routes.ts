@@ -104,6 +104,11 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/complements/complements').then((module) => module.ComplementsComponent),
       },
+      // Gestión CSM (spec/16 §4.4, 9.4): Clientes, Metas, Indicadores y Plantillas. El backend decide quién la ve.
+      {
+        path: 'management',
+        loadComponent: () => import('./features/management/management').then((module) => module.ManagementComponent),
+      },
       // Mi equipo (spec/16 §3.5, 9d): la jefatura de área. El backend exige la capacidad.
       {
         path: 'team',

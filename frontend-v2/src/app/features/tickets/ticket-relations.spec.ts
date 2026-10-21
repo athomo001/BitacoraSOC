@@ -13,7 +13,7 @@ function ticket(overrides: Partial<Ticket>): Ticket {
     teamName: null, assigneeUsername: null, status: 'in_progress', impact: 'high', urgency: 'high', priority: 'p1_critical',
     title: 'Caída fibra troncal Sur', description: 'x', slaPausedSeconds: 0, reopenedCount: 0, onHoldSince: null,
     sla: {}, allowedTransitions: ['pending_vendor', 'resolved'], createdAt: '2026-10-07T04:58:00Z', updatedAt: '', childCount: 0,
-    areaId: 'a-soc', areaCode: 'soc', areaName: 'SOC', requestedAreaId: 'a-soc', requestedAreaCode: 'soc', requestedAreaName: 'SOC', canWork: true, ...overrides,
+    areaId: 'a-soc', areaCode: 'soc', areaName: 'SOC', requestedAreaId: 'a-soc', requestedAreaCode: 'soc', requestedAreaName: 'SOC', canWork: true, source: 'app', ...overrides,
   };
 }
 

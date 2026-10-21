@@ -55,6 +55,8 @@ type ticketViewDTO struct {
 	RequestedAreaName string  `json:"requestedAreaName"`
 	CreatedByName     *string `json:"createdByName,omitempty"`
 	CanWork           bool    `json:"canWork"`
+	// Glpi: solo en los tickets traídos de GLPI (spec/18).
+	Glpi *ticketGlpiDTO `json:"glpi,omitempty"`
 }
 
 type ticketPlaceDTO struct {
@@ -132,6 +134,10 @@ type ticketCommentDTO struct {
 	Images     []ticketImageDTO `json:"images"`
 	// Origin: '' propio, 'parent:TKT-…', 'child:TKT-…' o 'merged:TKT-…'.
 	Origin string `json:"origin"`
+	// GlpiKind: en un ticket de GLPI, followup | task | solution; las tareas
+	// traen su tiempo dedicado.
+	GlpiKind        string `json:"glpiKind,omitempty"`
+	GlpiTimeSeconds int32  `json:"glpiTimeSeconds,omitempty"`
 }
 
 // ticketImageDTO: los bytes se piden aparte (GET /api/tickets/{id}/images/{imageId}).
@@ -153,7 +159,8 @@ func imagesOfComment(rows []db.ListTicketImagesRow, commentID uuid.UUID) []ticke
 }
 
 func toTicketCommentDTO(c db.TicketComment) ticketCommentDTO {
-	return ticketCommentDTO{ID: c.ID, AuthorName: c.AuthorName, Content: c.Content, IsPublic: c.IsPublic, CreatedAt: c.CreatedAt.Time, Images: []ticketImageDTO{}, Origin: c.Origin}
+	return ticketCommentDTO{ID: c.ID, AuthorName: c.AuthorName, Content: c.Content, IsPublic: c.IsPublic, CreatedAt: c.CreatedAt.Time, Images: []ticketImageDTO{}, Origin: c.Origin,
+		GlpiKind: c.GlpiKind.String, GlpiTimeSeconds: c.GlpiTimeSeconds.Int32}
 }
 
 type ticketTaskDTO struct {
@@ -256,6 +263,10 @@ func (h *TicketsHandler) List(w http.ResponseWriter, r *http.Request) {
 		PageSize: int32(size), PageOffset: int32((page - 1) * size),
 		VisibleAreas: scope.visible(),
 	}
+	// ?source=app | glpi: dónde nació (spec/18).
+	if src := q.Get("source"); src == "app" || src == ticketSourceGlpi {
+		params.Source = pgtype.Text{String: src, Valid: true}
+	}
 	// ?queue=mine (la cola de mis áreas) | asked (lo que mis áreas pidieron a otras) | all.
 	if own := scope.list(); len(own) > 0 {
 		switch q.Get("queue") {
@@ -276,7 +287,7 @@ func (h *TicketsHandler) List(w http.ResponseWriter, r *http.Request) {
 		problemdetails.Write(w, r, 500, "internal-error", "no se pudieron listar los tickets")
 		return
 	}
-	total, err := h.Queries.CountTicketsView(ctx, db.CountTicketsViewParams{TicketType: params.TicketType, Scope: params.Scope, Status: params.Status, AssignedTeamID: params.AssignedTeamID, ClientID: params.ClientID, Q: params.Q, OpenOnly: params.OpenOnly, VisibleAreas: params.VisibleAreas, QueueAreas: params.QueueAreas, AskedAreas: params.AskedAreas})
+	total, err := h.Queries.CountTicketsView(ctx, db.CountTicketsViewParams{TicketType: params.TicketType, Scope: params.Scope, Status: params.Status, AssignedTeamID: params.AssignedTeamID, ClientID: params.ClientID, Q: params.Q, OpenOnly: params.OpenOnly, VisibleAreas: params.VisibleAreas, QueueAreas: params.QueueAreas, AskedAreas: params.AskedAreas, Source: params.Source})
 	if err != nil {
 		problemdetails.Write(w, r, 500, "internal-error", "no se pudo contar los tickets")
 		return
@@ -289,12 +300,14 @@ func (h *TicketsHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 	items := make([]ticketViewDTO, 0, len(rows))
 	atRisk := h.atRiskPercent(ctx)
+	apiURL := glpiAPIURL(ctx, h.Queries)
 	for _, row := range rows {
 		v := toTicketView(row.Ticket, row.ClientName, row.TeamName, row.AssigneeUsername, now, atRisk)
 		v.ParentNumber, v.MergedIntoNumber, v.ChildCount = textPtr(row.ParentNumber), textPtr(row.MergedIntoNumber), row.ChildCount
 		v.Place = ticketPlace(row.Ticket, row.PlaceName, row.PlaceParentName, row.AssetName)
 		v.AreaCode, v.AreaName, v.RequestedAreaCode, v.RequestedAreaName = row.AreaCode, row.AreaName, row.RequestedAreaCode, row.RequestedAreaName
 		v.CanWork = scope.canWork(row.Ticket.AreaID)
+		withGlpi(&v, row.Ticket, apiURL)
 		items = append(items, v)
 	}
 	writeData(w, 200, map[string]any{
@@ -317,7 +330,7 @@ func (h *TicketsHandler) loadDetail(r *http.Request, id uuid.UUID) (ticketDetail
 	if err != nil {
 		return ticketDetailDTO{}, err
 	}
-	entryRows, err := h.Queries.ListTicketEntriesWithAuthor(ctx, pgtype.UUID{Bytes: id, Valid: true})
+	entryRows, err := h.Queries.ListTicketEntriesWithAuthor(ctx, db.ListTicketEntriesWithAuthorParams{TicketID: id, GlpiTicketID: glpiNumber(row.Ticket)})
 	if err != nil {
 		return ticketDetailDTO{}, err
 	}
@@ -348,6 +361,9 @@ func (h *TicketsHandler) loadDetail(r *http.Request, id uuid.UUID) (ticketDetail
 	if scope, err := loadTicketScope(ctx, h.Queries); err == nil {
 		d.Ticket.CanWork = scope.canWork(row.Ticket.AreaID)
 	}
+	if isGlpiTicket(row.Ticket) {
+		withGlpi(&d.Ticket, row.Ticket, glpiAPIURL(ctx, h.Queries))
+	}
 	for _, rv := range resolvers {
 		d.Resolvers = append(d.Resolvers, ticketResolverDTO{UserID: rv.UserID, Username: rv.Username, FullName: textPtr(rv.FullName)})
 	}
@@ -375,6 +391,13 @@ func (h *TicketsHandler) loadDetail(r *http.Request, id uuid.UUID) (ticketDetail
 	}
 	for _, t := range taskRows {
 		d.Tasks = append(d.Tasks, ticketTaskDTO{ID: t.ID, Username: t.Username, Content: t.Content, TimeSpentSeconds: t.TimeSpentSeconds, IsPublic: t.IsPublic, PerformedAt: t.PerformedAt.Time})
+	}
+	// Las tareas de GLPI también se ven en «Tareas», con su tiempo.
+	for _, c := range d.Comments {
+		if c.GlpiKind == "task" {
+			d.Tasks = append(d.Tasks, ticketTaskDTO{ID: c.ID, Username: c.AuthorName, Content: c.Content, TimeSpentSeconds: c.GlpiTimeSeconds, IsPublic: c.IsPublic, PerformedAt: c.CreatedAt})
+			d.TotalTimeSpentSeconds += int64(c.GlpiTimeSeconds)
+		}
 	}
 	for _, e := range entryRows {
 		d.Entries = append(d.Entries, ticketEntryDTO{ID: e.ID, EntryType: string(e.EntryType), Content: e.Content, AuthorUsername: e.Username, CreatedAt: e.CreatedAt.Time})

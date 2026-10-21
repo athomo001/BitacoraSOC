@@ -96,9 +96,10 @@ WHERE id = sqlc.arg('id')
 RETURNING *;
 
 -- name: ListOpenTicketsForSLAMail :many
--- Tickets abiertos a los que todavía les falta algún aviso de SLA.
+-- Tickets abiertos a los que todavía les falta algún aviso de SLA. Los de
+-- GLPI no: sus avisos los manda GLPI (spec/18).
 SELECT * FROM tickets
-WHERE status NOT IN ('resolved', 'closed', 'cancelled') AND merged_into_id IS NULL
+WHERE status NOT IN ('resolved', 'closed', 'cancelled') AND merged_into_id IS NULL AND source = 'app'
   AND (sla_response_breach_notified_at IS NULL OR sla_resolution_warn_notified_at IS NULL OR sla_resolution_breach_notified_at IS NULL);
 
 -- name: MarkTicketSLANotified :exec
