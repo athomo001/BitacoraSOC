@@ -13,6 +13,8 @@ import { SseService } from '../../core/sse/sse.service';
 import { SystemFeaturesService } from '../../core/system-features/system-features.service';
 import { DraftsService } from '../../core/drafts/drafts.service';
 import { appendSnippet, openMarkdownHelp } from '../../shared/markdown/markdown-help-dialog';
+import { Dialog } from '@angular/cdk/dialog';
+import { GlpiCreateDialogComponent, GlpiCreateDialogData } from '../tickets/glpi-create-dialog';
 import { NotesService } from '../../core/notes/notes.service';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { MessageKey } from '../../core/i18n/messages';
@@ -21,6 +23,7 @@ import { Organization, OrganizationsService, TeamSummary } from '../../core/orga
 import { defangWithCount } from '../../core/entries/defang';
 import { Entry, EntryAuthor, EntryComment, EntryDetail, EntryFilters, EntryScope, EntryType, EntriesService, TagSuggestion } from '../../core/entries/entries.service';
 
+import '../../core/i18n/packs/glpi';
 import '../../core/i18n/packs/entries';
 interface ComposeDraft {
   entryType: EntryType;
@@ -77,6 +80,7 @@ export class EntriesComponent implements OnInit {
   private readonly api = inject(EntriesService);
   private readonly drafts = inject(DraftsService);
   private readonly injector = inject(Injector);
+  private readonly dialog = inject(Dialog);
   private readonly notesApi = inject(NotesService);
   private readonly sse = inject(SseService);
   private readonly auth = inject(AuthService);
@@ -105,6 +109,10 @@ export class EntriesComponent implements OnInit {
   /** Autor: '' todos, 'me' (Mías) o un id. Cliente: '' todos o un id (paridad con el legacy). */
   protected readonly filterAuthor = signal('');
   protected readonly filterClient = signal('');
+  /** «En seguimiento» (10j). */
+  protected readonly filterFollowUp = signal(false);
+  protected readonly closingFollowUp = signal(false);
+  protected readonly closeNote = signal('');
   protected readonly authors = signal<EntryAuthor[]>([]);
   protected readonly filterClients = signal<Organization[]>([]);
   /** Sugerencias de etiquetas al escribir (las que ya existen). */
@@ -122,6 +130,8 @@ export class EntriesComponent implements OnInit {
   private readonly route = inject(ActivatedRoute, { optional: true });
   protected readonly selected = signal<EntryDetail | null>(null);
   protected readonly newComment = signal('');
+  /** «También en GLPI» (10d.2): el seguimiento va al ticket de GLPI enlazado. */
+  protected readonly alsoGlpi = signal(false);
   protected readonly confirmDelete = signal(false);
 
   protected readonly draft = signal<ComposeDraft>({ ...EMPTY_DRAFT });
@@ -236,12 +246,26 @@ export class EntriesComponent implements OnInit {
       to: this.filterTo() || undefined,
       author: this.filterAuthor() || undefined,
       client: this.filterClient() || undefined,
+      followUp: this.filterFollowUp() ? 'open' : undefined,
     };
   }
 
   /** «Mías»: las entradas que escribí yo. */
   protected toggleMine(): void {
     this.quickFilter(this.filterAuthor, this.filterAuthor() === 'me' ? '' : 'me');
+  }
+
+  /** «En seguimiento»: lo que sigue abierto, primero lo que se movió hace menos. */
+  protected toggleFollowUp(): void {
+    this.quickFilter(this.filterFollowUp, !this.filterFollowUp());
+  }
+
+  /** «hace 5 min», «hace 3 h», «hace 2 d». */
+  protected ago(iso: string): string {
+    const minutes = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 60000));
+    if (minutes < 60) return this.i18n.tf('entries.fu.agoMin', minutes);
+    if (minutes < 24 * 60) return this.i18n.tf('entries.fu.agoH', Math.floor(minutes / 60));
+    return this.i18n.tf('entries.fu.agoD', Math.floor(minutes / (24 * 60)));
   }
 
   /** La etiqueta que se está escribiendo (lo que va después de la última coma). */
@@ -305,11 +329,12 @@ export class EntriesComponent implements OnInit {
     this.filterTo.set('');
     this.filterAuthor.set('');
     this.filterClient.set('');
+    this.filterFollowUp.set(false);
     void this.load();
   }
 
   protected hasFilters(): boolean {
-    return !!(this.filterScope() || this.filterType() || this.filterTag() || this.filterQ() || this.filterFrom() || this.filterTo() || this.filterAuthor() || this.filterClient());
+    return !!(this.filterScope() || this.filterType() || this.filterTag() || this.filterQ() || this.filterFrom() || this.filterTo() || this.filterAuthor() || this.filterClient() || this.filterFollowUp());
   }
 
   protected summary(entry: Entry): string {
@@ -339,6 +364,8 @@ export class EntriesComponent implements OnInit {
     this.error.set(null);
     this.linkOpen.set(false);
     this.confirmDelete.set(false);
+    this.closingFollowUp.set(false);
+    this.closeNote.set('');
     try {
       this.selected.set(await this.api.get(entry.id));
       this.panel.set('detail');
@@ -383,6 +410,24 @@ export class EntriesComponent implements OnInit {
   protected readonly linkKind = signal<'internal' | 'glpi'>('internal');
   protected readonly linkNumber = signal('');
   protected readonly linkBusy = signal(false);
+
+  /** «Crear en GLPI» (10d.2): vista previa, crea el ticket y deja la entrada enlazada. */
+  protected createInGlpi(): void {
+    const entry = this.selected();
+    if (!entry) return;
+    const data: GlpiCreateDialogData<{ glpiTicketId: string }> = {
+      load: () => this.api.glpiPreview(entry.id),
+      create: (input) => this.api.createInGlpi(entry.id, input),
+    };
+    this.dialog.open<{ glpiTicketId: string }>(GlpiCreateDialogComponent, { data, injector: this.injector, ariaLabel: this.i18n.t('gw.create') })
+      .closed.subscribe((made) => {
+        if (made) void this.select(entry);
+      });
+  }
+
+  protected glpiPushKey(state: string): MessageKey {
+    return `gw.push.${state}` as MessageKey;
+  }
 
   protected openLink(): void {
     this.linkKind.set(this.ticketsEnabled() ? 'internal' : 'glpi');
@@ -430,11 +475,38 @@ export class EntriesComponent implements OnInit {
     const comment = this.newComment().trim();
     if (!entry || !comment) return;
     try {
-      const created: EntryComment = await this.api.addComment(entry.id, comment);
-      this.selected.set({ ...entry, comments: [...entry.comments, created] });
+      const created: EntryComment = await this.api.addComment(entry.id, comment, this.alsoGlpi() && !!entry.glpiTicketId && !!entry.glpiWrite);
+      // Un seguimiento la deja en seguimiento (y borra un cierre anterior).
+      this.selected.set({ ...entry, comments: [...entry.comments, created], followUpOpen: true, followUpCount: entry.comments.length + 1,
+        lastFollowUpAt: created.createdAt, followUpClosedAt: undefined, followUpClosedBy: undefined, followUpCloseNote: undefined });
+      this.patchListed(entry.id, { followUpOpen: true, followUpCount: entry.comments.length + 1, lastFollowUpAt: created.createdAt });
       this.newComment.set('');
     } catch (error) {
       this.error.set(problemDetail(error, this.i18n.t('entries.commentError')));
+    }
+  }
+
+  /** Refleja en la lista lo que cambió en el detalle, sin recargarla. */
+  private patchListed(id: string, changes: Partial<Entry>): void {
+    this.entries.update((list) => list.map((e) => (e.id === id ? { ...e, ...changes } : e)));
+  }
+
+  /** Cerrar el seguimiento (con nota opcional) o ponerla en seguimiento. */
+  protected async setFollowUp(open: boolean): Promise<void> {
+    const entry = this.selected();
+    if (!entry) return;
+    const note = open ? '' : this.closeNote().trim();
+    try {
+      const res = await this.api.setFollowUp(entry.id, open, note);
+      this.selected.set({ ...entry, followUpOpen: res.followUpOpen, followUpClosedAt: res.followUpClosedAt,
+        followUpClosedBy: open ? undefined : this.auth.user()?.username, followUpCloseNote: note || undefined });
+      this.patchListed(entry.id, { followUpOpen: res.followUpOpen });
+      this.closingFollowUp.set(false);
+      this.closeNote.set('');
+      // Con el filtro puesto, la cerrada deja de pertenecer a la lista.
+      if (!open && this.filterFollowUp()) void this.load();
+    } catch (error) {
+      this.error.set(problemDetail(error, this.i18n.t('entries.fu.error')));
     }
   }
 

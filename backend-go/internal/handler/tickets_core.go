@@ -151,6 +151,8 @@ func (h *TicketsHandler) afterReopen(ctx context.Context, id, actorID uuid.UUID)
 
 // afterStatusMail: avisos de un cambio de estado (spec/15 §4.2 y §4.3).
 func (h *TicketsHandler) afterStatusMail(ctx context.Context, id uuid.UUID, from, to tickets.Status, actorID uuid.UUID) {
+	// La copia en GLPI sigue al ticket de la app (10d.2).
+	h.Glpi.AfterStatus(ctx, id, string(from), string(to), actorID)
 	emit := func(event, comment string) {
 		h.Mailer.Emit(ctx, mailEmission{Event: event, TicketID: id, ActorID: actorID, Comment: comment})
 	}

@@ -1,3 +1,4 @@
+import { GlpiCreateInput, GlpiCreatePreview } from '../glpi/glpi.service';
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
@@ -35,6 +36,11 @@ export interface Entry {
   updatedAt: string;
   /** La creó una llave de la API de integraciones (spec/19). */
   apiKeyName?: string;
+  /** En seguimiento hasta que alguien lo cierra (10j). */
+  followUpOpen: boolean;
+  /** Cuántos seguimientos tiene y cuándo fue el último. */
+  followUpCount: number;
+  lastFollowUpAt?: string;
 }
 
 export interface EntryComment {
@@ -44,6 +50,9 @@ export interface EntryComment {
   comment: string;
   isSystemGenerated: boolean;
   createdAt: string;
+  /** «También en GLPI» (10d.2): en cola, enviado o no se envió. */
+  glpiPush?: 'queued' | 'sent' | 'failed';
+  glpiPushError?: string;
 }
 
 export interface EntryDetail extends Entry {
@@ -53,6 +62,12 @@ export interface EntryDetail extends Entry {
   /** Ticket de GLPI enlazado y, si GLPI está configurado, el enlace a su ficha. */
   glpiTicketId?: string;
   glpiTicketUrl?: string;
+  /** «Escribir en GLPI» encendido (10d.2). */
+  glpiWrite?: boolean;
+  /** Quién cerró el seguimiento, cuándo y con qué nota. */
+  followUpClosedAt?: string;
+  followUpClosedBy?: string;
+  followUpCloseNote?: string;
 }
 
 export interface EntryFilters {
@@ -66,6 +81,8 @@ export interface EntryFilters {
   author?: string;
   /** Cliente: por el servicio o el activo de la entrada (o la etiqueta cliente:X del legacy). */
   client?: string;
+  /** «En seguimiento»: solo las abiertas, primero la de seguimiento más reciente. */
+  followUp?: 'open';
   page?: number;
   pageSize?: number;
 }
@@ -84,6 +101,7 @@ function filterParams(f: EntryFilters): Record<string, string> {
   if (f.q) params['q'] = f.q;
   if (f.author) params['author'] = f.author;
   if (f.client) params['client'] = f.client;
+  if (f.followUp) params['followUp'] = f.followUp;
   if (f.page) params['page'] = String(f.page);
   if (f.pageSize) params['pageSize'] = String(f.pageSize);
   return params;
@@ -169,8 +187,22 @@ export class EntriesService {
     return (await firstValueFrom(this.http.put<ApiEnvelope<EntryDetail>>(`/api/entries/${entryId}/glpi-ticket`, { glpiTicketId }))).data;
   }
 
-  async addComment(entryId: string, comment: string): Promise<EntryComment> {
-    return (await firstValueFrom(this.http.post<ApiEnvelope<EntryComment>>(`/api/entries/${entryId}/comments`, { comment }))).data;
+  async addComment(entryId: string, comment: string, syncToGlpi = false): Promise<EntryComment> {
+    return (await firstValueFrom(this.http.post<ApiEnvelope<EntryComment>>(`/api/entries/${entryId}/comments`, syncToGlpi ? { comment, syncToGlpi } : { comment }))).data;
+  }
+
+  /** Vista previa de «Crear en GLPI» desde la entrada (10d.2). */
+  async glpiPreview(entryId: string): Promise<GlpiCreatePreview> {
+    return (await firstValueFrom(this.http.get<ApiEnvelope<GlpiCreatePreview>>(`/api/entries/${entryId}/glpi-create`))).data;
+  }
+
+  async createInGlpi(entryId: string, input: GlpiCreateInput): Promise<{ glpiTicketId: string; glpiTicketUrl?: string }> {
+    return (await firstValueFrom(this.http.post<ApiEnvelope<{ glpiTicketId: string; glpiTicketUrl?: string }>>(`/api/entries/${entryId}/glpi-create`, input))).data;
+  }
+
+  /** Cerrar el seguimiento (nota opcional) o ponerla en seguimiento sin escribir uno. */
+  async setFollowUp(entryId: string, open: boolean, note = ''): Promise<{ followUpOpen: boolean; followUpClosedAt?: string }> {
+    return (await firstValueFrom(this.http.put<ApiEnvelope<{ followUpOpen: boolean; followUpClosedAt?: string }>>(`/api/entries/${entryId}/follow-up`, { open, note }))).data;
   }
 
   /** Sin conversión a WebP ni limpieza EXIF (versión simple de esta fase, ver spec/00-mapa-mental.md). */

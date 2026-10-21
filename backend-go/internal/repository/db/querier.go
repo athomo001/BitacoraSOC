@@ -53,6 +53,9 @@ type Querier interface {
 	ClaimComplementTicket(ctx context.Context, arg ClaimComplementTicketParams) (int64, error)
 	// Solo un nodo envía el resumen del día: el que logra marcarlo.
 	ClaimDigestDay(ctx context.Context, day pgtype.Date) (int64, error)
+	// Toma lo que toca enviar (en orden) por dos minutos: el otro nodo no lo
+	// repite. Sin id, lo vencido; con id, solo ese (enviar al momento).
+	ClaimGlpiOutbox(ctx context.Context, onlyID pgtype.UUID) ([]GlpiOutbox, error)
 	// Un solo envío por día y por semana objetivo.
 	ClaimGuardReminder(ctx context.Context, arg ClaimGuardReminderParams) (int64, error)
 	ClaimIdempotency(ctx context.Context, arg ClaimIdempotencyParams) (int64, error)
@@ -145,7 +148,9 @@ type Querier interface {
 	// (to_tsvector('spanish', content)) — la expresión del WHERE debe calzar
 	// exactamente con la del índice para poder usarlo.
 	CreateEntry(ctx context.Context, arg CreateEntryParams) (Entry, error)
-	CreateEntryComment(ctx context.Context, arg CreateEntryCommentParams) (EntryComment, error)
+	// Un seguimiento deja la entrada «En seguimiento» (10j), también los de
+	// sistema que deja Escalamiento.
+	CreateEntryComment(ctx context.Context, arg CreateEntryCommentParams) (CreateEntryCommentRow, error)
 	CreateEscalationIncident(ctx context.Context, arg CreateEscalationIncidentParams) (EscalationIncident, error)
 	CreateEscalationPool(ctx context.Context, arg CreateEscalationPoolParams) (EscalationPool, error)
 	// Parte desde el último evento de la cola: no recibe lo anterior a crearse.
@@ -263,6 +268,9 @@ type Querier interface {
 	DeleteFutureUntouchedOccurrences(ctx context.Context, arg DeleteFutureUntouchedOccurrencesParams) (int64, error)
 	// Al editar un flujo, las vueltas que todavía no empiezan y nadie tocó se rehacen.
 	DeleteFutureUntouchedRuns(ctx context.Context, arg DeleteFutureUntouchedRunsParams) (int64, error)
+	// Lo que se borró en GLPI sale de la app, pero solo lo que vino de GLPI: los
+	// comentarios propios del ticket de la app no se tocan.
+	DeleteGlpiCopyCommentsExcept(ctx context.Context, arg DeleteGlpiCopyCommentsExceptParams) error
 	// Lo que se borró en GLPI también sale de la app (keep: «followup:12», «task:7»…).
 	DeleteGlpiTicketCommentsExcept(ctx context.Context, arg DeleteGlpiTicketCommentsExceptParams) error
 	DeleteGoal(ctx context.Context, id uuid.UUID) (int64, error)
@@ -403,6 +411,7 @@ type Querier interface {
 	GetComplementUpload(ctx context.Context, id uuid.UUID) (ComplementUpload, error)
 	GetDirectoryContact(ctx context.Context, id uuid.UUID) (GetDirectoryContactRow, error)
 	GetEntry(ctx context.Context, id uuid.UUID) (GetEntryRow, error)
+	GetEntryCommentPush(ctx context.Context, id uuid.UUID) (GetEntryCommentPushRow, error)
 	GetEscalationIncident(ctx context.Context, id uuid.UUID) (GetEscalationIncidentRow, error)
 	GetEscalationPool(ctx context.Context, id uuid.UUID) (EscalationPool, error)
 	GetForwardDestination(ctx context.Context, id uuid.UUID) (ForwardDestination, error)
@@ -480,6 +489,7 @@ type Querier interface {
 	GetTicketBrief(ctx context.Context, id uuid.UUID) (GetTicketBriefRow, error)
 	GetTicketByNumber(ctx context.Context, ticketNumber string) (Ticket, error)
 	GetTicketByNumberForMerge(ctx context.Context, ticketNumber string) (Ticket, error)
+	GetTicketComment(ctx context.Context, id uuid.UUID) (TicketComment, error)
 	GetTicketImage(ctx context.Context, arg GetTicketImageParams) (GetTicketImageRow, error)
 	GetTicketRef(ctx context.Context, id uuid.UUID) (GetTicketRefRow, error)
 	GetTicketSeries(ctx context.Context, id uuid.UUID) (TicketNumberSeries, error)
@@ -519,6 +529,7 @@ type Querier interface {
 	InsertComplementFile(ctx context.Context, arg InsertComplementFileParams) error
 	InsertFlowOccurrence(ctx context.Context, arg InsertFlowOccurrenceParams) (int64, error)
 	InsertForwardEvent(ctx context.Context, arg InsertForwardEventParams) error
+	InsertGlpiOutbox(ctx context.Context, arg InsertGlpiOutboxParams) (uuid.UUID, error)
 	InsertMonthlySummary(ctx context.Context, arg InsertMonthlySummaryParams) error
 	InsertNoticeRecipient(ctx context.Context, arg InsertNoticeRecipientParams) (int64, error)
 	// Notificaciones (spec/16 §4.5, 9.5, 000042).
@@ -675,9 +686,11 @@ type Querier interface {
 	// en Go.
 	ListEmailDomainSources(ctx context.Context) ([]ListEmailDomainSourcesRow, error)
 	ListEnabledShiftReminders(ctx context.Context) ([]ShiftReminder, error)
-	// Filtros (todos opcionales): ámbito, tipo, etiqueta, fechas, texto, autor y
-	// cliente. El cliente sale del servicio o del activo de la entrada, o de la
-	// etiqueta cliente:X que dejó el ETL cuando el cliente tenía varios servicios.
+	// Filtros (todos opcionales): ámbito, tipo, etiqueta, fechas, texto (también
+	// en los seguimientos), autor, cliente y «En seguimiento». El cliente sale del
+	// servicio o del activo de la entrada, o de la etiqueta cliente:X que dejó el
+	// ETL cuando el cliente tenía varios servicios. Con «En seguimiento», primero
+	// lo que tuvo un seguimiento más reciente.
 	ListEntries(ctx context.Context, arg ListEntriesParams) ([]ListEntriesRow, error)
 	// ===== API de integraciones: datos =====
 	// Entradas de la Bitácora para una llave: de sus clientes (NULL = todos;
@@ -719,11 +732,16 @@ type Querier interface {
 	ListForwardDestinations(ctx context.Context, today pgtype.Date) ([]ListForwardDestinationsRow, error)
 	// Qué grupos pide algún destino encendido: sin destinos, no se encola nada.
 	ListForwardSubscriptions(ctx context.Context) ([]ListForwardSubscriptionsRow, error)
+	// Las copias que la sincronización mira: las de tickets abiertos y las de
+	// cerrados hace menos de una semana (por si alguien escribe en GLPI al cierre).
+	ListGlpiCopies(ctx context.Context) ([]ListGlpiCopiesRow, error)
 	// Números de GLPI enlazados a mano en la Bitácora o en Escalamiento, con
 	// quien los enlazó primero (su área es la del ticket si no entra por grupo).
 	ListGlpiHandLinks(ctx context.Context) ([]ListGlpiHandLinksRow, error)
 	// Los equipos que vienen de GLPI (activos o no).
 	ListGlpiLinkedAssets(ctx context.Context) ([]ListGlpiLinkedAssetsRow, error)
+	// Lo último de la cola, para Administración → GLPI.
+	ListGlpiOutbox(ctx context.Context) ([]ListGlpiOutboxRow, error)
 	ListGlpiRuns(ctx context.Context) ([]ListGlpiRunsRow, error)
 	ListGlpiTicketRuns(ctx context.Context) ([]ListGlpiTicketRunsRow, error)
 	ListGoalEvents(ctx context.Context, goalID uuid.UUID) ([]ListGoalEventsRow, error)
@@ -999,9 +1017,13 @@ type Querier interface {
 	MarkForwardSent(ctx context.Context, arg MarkForwardSentParams) (bool, error)
 	MarkGlpiAutoRun(ctx context.Context, at pgtype.Timestamptz) error
 	MarkGlpiFailureNotified(ctx context.Context, day pgtype.Date) error
+	MarkGlpiOutboxFailed(ctx context.Context, arg MarkGlpiOutboxFailedParams) error
+	MarkGlpiOutboxRetry(ctx context.Context, arg MarkGlpiOutboxRetryParams) error
+	MarkGlpiOutboxSent(ctx context.Context, arg MarkGlpiOutboxSentParams) error
 	MarkGlpiTicketDeleted(ctx context.Context, glpiID pgtype.Int4) (int64, error)
 	MarkGlpiTicketsAutoRun(ctx context.Context, at pgtype.Timestamptz) error
 	MarkGlpiTicketsFailureNotified(ctx context.Context, day pgtype.Date) error
+	MarkGlpiWriteFailureNotified(ctx context.Context, writeFailureNotifiedOn pgtype.Date) error
 	MarkNoticePublished(ctx context.Context, id uuid.UUID) error
 	MarkNoticeRead(ctx context.Context, arg MarkNoticeReadParams) (int64, error)
 	MarkNoticeReminded(ctx context.Context, noticeID uuid.UUID) error
@@ -1107,6 +1129,8 @@ type Querier interface {
 	ResetLoginRateLimit(ctx context.Context, ipAddress string) error
 	// Reabrir permite volver a avisar el SLA de resolución (spec/15 §4.2).
 	ResetTicketResolutionSLANotified(ctx context.Context, id uuid.UUID) error
+	// «Reintentar»: lo que falló vuelve a la cola desde cero (uno o todos).
+	RetryGlpiOutbox(ctx context.Context, id pgtype.UUID) (int64, error)
 	RetryTicketMail(ctx context.Context, arg RetryTicketMailParams) (int64, error)
 	RevokeAPIKey(ctx context.Context, arg RevokeAPIKeyParams) (ApiKey, error)
 	RotatePublicShareLink(ctx context.Context, arg RotatePublicShareLinkParams) (PublicShareLink, error)
@@ -1131,10 +1155,14 @@ type Querier interface {
 	// cada tipo (la fuente de verdad son contact_channels), cifrada + indexada
 	// para listar y buscar sin recorrer los canales.
 	SetContactPrimaryChannels(ctx context.Context, arg SetContactPrimaryChannelsParams) error
+	SetEntryCommentPush(ctx context.Context, arg SetEntryCommentPushParams) error
+	// Cerrar el seguimiento (con nota opcional) o ponerlo de nuevo en seguimiento.
+	SetEntryFollowUp(ctx context.Context, arg SetEntryFollowUpParams) (SetEntryFollowUpRow, error)
 	// Ticket de GLPI de una entrada (NULL lo quita).
 	SetEntryGlpiTicket(ctx context.Context, arg SetEntryGlpiTicketParams) (uuid.UUID, error)
 	SetEscalationIncidentEntry(ctx context.Context, arg SetEscalationIncidentEntryParams) error
 	SetForwardDownAlerted(ctx context.Context, id uuid.UUID) error
+	SetGlpiCopyDateMod(ctx context.Context, arg SetGlpiCopyDateModParams) error
 	SetGlpiTicketsCursor(ctx context.Context, cursor pgtype.Text) error
 	// completed_by NULL = se cumplió sola (con el último hito).
 	SetGoalCompleted(ctx context.Context, arg SetGoalCompletedParams) error
@@ -1166,6 +1194,11 @@ type Querier interface {
 	// cliente anterior; enlace público y PIN nuevos (el cliente equivocado deja
 	// de ver el ticket).
 	SetTicketClient(ctx context.Context, arg SetTicketClientParams) (Ticket, error)
+	// Estado del envío a GLPI de un comentario; al enviarse queda con el número
+	// del seguimiento (así la sincronización no lo trae de vuelta como nuevo).
+	SetTicketCommentPush(ctx context.Context, arg SetTicketCommentPushParams) error
+	// Una sola copia por ticket, y solo de los tickets de la app.
+	SetTicketGlpiCopy(ctx context.Context, arg SetTicketGlpiCopyParams) (int64, error)
 	// "Afecta al cliente" y "Avisar a" del ticket (spec/15 §5). Recipients NULL
 	// = volver a los del cliente.
 	SetTicketMailRecipients(ctx context.Context, arg SetTicketMailRecipientsParams) (Ticket, error)
@@ -1249,6 +1282,8 @@ type Querier interface {
 	// reset_cursor: cambiaron las entidades o los grupos; la próxima corrida
 	// vuelve a hacer la primera carga (no duplica: glpi_id es único).
 	UpdateGlpiTicketsConfig(ctx context.Context, arg UpdateGlpiTicketsConfigParams) error
+	// GLPI en la Ticketera, fase 2 (10d.2, spec/18 §4): de la app a GLPI.
+	UpdateGlpiWriteConfig(ctx context.Context, arg UpdateGlpiWriteConfigParams) error
 	UpdateGoal(ctx context.Context, arg UpdateGoalParams) error
 	// Cambiar el enlace deja el hito sin marcar (se vuelve a calcular).
 	UpdateGoalMilestone(ctx context.Context, arg UpdateGoalMilestoneParams) (int64, error)
@@ -1310,6 +1345,9 @@ type Querier interface {
 	// formulario largo. draft_key es libre (no FK): el recurso final puede no
 	// existir todavía en el momento del autosave.
 	UpsertDraft(ctx context.Context, arg UpsertDraftParams) (EntryDraft, error)
+	// Lo que alguien escribió en GLPI sobre la copia llega al ticket de la app
+	// con la marca «desde GLPI» (origin 'glpi'); no toca nada más del ticket.
+	UpsertGlpiCopyComment(ctx context.Context, arg UpsertGlpiCopyCommentParams) error
 	// GLPI manda: cada corrida deja el ticket como está en GLPI. Sin enlace
 	// público; el número es GLPI-<id>.
 	UpsertGlpiTicket(ctx context.Context, arg UpsertGlpiTicketParams) (UpsertGlpiTicketRow, error)

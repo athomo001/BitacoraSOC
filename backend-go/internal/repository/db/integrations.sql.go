@@ -122,7 +122,7 @@ func (q *Queries) ClaimIdempotency(ctx context.Context, arg ClaimIdempotencyPara
 
 const createAPIEntry = `-- name: CreateAPIEntry :one
 INSERT INTO entries (user_id, entry_type, scope, content, tags, service_id, api_key_id, api_key_name)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, user_id, entry_type, scope, content, tags, service_id, asset_id, work_shift_id, glpi_ticket_id, glpi_linked_at, ticket_id, image_url, image_hash, image_size_bytes, created_at, updated_at, owner_complement_id, owner_complement_name, api_key_id, api_key_name
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, user_id, entry_type, scope, content, tags, service_id, asset_id, work_shift_id, glpi_ticket_id, glpi_linked_at, ticket_id, image_url, image_hash, image_size_bytes, created_at, updated_at, owner_complement_id, owner_complement_name, api_key_id, api_key_name, follow_up_open, follow_up_closed_at, follow_up_closed_by, follow_up_close_note
 `
 
 type CreateAPIEntryParams struct {
@@ -170,6 +170,10 @@ func (q *Queries) CreateAPIEntry(ctx context.Context, arg CreateAPIEntryParams) 
 		&i.OwnerComplementName,
 		&i.ApiKeyID,
 		&i.ApiKeyName,
+		&i.FollowUpOpen,
+		&i.FollowUpClosedAt,
+		&i.FollowUpClosedBy,
+		&i.FollowUpCloseNote,
 	)
 	return i, err
 }
@@ -870,7 +874,7 @@ func (q *Queries) ListDueForwardDestinations(ctx context.Context) ([]uuid.UUID, 
 
 const listEntriesForAPI = `-- name: ListEntriesForAPI :many
 
-SELECT e.id, e.user_id, e.entry_type, e.scope, e.content, e.tags, e.service_id, e.asset_id, e.work_shift_id, e.glpi_ticket_id, e.glpi_linked_at, e.ticket_id, e.image_url, e.image_hash, e.image_size_bytes, e.created_at, e.updated_at, e.owner_complement_id, e.owner_complement_name, e.api_key_id, e.api_key_name, u.username AS author_username,
+SELECT e.id, e.user_id, e.entry_type, e.scope, e.content, e.tags, e.service_id, e.asset_id, e.work_shift_id, e.glpi_ticket_id, e.glpi_linked_at, e.ticket_id, e.image_url, e.image_hash, e.image_size_bytes, e.created_at, e.updated_at, e.owner_complement_id, e.owner_complement_name, e.api_key_id, e.api_key_name, e.follow_up_open, e.follow_up_closed_at, e.follow_up_closed_by, e.follow_up_close_note, u.username AS author_username,
   COALESCE(COALESCE(so.id, ac.id, tc.id)::text, '')::text AS client_id, COALESCE(so.name, ac.name, tc.name, '')::text AS client_name
 FROM entries e
 JOIN users u ON u.id = e.user_id
@@ -920,6 +924,10 @@ type ListEntriesForAPIRow struct {
 	OwnerComplementName pgtype.Text        `json:"owner_complement_name"`
 	ApiKeyID            pgtype.UUID        `json:"api_key_id"`
 	ApiKeyName          pgtype.Text        `json:"api_key_name"`
+	FollowUpOpen        bool               `json:"follow_up_open"`
+	FollowUpClosedAt    pgtype.Timestamptz `json:"follow_up_closed_at"`
+	FollowUpClosedBy    pgtype.UUID        `json:"follow_up_closed_by"`
+	FollowUpCloseNote   pgtype.Text        `json:"follow_up_close_note"`
 	AuthorUsername      string             `json:"author_username"`
 	ClientID            string             `json:"client_id"`
 	ClientName          string             `json:"client_name"`
@@ -968,6 +976,10 @@ func (q *Queries) ListEntriesForAPI(ctx context.Context, arg ListEntriesForAPIPa
 			&i.OwnerComplementName,
 			&i.ApiKeyID,
 			&i.ApiKeyName,
+			&i.FollowUpOpen,
+			&i.FollowUpClosedAt,
+			&i.FollowUpClosedBy,
+			&i.FollowUpCloseNote,
 			&i.AuthorUsername,
 			&i.ClientID,
 			&i.ClientName,
@@ -1230,7 +1242,7 @@ func (q *Queries) ListOnCallTeams(ctx context.Context) ([]ListOnCallTeamsRow, er
 }
 
 const listTicketsForAPI = `-- name: ListTicketsForAPI :many
-SELECT t.id, t.ticket_number, t.ticket_type, t.scope, t.client_id, t.asset_id, t.service_id, t.assigned_team_id, t.assigned_user_id, t.assigned_contact_id, t.status, t.impact, t.urgency, t.priority, t.title, t.description, t.sla_response_due_at, t.sla_resolution_due_at, t.sla_on_hold_since, t.sla_paused_seconds, t.first_responded_at, t.resolved_at, t.closed_at, t.reopened_count, t.reopened_at, t.public_tracking_token, t.public_tracking_enabled, t.public_tracking_pin, t.created_by, t.created_at, t.updated_at, t.parent_id, t.merged_into_id, t.affects_client, t.notify_to, t.notify_cc, t.sla_response_breach_notified_at, t.sla_resolution_warn_notified_at, t.sla_resolution_breach_notified_at, t.territorial_unit_id, t.area_id, t.requested_area_id, t.source, t.glpi_id, t.glpi_date_mod, t.glpi_synced_at, t.glpi_deleted, t.glpi_linked_only, t.glpi_group_id, t.glpi_group_name, t.glpi_technician, t.api_key_id, t.api_key_name, o.name AS client_name, a.code AS area_code, a.name AS area_name
+SELECT t.id, t.ticket_number, t.ticket_type, t.scope, t.client_id, t.asset_id, t.service_id, t.assigned_team_id, t.assigned_user_id, t.assigned_contact_id, t.status, t.impact, t.urgency, t.priority, t.title, t.description, t.sla_response_due_at, t.sla_resolution_due_at, t.sla_on_hold_since, t.sla_paused_seconds, t.first_responded_at, t.resolved_at, t.closed_at, t.reopened_count, t.reopened_at, t.public_tracking_token, t.public_tracking_enabled, t.public_tracking_pin, t.created_by, t.created_at, t.updated_at, t.parent_id, t.merged_into_id, t.affects_client, t.notify_to, t.notify_cc, t.sla_response_breach_notified_at, t.sla_resolution_warn_notified_at, t.sla_resolution_breach_notified_at, t.territorial_unit_id, t.area_id, t.requested_area_id, t.source, t.glpi_id, t.glpi_date_mod, t.glpi_synced_at, t.glpi_deleted, t.glpi_linked_only, t.glpi_group_id, t.glpi_group_name, t.glpi_technician, t.api_key_id, t.api_key_name, t.glpi_copy_id, t.glpi_copy_date_mod, t.glpi_copy_synced_at, o.name AS client_name, a.code AS area_code, a.name AS area_name
 FROM tickets t
 JOIN organizations o ON o.id = t.client_id
 JOIN areas a ON a.id = t.area_id
@@ -1308,6 +1320,9 @@ type ListTicketsForAPIRow struct {
 	GlpiTechnician                pgtype.Text        `json:"glpi_technician"`
 	ApiKeyID                      pgtype.UUID        `json:"api_key_id"`
 	ApiKeyName                    pgtype.Text        `json:"api_key_name"`
+	GlpiCopyID                    pgtype.Int4        `json:"glpi_copy_id"`
+	GlpiCopyDateMod               pgtype.Text        `json:"glpi_copy_date_mod"`
+	GlpiCopySyncedAt              pgtype.Timestamptz `json:"glpi_copy_synced_at"`
 	ClientName                    string             `json:"client_name"`
 	AreaCode                      string             `json:"area_code"`
 	AreaName                      string             `json:"area_name"`
@@ -1384,6 +1399,9 @@ func (q *Queries) ListTicketsForAPI(ctx context.Context, arg ListTicketsForAPIPa
 			&i.GlpiTechnician,
 			&i.ApiKeyID,
 			&i.ApiKeyName,
+			&i.GlpiCopyID,
+			&i.GlpiCopyDateMod,
+			&i.GlpiCopySyncedAt,
 			&i.ClientName,
 			&i.AreaCode,
 			&i.AreaName,

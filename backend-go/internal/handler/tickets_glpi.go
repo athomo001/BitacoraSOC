@@ -61,3 +61,12 @@ func glpiNumber(t db.Ticket) pgtype.Text {
 	}
 	return pgtype.Text{String: strconv.Itoa(int(t.GlpiID.Int32)), Valid: true}
 }
+
+// glpiCopyOf: la copia en GLPI de un ticket de la app (10d.2), o nil.
+func glpiCopyOf(ctx context.Context, q *db.Queries, t db.Ticket) *glpiCopyDTO {
+	if !t.GlpiCopyID.Valid {
+		return nil
+	}
+	id := int(t.GlpiCopyID.Int32)
+	return &glpiCopyDTO{ID: id, URL: glpi.WebURL(glpiAPIURL(ctx, q), glpi.Ticket, id)}
+}

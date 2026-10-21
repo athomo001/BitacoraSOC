@@ -42,23 +42,26 @@ WHERE ($1::entry_scope IS NULL OR e.scope = $1)
   AND ($3::text IS NULL OR $3 = ANY(e.tags))
   AND ($4::timestamptz IS NULL OR e.created_at >= $4)
   AND ($5::timestamptz IS NULL OR e.created_at < $5)
-  AND ($6::text IS NULL OR to_tsvector('spanish', e.content) @@ websearch_to_tsquery('spanish', $6))
-  AND ($7::uuid IS NULL OR e.user_id = $7)
-  AND ($8::uuid IS NULL
-       OR EXISTS (SELECT 1 FROM services s WHERE s.id = e.service_id AND s.organization_id = $8)
-       OR EXISTS (SELECT 1 FROM assets a WHERE a.id = e.asset_id AND a.client_id = $8)
-       OR EXISTS (SELECT 1 FROM organizations o, unnest(e.tags) t WHERE o.id = $8 AND lower(t) = lower('cliente:' || o.name)))
+  AND ($6::text IS NULL OR to_tsvector('spanish', e.content) @@ websearch_to_tsquery('spanish', $6)
+       OR EXISTS (SELECT 1 FROM entry_comments fc WHERE fc.entry_id = e.id AND to_tsvector('spanish', fc.comment) @@ websearch_to_tsquery('spanish', $6)))
+  AND ($7::boolean IS NULL OR e.follow_up_open = $7)
+  AND ($8::uuid IS NULL OR e.user_id = $8)
+  AND ($9::uuid IS NULL
+       OR EXISTS (SELECT 1 FROM services s WHERE s.id = e.service_id AND s.organization_id = $9)
+       OR EXISTS (SELECT 1 FROM assets a WHERE a.id = e.asset_id AND a.client_id = $9)
+       OR EXISTS (SELECT 1 FROM organizations o, unnest(e.tags) t WHERE o.id = $9 AND lower(t) = lower('cliente:' || o.name)))
 `
 
 type CountEntriesParams struct {
-	Scope     NullEntryScope     `json:"scope"`
-	EntryType NullEntryType      `json:"entry_type"`
-	Tag       pgtype.Text        `json:"tag"`
-	FromDate  pgtype.Timestamptz `json:"from_date"`
-	ToDate    pgtype.Timestamptz `json:"to_date"`
-	Q         pgtype.Text        `json:"q"`
-	AuthorID  pgtype.UUID        `json:"author_id"`
-	ClientID  pgtype.UUID        `json:"client_id"`
+	Scope        NullEntryScope     `json:"scope"`
+	EntryType    NullEntryType      `json:"entry_type"`
+	Tag          pgtype.Text        `json:"tag"`
+	FromDate     pgtype.Timestamptz `json:"from_date"`
+	ToDate       pgtype.Timestamptz `json:"to_date"`
+	Q            pgtype.Text        `json:"q"`
+	FollowUpOpen pgtype.Bool        `json:"follow_up_open"`
+	AuthorID     pgtype.UUID        `json:"author_id"`
+	ClientID     pgtype.UUID        `json:"client_id"`
 }
 
 func (q *Queries) CountEntries(ctx context.Context, arg CountEntriesParams) (int64, error) {
@@ -69,6 +72,7 @@ func (q *Queries) CountEntries(ctx context.Context, arg CountEntriesParams) (int
 		arg.FromDate,
 		arg.ToDate,
 		arg.Q,
+		arg.FollowUpOpen,
 		arg.AuthorID,
 		arg.ClientID,
 	)
@@ -80,7 +84,7 @@ func (q *Queries) CountEntries(ctx context.Context, arg CountEntriesParams) (int
 const createEntry = `-- name: CreateEntry :one
 
 INSERT INTO entries (user_id, entry_type, scope, content, tags, service_id, asset_id, image_url, image_hash, image_size_bytes)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id, user_id, entry_type, scope, content, tags, service_id, asset_id, work_shift_id, glpi_ticket_id, glpi_linked_at, ticket_id, image_url, image_hash, image_size_bytes, created_at, updated_at, owner_complement_id, owner_complement_name, api_key_id, api_key_name
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id, user_id, entry_type, scope, content, tags, service_id, asset_id, work_shift_id, glpi_ticket_id, glpi_linked_at, ticket_id, image_url, image_hash, image_size_bytes, created_at, updated_at, owner_complement_id, owner_complement_name, api_key_id, api_key_name, follow_up_open, follow_up_closed_at, follow_up_closed_by, follow_up_close_note
 `
 
 type CreateEntryParams struct {
@@ -138,12 +142,16 @@ func (q *Queries) CreateEntry(ctx context.Context, arg CreateEntryParams) (Entry
 		&i.OwnerComplementName,
 		&i.ApiKeyID,
 		&i.ApiKeyName,
+		&i.FollowUpOpen,
+		&i.FollowUpClosedAt,
+		&i.FollowUpClosedBy,
+		&i.FollowUpCloseNote,
 	)
 	return i, err
 }
 
 const deleteEntry = `-- name: DeleteEntry :one
-DELETE FROM entries WHERE id = $1 RETURNING id, user_id, entry_type, scope, content, tags, service_id, asset_id, work_shift_id, glpi_ticket_id, glpi_linked_at, ticket_id, image_url, image_hash, image_size_bytes, created_at, updated_at, owner_complement_id, owner_complement_name, api_key_id, api_key_name
+DELETE FROM entries WHERE id = $1 RETURNING id, user_id, entry_type, scope, content, tags, service_id, asset_id, work_shift_id, glpi_ticket_id, glpi_linked_at, ticket_id, image_url, image_hash, image_size_bytes, created_at, updated_at, owner_complement_id, owner_complement_name, api_key_id, api_key_name, follow_up_open, follow_up_closed_at, follow_up_closed_by, follow_up_close_note
 `
 
 // Borrado real (no soft-delete, HU-7g) — RETURNING para el snapshot de auditoría.
@@ -172,39 +180,49 @@ func (q *Queries) DeleteEntry(ctx context.Context, id uuid.UUID) (Entry, error) 
 		&i.OwnerComplementName,
 		&i.ApiKeyID,
 		&i.ApiKeyName,
+		&i.FollowUpOpen,
+		&i.FollowUpClosedAt,
+		&i.FollowUpClosedBy,
+		&i.FollowUpCloseNote,
 	)
 	return i, err
 }
 
 const getEntry = `-- name: GetEntry :one
-SELECT e.id, e.user_id, e.entry_type, e.scope, e.content, e.tags, e.service_id, e.asset_id, e.work_shift_id, e.glpi_ticket_id, e.glpi_linked_at, e.ticket_id, e.image_url, e.image_hash, e.image_size_bytes, e.created_at, e.updated_at, e.owner_complement_id, e.owner_complement_name, e.api_key_id, e.api_key_name, u.username AS author_username
+SELECT e.id, e.user_id, e.entry_type, e.scope, e.content, e.tags, e.service_id, e.asset_id, e.work_shift_id, e.glpi_ticket_id, e.glpi_linked_at, e.ticket_id, e.image_url, e.image_hash, e.image_size_bytes, e.created_at, e.updated_at, e.owner_complement_id, e.owner_complement_name, e.api_key_id, e.api_key_name, e.follow_up_open, e.follow_up_closed_at, e.follow_up_closed_by, e.follow_up_close_note, u.username AS author_username, COALESCE(fu.username, '')::text AS follow_up_closed_by_name
 FROM entries e JOIN users u ON u.id = e.user_id
+LEFT JOIN users fu ON fu.id = e.follow_up_closed_by
 WHERE e.id = $1
 `
 
 type GetEntryRow struct {
-	ID                  uuid.UUID          `json:"id"`
-	UserID              uuid.UUID          `json:"user_id"`
-	EntryType           EntryType          `json:"entry_type"`
-	Scope               EntryScope         `json:"scope"`
-	Content             string             `json:"content"`
-	Tags                []string           `json:"tags"`
-	ServiceID           pgtype.UUID        `json:"service_id"`
-	AssetID             pgtype.UUID        `json:"asset_id"`
-	WorkShiftID         pgtype.UUID        `json:"work_shift_id"`
-	GlpiTicketID        pgtype.Text        `json:"glpi_ticket_id"`
-	GlpiLinkedAt        pgtype.Timestamptz `json:"glpi_linked_at"`
-	TicketID            pgtype.UUID        `json:"ticket_id"`
-	ImageUrl            pgtype.Text        `json:"image_url"`
-	ImageHash           pgtype.Text        `json:"image_hash"`
-	ImageSizeBytes      pgtype.Int4        `json:"image_size_bytes"`
-	CreatedAt           pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt           pgtype.Timestamptz `json:"updated_at"`
-	OwnerComplementID   pgtype.UUID        `json:"owner_complement_id"`
-	OwnerComplementName pgtype.Text        `json:"owner_complement_name"`
-	ApiKeyID            pgtype.UUID        `json:"api_key_id"`
-	ApiKeyName          pgtype.Text        `json:"api_key_name"`
-	AuthorUsername      string             `json:"author_username"`
+	ID                   uuid.UUID          `json:"id"`
+	UserID               uuid.UUID          `json:"user_id"`
+	EntryType            EntryType          `json:"entry_type"`
+	Scope                EntryScope         `json:"scope"`
+	Content              string             `json:"content"`
+	Tags                 []string           `json:"tags"`
+	ServiceID            pgtype.UUID        `json:"service_id"`
+	AssetID              pgtype.UUID        `json:"asset_id"`
+	WorkShiftID          pgtype.UUID        `json:"work_shift_id"`
+	GlpiTicketID         pgtype.Text        `json:"glpi_ticket_id"`
+	GlpiLinkedAt         pgtype.Timestamptz `json:"glpi_linked_at"`
+	TicketID             pgtype.UUID        `json:"ticket_id"`
+	ImageUrl             pgtype.Text        `json:"image_url"`
+	ImageHash            pgtype.Text        `json:"image_hash"`
+	ImageSizeBytes       pgtype.Int4        `json:"image_size_bytes"`
+	CreatedAt            pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt            pgtype.Timestamptz `json:"updated_at"`
+	OwnerComplementID    pgtype.UUID        `json:"owner_complement_id"`
+	OwnerComplementName  pgtype.Text        `json:"owner_complement_name"`
+	ApiKeyID             pgtype.UUID        `json:"api_key_id"`
+	ApiKeyName           pgtype.Text        `json:"api_key_name"`
+	FollowUpOpen         bool               `json:"follow_up_open"`
+	FollowUpClosedAt     pgtype.Timestamptz `json:"follow_up_closed_at"`
+	FollowUpClosedBy     pgtype.UUID        `json:"follow_up_closed_by"`
+	FollowUpCloseNote    pgtype.Text        `json:"follow_up_close_note"`
+	AuthorUsername       string             `json:"author_username"`
+	FollowUpClosedByName string             `json:"follow_up_closed_by_name"`
 }
 
 func (q *Queries) GetEntry(ctx context.Context, id uuid.UUID) (GetEntryRow, error) {
@@ -232,7 +250,12 @@ func (q *Queries) GetEntry(ctx context.Context, id uuid.UUID) (GetEntryRow, erro
 		&i.OwnerComplementName,
 		&i.ApiKeyID,
 		&i.ApiKeyName,
+		&i.FollowUpOpen,
+		&i.FollowUpClosedAt,
+		&i.FollowUpClosedBy,
+		&i.FollowUpCloseNote,
 		&i.AuthorUsername,
+		&i.FollowUpClosedByName,
 	)
 	return i, err
 }
@@ -249,34 +272,40 @@ func (q *Queries) GetServiceOrganizationID(ctx context.Context, id uuid.UUID) (u
 }
 
 const listEntries = `-- name: ListEntries :many
-SELECT e.id, e.user_id, e.entry_type, e.scope, e.content, e.tags, e.service_id, e.asset_id, e.work_shift_id, e.glpi_ticket_id, e.glpi_linked_at, e.ticket_id, e.image_url, e.image_hash, e.image_size_bytes, e.created_at, e.updated_at, e.owner_complement_id, e.owner_complement_name, e.api_key_id, e.api_key_name, u.username AS author_username
+SELECT e.id, e.user_id, e.entry_type, e.scope, e.content, e.tags, e.service_id, e.asset_id, e.work_shift_id, e.glpi_ticket_id, e.glpi_linked_at, e.ticket_id, e.image_url, e.image_hash, e.image_size_bytes, e.created_at, e.updated_at, e.owner_complement_id, e.owner_complement_name, e.api_key_id, e.api_key_name, e.follow_up_open, e.follow_up_closed_at, e.follow_up_closed_by, e.follow_up_close_note, u.username AS author_username,
+  (SELECT count(*) FROM entry_comments c WHERE c.entry_id = e.id)::int AS follow_up_count,
+  (SELECT max(c.created_at) FROM entry_comments c WHERE c.entry_id = e.id)::timestamptz AS last_follow_up_at
 FROM entries e JOIN users u ON u.id = e.user_id
 WHERE ($1::entry_scope IS NULL OR e.scope = $1)
   AND ($2::entry_type IS NULL OR e.entry_type = $2)
   AND ($3::text IS NULL OR $3 = ANY(e.tags))
   AND ($4::timestamptz IS NULL OR e.created_at >= $4)
   AND ($5::timestamptz IS NULL OR e.created_at < $5)
-  AND ($6::text IS NULL OR to_tsvector('spanish', e.content) @@ websearch_to_tsquery('spanish', $6))
-  AND ($7::uuid IS NULL OR e.user_id = $7)
-  AND ($8::uuid IS NULL
-       OR EXISTS (SELECT 1 FROM services s WHERE s.id = e.service_id AND s.organization_id = $8)
-       OR EXISTS (SELECT 1 FROM assets a WHERE a.id = e.asset_id AND a.client_id = $8)
-       OR EXISTS (SELECT 1 FROM organizations o, unnest(e.tags) t WHERE o.id = $8 AND lower(t) = lower('cliente:' || o.name)))
-ORDER BY e.created_at DESC
-LIMIT $10 OFFSET $9
+  AND ($6::text IS NULL OR to_tsvector('spanish', e.content) @@ websearch_to_tsquery('spanish', $6)
+       OR EXISTS (SELECT 1 FROM entry_comments fc WHERE fc.entry_id = e.id AND to_tsvector('spanish', fc.comment) @@ websearch_to_tsquery('spanish', $6)))
+  AND ($7::boolean IS NULL OR e.follow_up_open = $7)
+  AND ($8::uuid IS NULL OR e.user_id = $8)
+  AND ($9::uuid IS NULL
+       OR EXISTS (SELECT 1 FROM services s WHERE s.id = e.service_id AND s.organization_id = $9)
+       OR EXISTS (SELECT 1 FROM assets a WHERE a.id = e.asset_id AND a.client_id = $9)
+       OR EXISTS (SELECT 1 FROM organizations o, unnest(e.tags) t WHERE o.id = $9 AND lower(t) = lower('cliente:' || o.name)))
+ORDER BY CASE WHEN $7::boolean THEN COALESCE((SELECT max(c.created_at) FROM entry_comments c WHERE c.entry_id = e.id), e.created_at) END DESC NULLS LAST,
+  e.created_at DESC
+LIMIT $11 OFFSET $10
 `
 
 type ListEntriesParams struct {
-	Scope      NullEntryScope     `json:"scope"`
-	EntryType  NullEntryType      `json:"entry_type"`
-	Tag        pgtype.Text        `json:"tag"`
-	FromDate   pgtype.Timestamptz `json:"from_date"`
-	ToDate     pgtype.Timestamptz `json:"to_date"`
-	Q          pgtype.Text        `json:"q"`
-	AuthorID   pgtype.UUID        `json:"author_id"`
-	ClientID   pgtype.UUID        `json:"client_id"`
-	PageOffset int32              `json:"page_offset"`
-	PageSize   int32              `json:"page_size"`
+	Scope        NullEntryScope     `json:"scope"`
+	EntryType    NullEntryType      `json:"entry_type"`
+	Tag          pgtype.Text        `json:"tag"`
+	FromDate     pgtype.Timestamptz `json:"from_date"`
+	ToDate       pgtype.Timestamptz `json:"to_date"`
+	Q            pgtype.Text        `json:"q"`
+	FollowUpOpen pgtype.Bool        `json:"follow_up_open"`
+	AuthorID     pgtype.UUID        `json:"author_id"`
+	ClientID     pgtype.UUID        `json:"client_id"`
+	PageOffset   int32              `json:"page_offset"`
+	PageSize     int32              `json:"page_size"`
 }
 
 type ListEntriesRow struct {
@@ -301,12 +330,20 @@ type ListEntriesRow struct {
 	OwnerComplementName pgtype.Text        `json:"owner_complement_name"`
 	ApiKeyID            pgtype.UUID        `json:"api_key_id"`
 	ApiKeyName          pgtype.Text        `json:"api_key_name"`
+	FollowUpOpen        bool               `json:"follow_up_open"`
+	FollowUpClosedAt    pgtype.Timestamptz `json:"follow_up_closed_at"`
+	FollowUpClosedBy    pgtype.UUID        `json:"follow_up_closed_by"`
+	FollowUpCloseNote   pgtype.Text        `json:"follow_up_close_note"`
 	AuthorUsername      string             `json:"author_username"`
+	FollowUpCount       int32              `json:"follow_up_count"`
+	LastFollowUpAt      pgtype.Timestamptz `json:"last_follow_up_at"`
 }
 
-// Filtros (todos opcionales): ámbito, tipo, etiqueta, fechas, texto, autor y
-// cliente. El cliente sale del servicio o del activo de la entrada, o de la
-// etiqueta cliente:X que dejó el ETL cuando el cliente tenía varios servicios.
+// Filtros (todos opcionales): ámbito, tipo, etiqueta, fechas, texto (también
+// en los seguimientos), autor, cliente y «En seguimiento». El cliente sale del
+// servicio o del activo de la entrada, o de la etiqueta cliente:X que dejó el
+// ETL cuando el cliente tenía varios servicios. Con «En seguimiento», primero
+// lo que tuvo un seguimiento más reciente.
 func (q *Queries) ListEntries(ctx context.Context, arg ListEntriesParams) ([]ListEntriesRow, error) {
 	rows, err := q.db.Query(ctx, listEntries,
 		arg.Scope,
@@ -315,6 +352,7 @@ func (q *Queries) ListEntries(ctx context.Context, arg ListEntriesParams) ([]Lis
 		arg.FromDate,
 		arg.ToDate,
 		arg.Q,
+		arg.FollowUpOpen,
 		arg.AuthorID,
 		arg.ClientID,
 		arg.PageOffset,
@@ -349,7 +387,13 @@ func (q *Queries) ListEntries(ctx context.Context, arg ListEntriesParams) ([]Lis
 			&i.OwnerComplementName,
 			&i.ApiKeyID,
 			&i.ApiKeyName,
+			&i.FollowUpOpen,
+			&i.FollowUpClosedAt,
+			&i.FollowUpClosedBy,
+			&i.FollowUpCloseNote,
 			&i.AuthorUsername,
+			&i.FollowUpCount,
+			&i.LastFollowUpAt,
 		); err != nil {
 			return nil, err
 		}
@@ -362,31 +406,34 @@ func (q *Queries) ListEntries(ctx context.Context, arg ListEntriesParams) ([]Lis
 }
 
 const listEntriesForExport = `-- name: ListEntriesForExport :many
-SELECT e.id, e.user_id, e.entry_type, e.scope, e.content, e.tags, e.service_id, e.asset_id, e.work_shift_id, e.glpi_ticket_id, e.glpi_linked_at, e.ticket_id, e.image_url, e.image_hash, e.image_size_bytes, e.created_at, e.updated_at, e.owner_complement_id, e.owner_complement_name, e.api_key_id, e.api_key_name, u.username AS author_username
+SELECT e.id, e.user_id, e.entry_type, e.scope, e.content, e.tags, e.service_id, e.asset_id, e.work_shift_id, e.glpi_ticket_id, e.glpi_linked_at, e.ticket_id, e.image_url, e.image_hash, e.image_size_bytes, e.created_at, e.updated_at, e.owner_complement_id, e.owner_complement_name, e.api_key_id, e.api_key_name, e.follow_up_open, e.follow_up_closed_at, e.follow_up_closed_by, e.follow_up_close_note, u.username AS author_username
 FROM entries e JOIN users u ON u.id = e.user_id
 WHERE ($1::entry_scope IS NULL OR e.scope = $1)
   AND ($2::entry_type IS NULL OR e.entry_type = $2)
   AND ($3::text IS NULL OR $3 = ANY(e.tags))
   AND ($4::timestamptz IS NULL OR e.created_at >= $4)
   AND ($5::timestamptz IS NULL OR e.created_at < $5)
-  AND ($6::text IS NULL OR to_tsvector('spanish', e.content) @@ websearch_to_tsquery('spanish', $6))
-  AND ($7::uuid IS NULL OR e.user_id = $7)
-  AND ($8::uuid IS NULL
-       OR EXISTS (SELECT 1 FROM services s WHERE s.id = e.service_id AND s.organization_id = $8)
-       OR EXISTS (SELECT 1 FROM assets a WHERE a.id = e.asset_id AND a.client_id = $8)
-       OR EXISTS (SELECT 1 FROM organizations o, unnest(e.tags) t WHERE o.id = $8 AND lower(t) = lower('cliente:' || o.name)))
+  AND ($6::text IS NULL OR to_tsvector('spanish', e.content) @@ websearch_to_tsquery('spanish', $6)
+       OR EXISTS (SELECT 1 FROM entry_comments fc WHERE fc.entry_id = e.id AND to_tsvector('spanish', fc.comment) @@ websearch_to_tsquery('spanish', $6)))
+  AND ($7::boolean IS NULL OR e.follow_up_open = $7)
+  AND ($8::uuid IS NULL OR e.user_id = $8)
+  AND ($9::uuid IS NULL
+       OR EXISTS (SELECT 1 FROM services s WHERE s.id = e.service_id AND s.organization_id = $9)
+       OR EXISTS (SELECT 1 FROM assets a WHERE a.id = e.asset_id AND a.client_id = $9)
+       OR EXISTS (SELECT 1 FROM organizations o, unnest(e.tags) t WHERE o.id = $9 AND lower(t) = lower('cliente:' || o.name)))
 ORDER BY e.created_at DESC
 `
 
 type ListEntriesForExportParams struct {
-	Scope     NullEntryScope     `json:"scope"`
-	EntryType NullEntryType      `json:"entry_type"`
-	Tag       pgtype.Text        `json:"tag"`
-	FromDate  pgtype.Timestamptz `json:"from_date"`
-	ToDate    pgtype.Timestamptz `json:"to_date"`
-	Q         pgtype.Text        `json:"q"`
-	AuthorID  pgtype.UUID        `json:"author_id"`
-	ClientID  pgtype.UUID        `json:"client_id"`
+	Scope        NullEntryScope     `json:"scope"`
+	EntryType    NullEntryType      `json:"entry_type"`
+	Tag          pgtype.Text        `json:"tag"`
+	FromDate     pgtype.Timestamptz `json:"from_date"`
+	ToDate       pgtype.Timestamptz `json:"to_date"`
+	Q            pgtype.Text        `json:"q"`
+	FollowUpOpen pgtype.Bool        `json:"follow_up_open"`
+	AuthorID     pgtype.UUID        `json:"author_id"`
+	ClientID     pgtype.UUID        `json:"client_id"`
 }
 
 type ListEntriesForExportRow struct {
@@ -411,6 +458,10 @@ type ListEntriesForExportRow struct {
 	OwnerComplementName pgtype.Text        `json:"owner_complement_name"`
 	ApiKeyID            pgtype.UUID        `json:"api_key_id"`
 	ApiKeyName          pgtype.Text        `json:"api_key_name"`
+	FollowUpOpen        bool               `json:"follow_up_open"`
+	FollowUpClosedAt    pgtype.Timestamptz `json:"follow_up_closed_at"`
+	FollowUpClosedBy    pgtype.UUID        `json:"follow_up_closed_by"`
+	FollowUpCloseNote   pgtype.Text        `json:"follow_up_close_note"`
 	AuthorUsername      string             `json:"author_username"`
 }
 
@@ -423,6 +474,7 @@ func (q *Queries) ListEntriesForExport(ctx context.Context, arg ListEntriesForEx
 		arg.FromDate,
 		arg.ToDate,
 		arg.Q,
+		arg.FollowUpOpen,
 		arg.AuthorID,
 		arg.ClientID,
 	)
@@ -455,6 +507,10 @@ func (q *Queries) ListEntriesForExport(ctx context.Context, arg ListEntriesForEx
 			&i.OwnerComplementName,
 			&i.ApiKeyID,
 			&i.ApiKeyName,
+			&i.FollowUpOpen,
+			&i.FollowUpClosedAt,
+			&i.FollowUpClosedBy,
+			&i.FollowUpCloseNote,
 			&i.AuthorUsername,
 		); err != nil {
 			return nil, err
@@ -510,7 +566,7 @@ UPDATE entries SET
   asset_id = COALESCE($6, asset_id),
   updated_at = now()
 WHERE id = $1
-RETURNING id, user_id, entry_type, scope, content, tags, service_id, asset_id, work_shift_id, glpi_ticket_id, glpi_linked_at, ticket_id, image_url, image_hash, image_size_bytes, created_at, updated_at, owner_complement_id, owner_complement_name, api_key_id, api_key_name
+RETURNING id, user_id, entry_type, scope, content, tags, service_id, asset_id, work_shift_id, glpi_ticket_id, glpi_linked_at, ticket_id, image_url, image_hash, image_size_bytes, created_at, updated_at, owner_complement_id, owner_complement_name, api_key_id, api_key_name, follow_up_open, follow_up_closed_at, follow_up_closed_by, follow_up_close_note
 `
 
 type PatchEntryParams struct {
@@ -554,7 +610,47 @@ func (q *Queries) PatchEntry(ctx context.Context, arg PatchEntryParams) (Entry, 
 		&i.OwnerComplementName,
 		&i.ApiKeyID,
 		&i.ApiKeyName,
+		&i.FollowUpOpen,
+		&i.FollowUpClosedAt,
+		&i.FollowUpClosedBy,
+		&i.FollowUpCloseNote,
 	)
+	return i, err
+}
+
+const setEntryFollowUp = `-- name: SetEntryFollowUp :one
+UPDATE entries SET
+  follow_up_open = $1,
+  follow_up_closed_at = CASE WHEN $1::boolean THEN NULL ELSE now() END,
+  follow_up_closed_by = CASE WHEN $1::boolean THEN NULL ELSE $2::uuid END,
+  follow_up_close_note = CASE WHEN $1::boolean THEN NULL ELSE $3::text END
+WHERE id = $4
+RETURNING id, follow_up_open, follow_up_closed_at
+`
+
+type SetEntryFollowUpParams struct {
+	Open     bool        `json:"open"`
+	ClosedBy pgtype.UUID `json:"closed_by"`
+	Note     pgtype.Text `json:"note"`
+	ID       uuid.UUID   `json:"id"`
+}
+
+type SetEntryFollowUpRow struct {
+	ID               uuid.UUID          `json:"id"`
+	FollowUpOpen     bool               `json:"follow_up_open"`
+	FollowUpClosedAt pgtype.Timestamptz `json:"follow_up_closed_at"`
+}
+
+// Cerrar el seguimiento (con nota opcional) o ponerlo de nuevo en seguimiento.
+func (q *Queries) SetEntryFollowUp(ctx context.Context, arg SetEntryFollowUpParams) (SetEntryFollowUpRow, error) {
+	row := q.db.QueryRow(ctx, setEntryFollowUp,
+		arg.Open,
+		arg.ClosedBy,
+		arg.Note,
+		arg.ID,
+	)
+	var i SetEntryFollowUpRow
+	err := row.Scan(&i.ID, &i.FollowUpOpen, &i.FollowUpClosedAt)
 	return i, err
 }
 
@@ -578,7 +674,7 @@ func (q *Queries) SetEntryGlpiTicket(ctx context.Context, arg SetEntryGlpiTicket
 }
 
 const updateEntryTicket = `-- name: UpdateEntryTicket :one
-UPDATE entries SET ticket_id = $2, updated_at = now() WHERE id = $1 RETURNING id, user_id, entry_type, scope, content, tags, service_id, asset_id, work_shift_id, glpi_ticket_id, glpi_linked_at, ticket_id, image_url, image_hash, image_size_bytes, created_at, updated_at, owner_complement_id, owner_complement_name, api_key_id, api_key_name
+UPDATE entries SET ticket_id = $2, updated_at = now() WHERE id = $1 RETURNING id, user_id, entry_type, scope, content, tags, service_id, asset_id, work_shift_id, glpi_ticket_id, glpi_linked_at, ticket_id, image_url, image_hash, image_size_bytes, created_at, updated_at, owner_complement_id, owner_complement_name, api_key_id, api_key_name, follow_up_open, follow_up_closed_at, follow_up_closed_by, follow_up_close_note
 `
 
 type UpdateEntryTicketParams struct {
@@ -611,6 +707,10 @@ func (q *Queries) UpdateEntryTicket(ctx context.Context, arg UpdateEntryTicketPa
 		&i.OwnerComplementName,
 		&i.ApiKeyID,
 		&i.ApiKeyName,
+		&i.FollowUpOpen,
+		&i.FollowUpClosedAt,
+		&i.FollowUpClosedBy,
+		&i.FollowUpCloseNote,
 	)
 	return i, err
 }

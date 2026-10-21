@@ -1,3 +1,4 @@
+import { GlpiCreateInput, GlpiCreatePreview } from '../glpi/glpi.service';
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
@@ -110,6 +111,9 @@ export interface TicketComment {
   /** En un ticket de GLPI: seguimiento, tarea (con su tiempo) o solución. */
   glpiKind?: 'followup' | 'task' | 'solution';
   glpiTimeSeconds?: number;
+  /** Escrito en la app y enviado a GLPI (10d.2): en cola, enviado o no se envió. */
+  glpiPush?: 'queued' | 'sent' | 'failed';
+  glpiPushError?: string;
 }
 export interface TicketTask { id: string; username: string; content: string; timeSpentSeconds: number; isPublic: boolean; performedAt: string; }
 export interface TicketEntry { id: string; entryType: string; content: string; authorUsername: string; createdAt: string; }
@@ -127,6 +131,10 @@ export interface TicketDetail {
   parent: TicketRef | null;
   mergedInto: TicketRef | null;
   children: TicketChild[];
+  /** «Escribir en GLPI» encendido (10d.2). */
+  glpiWrite?: boolean;
+  /** La copia en GLPI de un ticket de la app. */
+  glpiCopy?: { id: number; url?: string };
 }
 
 export interface TicketRef { id: string; ticketNumber: string; title: string; }
@@ -291,6 +299,15 @@ export class TicketsService {
   }
 
   /** alsoChildren: en un padre, el comentario llega también a sus hijos abiertos. */
+  /** Vista previa de «Crear en GLPI» (10d.2). */
+  async glpiCopyPreview(id: string): Promise<GlpiCreatePreview> {
+    return (await firstValueFrom(this.http.get<ApiEnvelope<GlpiCreatePreview>>(`/api/tickets/${id}/glpi-copy`))).data;
+  }
+
+  async createGlpiCopy(id: string, input: GlpiCreateInput): Promise<{ id: number; url?: string }> {
+    return (await firstValueFrom(this.http.post<ApiEnvelope<{ id: number; url?: string }>>(`/api/tickets/${id}/glpi-copy`, input))).data;
+  }
+
   async addComment(id: string, content: string, isPublic: boolean, imageIds: string[] = [], alsoChildren = false): Promise<TicketComment> {
     return (await firstValueFrom(this.http.post<ApiEnvelope<TicketComment>>(`/api/tickets/${id}/comments`, { content, isPublic, imageIds, alsoChildren }))).data;
   }

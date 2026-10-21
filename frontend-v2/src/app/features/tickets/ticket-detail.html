@@ -9,6 +9,10 @@
         <span class="td__glpi">GLPI</span>
         @if (g.url) { <a class="adm-btn td__glpi-open" [href]="g.url" target="_blank" rel="noopener"><mat-icon>open_in_new</mat-icon>{{ i18n.t('tickets.glpi.open') }}</a> }
       }
+      @if (d.glpiCopy; as cp) {
+        <span class="td__glpi" [title]="i18n.t('gw.copyHint')">{{ i18n.tf('gw.copy', cp.id) }}</span>
+        @if (cp.url) { <a class="adm-btn td__glpi-open" [href]="cp.url" target="_blank" rel="noopener"><mat-icon>open_in_new</mat-icon>{{ i18n.t('tickets.glpi.open') }}</a> }
+      }
       @if (t.apiKeyName) { <span class="pill tone-neutral">API · {{ t.apiKeyName }}</span> }
     </div>
     <h2 class="td__title">{{ t.title }}</h2>
@@ -170,6 +174,9 @@
       } @empty {
         @if (t.canWork) { <span class="td__muted">{{ i18n.t('tickets.detail.noActions') }}</span> }
       }
+      @if (d.glpiWrite && !t.glpi && !d.glpiCopy && t.canWork) {
+        <button type="button" class="td__btn" [disabled]="busy()" (click)="createInGlpi()"><mat-icon>add_task</mat-icon>{{ i18n.t('gw.create') }}</button>
+      }
       @if (canDelete() && !t.glpi) {
         @if (confirmDelete()) {
           <span class="td__confirm" role="group">
@@ -195,10 +202,11 @@
     @switch (tab()) {
       @case ('activity') {
         @for (c of d.comments; track c.id) {
-          @if (c.glpiKind) {
+          @if (c.glpiKind && !c.glpiPush) {
             <article class="td__comment" [class.td__comment--glpi-private]="!c.isPublic" [class.td__comment--solution]="c.glpiKind === 'solution'">
               <div class="td__comment-meta">
                 <span class="mono">{{ c.createdAt | date: 'dd/MM HH:mm' }}</span><span>·</span><span>{{ c.authorName }}</span>
+                @if (c.origin === 'glpi') { <span class="td__glpi">{{ i18n.t('gw.fromGlpi') }}</span> }
                 @if (c.glpiKind === 'task') { <span class="pill tone-neutral"><mat-icon>build</mat-icon>{{ i18n.t('tickets.glpi.task') }}@if (c.glpiTimeSeconds) { · <span class="mono">{{ duration(c.glpiTimeSeconds) }}</span> }</span> }
                 @if (c.glpiKind === 'solution') { <span class="pill tone-ok"><mat-icon>task_alt</mat-icon>{{ i18n.t('tickets.glpi.solution') }}</span> }
                 @if (!c.isPublic) { <span class="pill tone-warn td__vis"><mat-icon>lock</mat-icon>{{ i18n.t('tickets.glpi.private') }}</span> }
@@ -213,6 +221,7 @@
               <span class="pill td__vis" [class.tone-info]="c.isPublic">
                 <mat-icon>{{ c.isPublic ? 'visibility' : 'lock' }}</mat-icon>{{ i18n.t(c.isPublic ? 'tickets.activity.public' : 'tickets.activity.internal') }}
               </span>
+              @if (c.glpiPush; as push) { <span [class]="pushTone(push)" [title]="c.glpiPushError ?? ''"><mat-icon>{{ pushIcon(push) }}</mat-icon>{{ i18n.t(pushKey(push)) }}</span> }
             </div>
             @if (entryRef(c.content); as ref) {
               <p class="td__entry-ref">{{ i18n.t(ref.linked ? 'tickets.entryLinked' : 'tickets.entryUnlinked') }} <button type="button" class="td__linkbtn" (click)="openEntry(ref.id)">{{ i18n.t('tickets.openEntry') }}</button></p>
@@ -326,6 +335,8 @@
     <button type="button" class="td__btn td__btn--small" [disabled]="!publicUrl()" (click)="copyLink()"><mat-icon>content_copy</mat-icon>{{ i18n.t(copied() ? 'tickets.public.copied' : 'tickets.public.copy') }}</button>
     <button type="button" class="td__btn td__btn--small" [disabled]="busy()" (click)="regeneratePin()">{{ i18n.t('tickets.public.newPin') }}</button>
   </footer>
+  } @else if (d.glpiWrite) {
+  <app-ticket-glpi-comment [ticketId]="t.id" (sent)="reloadAll()" />
   }
 
   @if (error()) {

@@ -153,6 +153,75 @@ export interface GlpiTicketRun {
 }
 
 /** Importación de equipos desde GLPI (spec/16 §5.1, 9.6): Administración → GLPI. */
+/** Una entidad o un grupo de GLPI para elegir. */
+export interface GlpiOption {
+  id: number;
+  name: string;
+}
+
+/** «Escribir en GLPI» (10d.2): por cliente su entidad y por área su grupo al crear. */
+export interface GlpiWriteConfig {
+  enabled: boolean;
+  hasToken: boolean;
+  defaultType: 1 | 2;
+  clients: { clientId: string; clientName: string; entities: GlpiOption[]; entityId: number | null }[];
+  areas: { areaId: string; areaName: string; groups: GlpiOption[]; groupId: number | null }[];
+  warning?: string;
+}
+
+export interface GlpiWriteConfigInput {
+  enabled: boolean;
+  /** undefined/null = se mantiene; '' = se quita. */
+  token?: string | null;
+  defaultType: 1 | 2;
+  clientEntities: Record<string, number>;
+  areaGroups: Record<string, number>;
+}
+
+export interface GlpiWriteTest {
+  ok: boolean;
+  user?: string;
+  profile?: string;
+  problem?: GlpiExplanation;
+}
+
+export type GlpiOutboxState = 'queued' | 'sent' | 'failed';
+
+export interface GlpiOutboxItem {
+  id: string;
+  kind: 'followup' | 'solve' | 'close' | 'reopen';
+  glpiTicketId: number;
+  ticketNumber?: string;
+  state: GlpiOutboxState;
+  attempts: number;
+  lastError: string | null;
+  lastAttemptAt: string | null;
+  nextAttemptAt: string;
+  createdAt: string;
+}
+
+/** La vista previa de «Crear en GLPI». */
+export interface GlpiCreatePreview {
+  entities: GlpiOption[];
+  entityId: number | null;
+  groups: GlpiOption[];
+  groupId: number | null;
+  type: 1 | 2;
+  urgency: number;
+  impact: number;
+  title: string;
+  description: string;
+  problem?: string;
+  warning?: string;
+}
+
+export interface GlpiCreateInput {
+  entityId: number;
+  groupId: number;
+  type: 1 | 2;
+  title: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class GlpiService {
   private readonly http = inject(HttpClient);
@@ -208,5 +277,27 @@ export class GlpiService {
 
   async ticketRuns(): Promise<GlpiTicketRun[]> {
     return (await firstValueFrom(this.http.get<ApiEnvelope<GlpiTicketRun[]>>('/api/glpi/tickets/runs'))).data;
+  }
+
+  async writeConfig(): Promise<GlpiWriteConfig> {
+    return (await firstValueFrom(this.http.get<ApiEnvelope<GlpiWriteConfig>>('/api/glpi/write/config'))).data;
+  }
+
+  async saveWriteConfig(input: GlpiWriteConfigInput): Promise<GlpiWriteConfig> {
+    return (await firstValueFrom(this.http.put<ApiEnvelope<GlpiWriteConfig>>('/api/glpi/write/config', input))).data;
+  }
+
+  /** Abre sesión con el token de escritura sin crear nada. */
+  async testWrite(): Promise<GlpiWriteTest> {
+    return (await firstValueFrom(this.http.post<ApiEnvelope<GlpiWriteTest>>('/api/glpi/write/test', {}))).data;
+  }
+
+  async writeQueue(): Promise<GlpiOutboxItem[]> {
+    return (await firstValueFrom(this.http.get<ApiEnvelope<GlpiOutboxItem[]>>('/api/glpi/write/queue'))).data;
+  }
+
+  /** Lo que falló vuelve a la cola (uno o todo). */
+  async retryWrite(id?: string): Promise<number> {
+    return (await firstValueFrom(this.http.post<ApiEnvelope<{ queued: number }>>('/api/glpi/write/retry', id ? { id } : {}))).data.queued;
   }
 }

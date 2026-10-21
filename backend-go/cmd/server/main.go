@@ -208,13 +208,13 @@ func run(logger *slog.Logger) error {
 		runtimeAPI.Limiter = nil
 	}
 	shiftRemindersHandler := &handler.ShiftRemindersHandler{Queries: queries, AuditLog: auditLog, Sender: dotacionHandler.Sender}
-	entriesHandler := &handler.EntriesHandler{Pool: pool, Queries: queries, AuditLog: auditLog}
+	entriesHandler := &handler.EntriesHandler{Pool: pool, Queries: queries, AuditLog: auditLog, Glpi: glpiHandler}
 	// 30 intentos de PIN por token cada 15 min: un cliente real no llega, un ataque de 10^6 PIN tarda ~1 año.
 	// Avisos por correo de la Ticketera (spec/15) y Administración → Ticketera.
 	ticketMailer := &handler.TicketMailer{Queries: queries, Crypto: cryptoBox, AuditLog: auditLog, PublicBaseURL: publicBaseURL}
 	ticketSettingsHandler := &handler.TicketSettingsHandler{Queries: queries, Crypto: cryptoBox, AuditLog: auditLog}
 	ticketSeriesHandler := &handler.TicketSeriesHandler{Pool: pool, Queries: queries, AuditLog: auditLog}
-	ticketsHandler := &handler.TicketsHandler{Pool: pool, Queries: queries, AuditLog: auditLog, PinLimiter: ratelimit.NewAPILimiter(30, 15*time.Minute), Hub: hub, Mailer: ticketMailer, Notify: notifier}
+	ticketsHandler := &handler.TicketsHandler{Pool: pool, Queries: queries, AuditLog: auditLog, PinLimiter: ratelimit.NewAPILimiter(30, 15*time.Minute), Hub: hub, Mailer: ticketMailer, Notify: notifier, Glpi: glpiHandler}
 	entriesHandler.Tickets = ticketsHandler
 	notesHandler := &handler.NotesHandler{Queries: queries, AuditLog: auditLog}
 	draftsHandler := &handler.DraftsHandler{Queries: queries, AuditLog: auditLog, Hub: hub}
@@ -468,6 +468,12 @@ func run(logger *slog.Logger) error {
 	mux.Handle("GET /api/glpi/tickets/catalog", admin(glpiHandler.RequireEnabled(glpiHandler.TicketsCatalog)))
 	mux.Handle("POST /api/glpi/tickets/sync", admin(glpiHandler.RequireEnabled(glpiHandler.SyncTickets)))
 	mux.Handle("GET /api/glpi/tickets/runs", admin(glpiHandler.RequireEnabled(glpiHandler.TicketRuns)))
+	// Escribir en GLPI (10d.2, spec/18 §4).
+	mux.Handle("GET /api/glpi/write/config", admin(glpiHandler.RequireEnabled(glpiHandler.WriteConfig)))
+	mux.Handle("PUT /api/glpi/write/config", admin(glpiHandler.RequireEnabled(glpiHandler.PutWriteConfig)))
+	mux.Handle("POST /api/glpi/write/test", admin(glpiHandler.RequireEnabled(glpiHandler.TestWrite)))
+	mux.Handle("GET /api/glpi/write/queue", admin(glpiHandler.RequireEnabled(glpiHandler.WriteQueue)))
+	mux.Handle("POST /api/glpi/write/retry", admin(glpiHandler.RequireEnabled(glpiHandler.RetryWrite)))
 	// Agenda (spec/16 §4.3, 9.3): tareas y recurrentes en días hábiles. Todos
 	// los perfiles; el handler decide qué ve y a quién asigna cada uno.
 	mux.Handle("GET /api/agenda/meta", authed(agendaHandler.Meta))
@@ -745,6 +751,9 @@ func run(logger *slog.Logger) error {
 	mux.Handle("PATCH /api/entries/{id}", authed(entriesHandler.Patch))
 	mux.Handle("DELETE /api/entries/{id}", authed(entriesHandler.Delete))
 	mux.Handle("POST /api/entries/{id}/comments", authed(entriesHandler.AddComment))
+	mux.Handle("PUT /api/entries/{id}/follow-up", authed(entriesHandler.SetFollowUp))
+	mux.Handle("GET /api/entries/{id}/glpi-create", operator(entriesHandler.GlpiCreatePreview))
+	mux.Handle("POST /api/entries/{id}/glpi-create", operator(entriesHandler.CreateInGlpi))
 	mux.Handle("PUT /api/entries/{id}/glpi-ticket", authed(entriesHandler.SetGlpiTicket))
 	mux.Handle("GET /api/attachments/{id}", authed(entriesHandler.ServeAttachment))
 
@@ -768,6 +777,8 @@ func run(logger *slog.Logger) error {
 	mux.Handle("DELETE /api/tickets/{id}/images/{imageId}", ticketAuthed(ticketsHandler.DeletePendingImage))
 	mux.Handle("DELETE /api/tickets/{id}/resolvers/{userId}", ticketAuthed(ticketsHandler.RemoveResolver))
 	mux.Handle("POST /api/tickets/{id}/comments", ticketAuthed(ticketsHandler.AddComment))
+	mux.Handle("GET /api/tickets/{id}/glpi-copy", ticketAuthed(ticketsHandler.GlpiCopyPreview))
+	mux.Handle("POST /api/tickets/{id}/glpi-copy", ticketAuthed(ticketsHandler.CreateGlpiCopy))
 	mux.Handle("GET /api/tickets/{id}/tasks", ticketAuthed(ticketsHandler.ListTasks))
 	mux.Handle("POST /api/tickets/{id}/tasks", ticketAuthed(ticketsHandler.AddTask))
 	mux.Handle("PATCH /api/tickets/{id}/tasks/{taskId}", ticketAuthed(ticketsHandler.PatchTask))
@@ -926,6 +937,7 @@ func run(logger *slog.Logger) error {
 	// GLPI: la importación automática (cada noche a las 02:00 o cada 6 horas).
 	go scheduler.Run(ctx, time.Minute, glpiHandler.AutoTick)
 	go scheduler.Run(ctx, time.Minute, glpiHandler.TicketsAutoTick)
+	go scheduler.Run(ctx, 30*time.Second, glpiHandler.WriteTick)
 	// Correos de cumpleaños (comentario del dueño #21): una vez al día, desde la hora configurada.
 	birthdaysHandler := &handler.BirthdaysHandler{Queries: queries, Crypto: cryptoBox, AuditLog: auditLog}
 	mux.Handle("GET /api/config/birthday-emails", admin(birthdaysHandler.GetConfig))

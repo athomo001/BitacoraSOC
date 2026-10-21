@@ -138,6 +138,10 @@ type ticketCommentDTO struct {
 	// traen su tiempo dedicado.
 	GlpiKind        string `json:"glpiKind,omitempty"`
 	GlpiTimeSeconds int32  `json:"glpiTimeSeconds,omitempty"`
+	// GlpiPush: el envío a GLPI de un comentario de la app (10d.2):
+	// queued | sent | failed, con el motivo si falló.
+	GlpiPush      string  `json:"glpiPush,omitempty"`
+	GlpiPushError *string `json:"glpiPushError,omitempty"`
 }
 
 // ticketImageDTO: los bytes se piden aparte (GET /api/tickets/{id}/images/{imageId}).
@@ -160,7 +164,7 @@ func imagesOfComment(rows []db.ListTicketImagesRow, commentID uuid.UUID) []ticke
 
 func toTicketCommentDTO(c db.TicketComment) ticketCommentDTO {
 	return ticketCommentDTO{ID: c.ID, AuthorName: c.AuthorName, Content: c.Content, IsPublic: c.IsPublic, CreatedAt: c.CreatedAt.Time, Images: []ticketImageDTO{}, Origin: c.Origin,
-		GlpiKind: c.GlpiKind.String, GlpiTimeSeconds: c.GlpiTimeSeconds.Int32}
+		GlpiKind: c.GlpiKind.String, GlpiTimeSeconds: c.GlpiTimeSeconds.Int32, GlpiPush: c.GlpiPushState.String, GlpiPushError: textPtr(c.GlpiPushError)}
 }
 
 type ticketTaskDTO struct {
@@ -196,6 +200,10 @@ type ticketDetailDTO struct {
 	Parent                *ticketRefDTO       `json:"parent"`
 	MergedInto            *ticketRefDTO       `json:"mergedInto"`
 	Children              []ticketChildDTO    `json:"children"`
+	// GlpiWrite: «Escribir en GLPI» encendido (se ofrece comentar y crear).
+	GlpiWrite bool `json:"glpiWrite"`
+	// GlpiCopy: la copia en GLPI de un ticket de la app (10d.2).
+	GlpiCopy *glpiCopyDTO `json:"glpiCopy,omitempty"`
 }
 
 type ticketRefDTO struct {
@@ -364,6 +372,8 @@ func (h *TicketsHandler) loadDetail(r *http.Request, id uuid.UUID) (ticketDetail
 	if isGlpiTicket(row.Ticket) {
 		withGlpi(&d.Ticket, row.Ticket, glpiAPIURL(ctx, h.Queries))
 	}
+	d.GlpiWrite = h.Glpi.WriteReady(ctx)
+	d.GlpiCopy = glpiCopyOf(ctx, h.Queries, row.Ticket)
 	for _, rv := range resolvers {
 		d.Resolvers = append(d.Resolvers, ticketResolverDTO{UserID: rv.UserID, Username: rv.Username, FullName: textPtr(rv.FullName)})
 	}

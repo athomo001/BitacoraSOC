@@ -29,7 +29,7 @@ Cada destino elige sus grupos:
 | Grupo (`group`) | Eventos |
 | --- | --- |
 | `auditoria` | Todo lo de Administración → Auditoría desde un nivel mínimo: ingresos y fallos, cambios de configuración, accesos denegados, respaldos. |
-| `bitacora` | `entry.created`, `entry.updated`, `entry.deleted`, `entry.resolved`, `entry.comment_added`… con el texto completo, el tipo, las etiquetas, el autor y el cliente. |
+| `bitacora` | `entry.created`, `entry.updated`, `entry.deleted`, `entry.resolved`, `entry.comment_added`, `entry.follow_up.closed` y `opened`… con el texto completo, el tipo, las etiquetas, el autor y el cliente. |
 | `escalamiento` | `escalation.incident.opened` y `closed`, `escalation.action` (cada llamado con su resultado), `escalation.notify.sent`. |
 | `ticketera` | `ticket.created`, `ticket.updated`, `ticket.assigned`, `ticket.derived`, `ticket.comment_added`, `ticket.sla_breached`, `ticket.glpi_synced` (un ticket de GLPI que llegó o cambió)… con número, título, estado, prioridad, área y cliente. |
 

@@ -74,6 +74,7 @@ var opsEvents = map[string]string{
 	"entry.created": GroupEntries, "entry.created_with_ticket": GroupEntries, "entry.updated": GroupEntries,
 	"entry.deleted": GroupEntries, "entry.resolved": GroupEntries, "entry.comment_added": GroupEntries,
 	"entry.converted_to_ticket": GroupEntries, "entry.bulk_patched": GroupEntries,
+	"entry.follow_up.closed": GroupEntries, "entry.follow_up.opened": GroupEntries,
 
 	"escalation.incident.opened": GroupEscalation, "escalation.incident.closed": GroupEscalation,
 	"escalation.incident.reopened": GroupEscalation, "escalation.incident.note": GroupEscalation,

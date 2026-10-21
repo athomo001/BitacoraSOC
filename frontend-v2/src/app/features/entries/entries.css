@@ -230,6 +230,36 @@ mat-icon {
   font-size: 11px;
 }
 
+.en__fu,
+.en__fu-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.en__fu {
+  margin-left: 6px;
+  color: var(--text-muted);
+}
+
+.en__fu--open,
+.en__fu-state {
+  font-weight: 600;
+}
+
+.en__fu--open {
+  color: var(--status-warning);
+}
+
+.en__fu-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  align-items: center;
+}
+
 /* Redactor */
 .en__composer {
   display: flex;

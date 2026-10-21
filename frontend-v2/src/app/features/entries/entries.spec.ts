@@ -174,6 +174,45 @@ describe('EntriesComponent (Bitácora)', () => {
     expect(el.querySelector('.en__side')?.textContent).toContain('Seguimiento');
   });
 
+  it('«En seguimiento» trae solo lo abierto, la lista dice cuántos y cuándo, y se cierra con nota', async () => {
+    const { fixture, el, button } = await render();
+    button('En seguimiento').click();
+    const twoHoursAgo = new Date(Date.now() - 2 * 3600_000 - 60_000).toISOString();
+    const open = { ...ENTRY, followUpOpen: true, followUpCount: 3, lastFollowUpAt: twoHoursAgo };
+    httpMock.expectOne((r) => r.url === '/api/entries' && r.params.get('followUp') === 'open').flush({ data: { items: [open], total: 1 } });
+    await tick();
+    fixture.detectChanges();
+    const mark = el.querySelector('.en__fu--open')!;
+    expect(mark.textContent).toContain('3');
+    expect(mark.textContent).toContain('hace 2 h');
+
+    (el.querySelector('tr.en-row') as HTMLElement).click();
+    await tick();
+    httpMock.expectOne('/api/entries/e1').flush({ data: { ...open, comments: [] } });
+    await tick();
+    fixture.detectChanges();
+    expect(el.querySelector('.en__fu-head')!.textContent).toContain('En seguimiento');
+    button('Cerrar seguimiento').click();
+    fixture.detectChanges();
+    const note = el.querySelector('input[name="fuCloseNote"]') as HTMLInputElement;
+    note.value = 'El cliente lo resolvió';
+    note.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    [...el.querySelectorAll<HTMLButtonElement>('.en__comment-form button')].find((b) => b.textContent?.includes('Cerrar seguimiento'))!.click();
+    const put = httpMock.expectOne('/api/entries/e1/follow-up');
+    expect(put.request.method).toBe('PUT');
+    expect(put.request.body).toEqual({ open: false, note: 'El cliente lo resolvió' });
+    put.flush({ data: { followUpOpen: false, followUpClosedAt: new Date().toISOString() } });
+    await tick();
+    // Con el filtro puesto, la lista se vuelve a pedir: la cerrada ya no pertenece.
+    httpMock.expectOne((r) => r.url === '/api/entries' && r.params.get('followUp') === 'open').flush({ data: { items: [], total: 0 } });
+    await tick();
+    fixture.detectChanges();
+    expect(el.querySelector('.en__fu-head')!.textContent).toContain('Cerrado el');
+    expect(el.textContent).toContain('El cliente lo resolvió');
+    expect(button('Reabrir seguimiento')).toBeTruthy();
+  });
+
   it('las notas se abren en el panel: pizarrón y libreta', async () => {
     const { fixture, el, button } = await render();
     button('Notas').click();

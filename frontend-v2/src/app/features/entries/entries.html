@@ -29,6 +29,7 @@
         <input type="search" [placeholder]="i18n.t('entries.search')" [attr.aria-label]="i18n.t('entries.search')" [ngModel]="filterQ()" (ngModelChange)="filterQ.set($event)" (keyup.enter)="load()" />
       </label>
       <button type="button" class="seg" [attr.aria-pressed]="filterAuthor() === 'me'" (click)="toggleMine()"><mat-icon>person</mat-icon>{{ i18n.t('entries.mine') }}</button>
+      <button type="button" class="seg" [attr.aria-pressed]="filterFollowUp()" (click)="toggleFollowUp()"><mat-icon>forum</mat-icon>{{ i18n.t('entries.fu.filter') }}</button>
       <button type="button" class="adm-btn" [attr.aria-expanded]="moreFilters()" (click)="moreFilters.set(!moreFilters())"><mat-icon>tune</mat-icon>{{ i18n.t('entries.moreFilters') }}</button>
       <span class="en__count mono en__push">{{ i18n.tf('entries.count', total()) }}</span>
       <button type="button" class="adm-btn" [attr.aria-pressed]="panel() === 'notes'" (click)="toggleNotes()"><mat-icon>sticky_note_2</mat-icon>{{ i18n.t('entries.notes') }}</button>
@@ -81,6 +82,11 @@
               <td class="en__summary">
                 {{ summary(entry) }}
                 @if (entry.imageUrl) { <mat-icon class="en__clip" [title]="i18n.t('entries.hasImage')">attach_file</mat-icon> }
+                @if (entry.followUpCount || entry.followUpOpen) {
+                  <span class="en__fu" [class.en__fu--open]="entry.followUpOpen" [title]="i18n.t(entry.followUpOpen ? 'entries.fu.open' : 'entries.fu.closed')">
+                    <mat-icon>{{ entry.followUpOpen ? 'forum' : 'check' }}</mat-icon>{{ entry.followUpCount }}@if (entry.lastFollowUpAt) { · {{ ago(entry.lastFollowUpAt) }} }
+                  </span>
+                }
                 @for (tag of entry.tags; track tag) { <span class="pill tone-neutral en__tag">{{ tag }}</span> }
               </td>
               <td class="en__author">{{ entry.authorUsername }}@if (entry.apiKeyName) { <span class="en__api">API · {{ entry.apiKeyName }}</span> }</td>
@@ -238,19 +244,46 @@
               </div>
             } @else if (!entry.ticket || !entry.glpiTicketId) {
               <button type="button" class="adm-btn en__link-add" (click)="openLink()"><mat-icon>add_link</mat-icon>{{ i18n.t('entries.linkTicketBtn') }}</button>
+              @if (entry.glpiWrite && !entry.glpiTicketId) {
+                <button type="button" class="adm-btn en__link-add" (click)="createInGlpi()"><mat-icon>add_task</mat-icon>{{ i18n.t('gw.create') }}</button>
+              }
             }
           </div>
 
-          <span class="adm-label">{{ i18n.t('entries.followUps') }}</span>
+          <div class="en__fu-head">
+            <span class="adm-label">{{ i18n.t('entries.followUps') }}</span>
+            @if (entry.followUpOpen) {
+              <span class="en__fu-state text-warn"><mat-icon>forum</mat-icon>{{ i18n.t('entries.fu.open') }}</span>
+              @if (!closingFollowUp()) { <button type="button" class="adm-btn en__push" (click)="closingFollowUp.set(true)"><mat-icon>check</mat-icon>{{ i18n.t('entries.fu.close') }}</button> }
+            } @else {
+              @if (entry.followUpClosedAt) {
+                <span class="en__fu-state text-ok"><mat-icon>check</mat-icon>{{ i18n.tf('entries.fu.closedOn', (entry.followUpClosedAt | date: 'dd/MM HH:mm') ?? '') }}@if (entry.followUpClosedBy) { · {{ entry.followUpClosedBy }} }</span>
+              }
+              <button type="button" class="adm-btn en__push" (click)="setFollowUp(true)"><mat-icon>forum</mat-icon>{{ i18n.t(entry.followUpClosedAt ? 'entries.fu.reopen' : 'entries.fu.start') }}</button>
+            }
+          </div>
+          @if (!entry.followUpOpen && entry.followUpCloseNote) { <span class="adm-small adm-secondary">{{ entry.followUpCloseNote }}</span> }
+          @if (closingFollowUp()) {
+            <div class="en__comment-form">
+              <input class="adm-input" name="fuCloseNote" maxlength="500" [placeholder]="i18n.t('entries.fu.notePh')" [attr.aria-label]="i18n.t('entries.fu.notePh')" [ngModel]="closeNote()" (ngModelChange)="closeNote.set($event)" (keyup.enter)="setFollowUp(false)" />
+              <button type="button" class="adm-btn" (click)="closingFollowUp.set(false)">{{ i18n.t('adminChecklist.cancel') }}</button>
+              <button type="button" class="adm-btn adm-btn--primary" (click)="setFollowUp(false)">{{ i18n.t('entries.fu.close') }}</button>
+            </div>
+          }
           <ul class="en__comments">
             @for (c of entry.comments; track c.id) {
-              <li><strong>{{ c.authorUsername }}</strong><span class="mono adm-small adm-secondary en__cmeta">{{ c.createdAt | date: 'dd/MM HH:mm' }}</span><br />{{ c.comment }}</li>
+              <li><strong>{{ c.authorUsername }}</strong><span class="mono adm-small adm-secondary en__cmeta">{{ c.createdAt | date: 'dd/MM HH:mm' }}</span>
+                @if (c.glpiPush; as push) { <span class="pill" [class.tone-ok]="push === 'sent'" [class.tone-bad]="push === 'failed'" [class.tone-warn]="push === 'queued'" [title]="c.glpiPushError ?? ''">{{ i18n.t(glpiPushKey(push)) }}</span> }
+                <br />{{ c.comment }}</li>
             } @empty {
               <li class="adm-hint">{{ i18n.t('entries.noFollowUps') }}</li>
             }
           </ul>
           <div class="en__comment-form">
             <input class="adm-input" [placeholder]="i18n.t('entries.addFollowUp')" [attr.aria-label]="i18n.t('entries.addFollowUp')" [ngModel]="newComment()" (ngModelChange)="newComment.set($event)" (keyup.enter)="addComment()" />
+            @if (entry.glpiWrite && entry.glpiTicketId) {
+              <button type="button" class="seg" [attr.aria-pressed]="alsoGlpi()" (click)="alsoGlpi.set(!alsoGlpi())">{{ i18n.t('gw.alsoGlpi') }}</button>
+            }
             <button type="button" class="adm-btn adm-btn--primary" [disabled]="!newComment().trim()" (click)="addComment()">{{ i18n.t('entries.comment') }}</button>
           </div>
 

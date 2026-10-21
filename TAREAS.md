@@ -25,6 +25,8 @@ Lo hecho, lo que está en revisión y lo que falta hasta el corte. Marca con `[x
 - [x] Gestión CSM (9.4): diseño rehecho con el feedback del CSM (2026-10-19)
 - [ ] Tema Rosa con efecto 8-bit (construido el 2026-10-19, ver CHANGELOG): revisarlo en la app — Dueño
 - [x] Gestión CSM (9.4): la CSM aprobó el diseño rehecho (<https://claude.ai/artifact/MkPD5Eipnsgiy95BPQudob>) — CSM
+- [ ] Probar la 10d.2 con el GLPI de pruebas: `migrate … up` para la 000054; un usuario de GLPI con permiso para crear tickets y seguimientos y su User-Token en Administración → GLPI → Escribir en GLPI («Probar»); comentar un GLPI-…, «Crear en GLPI» desde un ticket y desde una entrada, y escribir en GLPI sobre la copia para ver que vuelve — Dueño
+- [ ] Revisar en la app el seguimiento de la Bitácora (10j): `migrate … up` para la 000053; filtro «En seguimiento», el contador en la lista y «Cerrar seguimiento» en el detalle — Dueño
 - [ ] Probar la 10b (Integraciones): `migrate … up` para la 000052; en Administración → Integraciones crear un destino hacia tu SIEM y «Probar»; crear una llave y probarla con el `curl` que muestra (manual: `docs/api-integraciones.md`) — Dueño
 - [ ] Revisar en la app la Gestión CSM (9.4): antes correr `migrate … up` para la 000051; ponerle a cada cliente su CSM, inicio del servicio y renovación (Gestión → ficha → Datos de la cuenta) — Dueño y CSM
 
@@ -58,12 +60,13 @@ Lo hecho, lo que está en revisión y lo que falta hasta el corte. Marca con `[x
 - [x] 10b Reenvío de eventos a un SIEM y API de integraciones (2026-10-21; ver «En curso»)
 - [ ] 10c SSO con Microsoft 365 — un admin del tenant registra la app en Entra ID
 - [x] 10d.1 Tickets de GLPI en la Ticketera, solo para mirar (2026-10-20; ver «En curso»)
-- [ ] 10d.2 De la app a GLPI: comentar en un ticket de GLPI y «Crear en GLPI» — se diseña cuando la 10d.1 esté probada con el GLPI real
+- [x] 10d.2 De la app a GLPI: comentar los GLPI-… y «Crear en GLPI» (2026-10-21; ver «En curso»)
 - [ ] 10e Pedidos especiales — validar el concepto con el dueño
 - [ ] 10f Reportes avanzados — elegir qué parte primero
 - [ ] 10g Carga CSV masiva — definir de qué más
 - [ ] 10h Enlaces públicos avanzados — definir qué falta
 - [ ] 10i Complementos con build — solo si hay un complemento real que lo necesite
+- [x] 10j Seguimiento de entradas de la Bitácora (2026-10-21; ver «En curso»). «Seguir» con aviso en la campana queda para después
 
 ### Corte
 - [ ] Ensayo de paridad 2 con un respaldo de producción nuevo
@@ -99,3 +102,5 @@ Lo hecho, lo que está en revisión y lo que falta hasta el corte. Marca con `[x
 - [x] RACI por cliente como el legacy, con las notas que el ETL perdía (2026-10-20)
 - [x] Tickets de GLPI en la Ticketera, solo para mirar (10d.1, 2026-10-20)
 - [x] Reenvío de eventos a un SIEM y API de integraciones (10b, 2026-10-21)
+- [x] Seguimiento de entradas de la Bitácora (10j, 2026-10-21)
+- [x] De la app a GLPI: comentar y crear en GLPI (10d.2, 2026-10-21)

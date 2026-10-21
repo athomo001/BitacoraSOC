@@ -1,0 +1,73 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+mat-icon {
+  width: 16px;
+  height: 16px;
+  font-size: 16px;
+}
+
+.gw__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.gw__maps {
+  padding: 4px 0;
+}
+
+.gw__body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.gw__flat {
+  margin: 0;
+}
+
+.gw__pad {
+  margin: 0;
+  padding: 8px 14px 0;
+}
+
+.gw__line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  align-items: center;
+}
+
+.gw__grow {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.gw__state {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.gw__block {
+  display: block;
+}
+
+.gw__mini {
+  margin-top: 4px;
+  padding: 2px 8px;
+}
+
+@media (width <= 900px) {
+  .gw__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

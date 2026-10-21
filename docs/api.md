@@ -308,7 +308,7 @@ Generada desde `backend-go/cmd/server/main.go`, donde se registran las rutas. La
 
 | Método | Ruta | Acceso |
 | --- | --- | --- |
-| `GET` | `/api/entries` | Sesión |
+| `GET` | `/api/entries` | Sesión — `q` busca también en los seguimientos; `followUp=open`: solo las que están en seguimiento, primero la de seguimiento más reciente. Cada entrada trae `followUpOpen`, `followUpCount` y `lastFollowUpAt` |
 | `POST` | `/api/entries` | Sesión |
 | `GET` | `/api/entries/export` | Sesión |
 | `GET` | `/api/entries/authors` | Sesión — quienes escribieron en la Bitácora (filtro por autor) |
@@ -321,10 +321,13 @@ Generada desde `backend-go/cmd/server/main.go`, donde se registran las rutas. La
 | `GET` | `/api/entries/{id}` | Sesión |
 | `PATCH` | `/api/entries/{id}` | Sesión |
 | `DELETE` | `/api/entries/{id}` | Sesión |
-| `POST` | `/api/entries/{id}/comments` | Sesión |
+| `POST` | `/api/entries/{id}/comments` | Sesión — un seguimiento deja la entrada en seguimiento |
+| `PUT` | `/api/entries/{id}/follow-up` | Sesión — `{open, note}`: cerrar el seguimiento (nota opcional) o ponerla en seguimiento. Auditoría: `entry.follow_up.closed\|opened` |
 | `POST` | `/api/entries/{id}/ticket-link` | Sesión · Ticketera encendida |
 | `DELETE` | `/api/entries/{id}/ticket-link` | Sesión · Ticketera encendida — quita el ticket interno y deja una nota en el ticket |
 | `PUT` | `/api/entries/{id}/glpi-ticket` | Sesión — `{glpiTicketId}` (solo dígitos, acepta `#`); vacío lo quita. Devuelve el detalle |
+| `GET` | `/api/entries/{id}/glpi-create` | Admin o analista · «Escribir en GLPI» encendido — vista previa de «Crear en GLPI»: `{entities, entityId, groups, groupId, type, urgency, impact, title, description, problem}` |
+| `POST` | `/api/entries/{id}/glpi-create` | Admin o analista — `{entityId, groupId, type, title}`: crea el ticket en GLPI y deja la entrada enlazada. `POST /api/entries/{id}/comments` acepta `syncToGlpi` («También en GLPI») |
 | `POST` | `/api/entries/{id}/convert-to-ticket` | Sesión · Ticketera encendida |
 | `POST` | `/api/entries/{id}/resolve` | Sesión · Ticketera encendida |
 
@@ -573,6 +576,11 @@ Importación de equipos desde GLPI (spec/16 §5.1, 9.6). Solo admin y solo con `
 | `GET` | `/api/glpi/tickets/catalog` | Entidades (con `parentId`) y grupos técnicos de GLPI, con `openCount` (abiertos ya traídos); `502 glpi-unreachable` si no conecta |
 | `POST` | `/api/glpi/tickets/sync` | «Sincronizar ahora»: `202`, la corrida sigue en segundo plano; `409 glpi-tickets-off` si está apagado, `409 glpi-busy` si ya hay una |
 | `GET` | `/api/glpi/tickets/runs` | Las últimas 20 corridas: `{trigger, firstLoad, running, ok, created, updated, skipped, deleted, message}` |
+| `GET` | `/api/glpi/write/config` | «Escribir en GLPI» (10d.2): encendido, si hay token, tipo por defecto, y por cliente sus entidades y por área sus grupos (al revés de los mapeos), con lo elegido |
+| `PUT` | `/api/glpi/write/config` | `{enabled, token, defaultType: 1\|2, clientEntities, areaGroups}`; `token` nulo se mantiene, `""` se quita. Auditoría `config.glpi.write.update` |
+| `POST` | `/api/glpi/write/test` | Abre sesión con el token de escritura y dice con quién y qué perfil, sin crear nada |
+| `GET` | `/api/glpi/write/queue` | Lo último de la cola de envíos (seguimientos y estado de las copias): estado, intentos, último error |
+| `POST` | `/api/glpi/write/retry` | `{id}` o vacío (todo): lo que falló vuelve a la cola |
 
 ### Gestión CSM
 
@@ -731,7 +739,9 @@ Los tickets traídos de GLPI (spec/18) llevan `source: "glpi"` y `glpi: {id, url
 | `GET` | `/api/tickets/{id}/images/{imageId}` | Sesión · Ticketera encendida |
 | `DELETE` | `/api/tickets/{id}/images/{imageId}` | Sesión · Ticketera encendida |
 | `DELETE` | `/api/tickets/{id}/resolvers/{userId}` | Sesión · Ticketera encendida |
-| `POST` | `/api/tickets/{id}/comments` | Sesión · Ticketera encendida |
+| `POST` | `/api/tickets/{id}/comments` | Sesión · Ticketera encendida — en un `GLPI-…`, solo con «Escribir en GLPI» encendido: sale como seguimiento (privado salvo `isPublic`) y el comentario trae `glpiPush` (`queued`, `sent`, `failed`). En un ticket con copia, también va a la copia |
+| `GET` | `/api/tickets/{id}/glpi-copy` | Sesión · Ticketera encendida · «Escribir en GLPI» — vista previa de «Crear en GLPI» |
+| `POST` | `/api/tickets/{id}/glpi-copy` | Quien trabaja el ticket — `{entityId, groupId, type, title}`: crea la copia al momento; `409 glpi-copy-exists` si ya tiene |
 | `GET` | `/api/tickets/{id}/tasks` | Sesión · Ticketera encendida |
 | `POST` | `/api/tickets/{id}/tasks` | Sesión · Ticketera encendida |
 | `PATCH` | `/api/tickets/{id}/tasks/{taskId}` | Sesión · Ticketera encendida |

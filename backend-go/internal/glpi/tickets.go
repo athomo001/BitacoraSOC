@@ -14,7 +14,8 @@ import (
 	"time"
 )
 
-// Tickets de GLPI para la Ticketera (10d.1, spec/18): solo se leen. La
+// Tickets de GLPI para la Ticketera (10d.1, spec/18): se leen aquí; lo que
+// la app escribe (10d.2) está en write.go. La
 // búsqueda (search/Ticket) trae los números de lo que cambió en las entidades
 // marcadas; cada ticket se lee después con sus grupos, técnicos, seguimientos,
 // tareas y solución.
@@ -163,6 +164,8 @@ type Note struct {
 	Date    string
 	// Seconds: el tiempo dedicado de una tarea.
 	Seconds int
+	// Ours: lo escribió la app (lleva SyncMarker); no se trae de vuelta.
+	Ours bool
 }
 
 // TicketData es un ticket de GLPI con lo que la Ticketera toma de él. Las
@@ -249,7 +252,7 @@ func FetchTicket(ctx context.Context, s *Session, id int) (TicketData, error) {
 	}
 	for _, f := range followups {
 		t.Notes = append(t.Notes, Note{Kind: "followup", ID: Int(f["id"]), UserID: Int(f["users_id"]), Content: Text(Str(f["content"])),
-			Private: Int(f["is_private"]) == 1, Date: firstDate(f, "date", "date_creation")})
+			Private: Int(f["is_private"]) == 1, Date: firstDate(f, "date", "date_creation"), Ours: IsOurs(Str(f["content"]))})
 	}
 	tasks, err := sub("TicketTask")
 	if err != nil {
@@ -272,7 +275,7 @@ func FetchTicket(ctx context.Context, s *Session, id int) (TicketData, error) {
 			continue // solución rechazada: el ticket volvió a abrirse
 		}
 		t.Notes = append(t.Notes, Note{Kind: "solution", ID: Int(x["id"]), UserID: Int(x["users_id"]), Content: Text(Str(x["content"])),
-			Date: firstDate(x, "date_creation", "date_mod")})
+			Date: firstDate(x, "date_creation", "date_mod"), Ours: IsOurs(Str(x["content"]))})
 	}
 	return t, nil
 }

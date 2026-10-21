@@ -17,7 +17,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 const (
@@ -26,7 +25,8 @@ const (
 )
 
 type TicketsHandler struct {
-	Pool     *pgxpool.Pool
+	// Pool abre las transacciones (en las pruebas, una transacción externa).
+	Pool     txBeginner
 	Queries  *db.Queries
 	AuditLog *audit.Logger
 	Now      func() time.Time
@@ -39,6 +39,9 @@ type TicketsHandler struct {
 	Mailer *TicketMailer
 	// Notify: avisos en la campana (9.5); nil = sin avisos (tests).
 	Notify *Notifier
+	// Glpi: escribir en GLPI (10d.2): comentar los GLPI-… y la copia de un
+	// ticket de la app; nil = no se escribe.
+	Glpi *GlpiHandler
 }
 
 func (h *TicketsHandler) now() time.Time {
@@ -214,6 +217,10 @@ func (h *TicketsHandler) AddComment(w http.ResponseWriter, r *http.Request) {
 		problemdetails.Write(w, r, http.StatusConflict, "ticket-merged", "este ticket se unió a otro: comenta en el principal")
 		return
 	}
+	if isGlpiTicket(ticket) {
+		h.addGlpiComment(w, r, ticket, req)
+		return
+	}
 	tx, err := h.Pool.Begin(ctx)
 	if err != nil {
 		problemdetails.Write(w, r, 500, "internal-error", "no se pudo crear el comentario")
@@ -245,6 +252,9 @@ func (h *TicketsHandler) AddComment(w http.ResponseWriter, r *http.Request) {
 	}
 	h.notifyChanged(ctx, id)
 	dto := toTicketCommentDTO(comment)
+	if h.pushToCopy(ctx, ticket, comment, u.Username, u.ID) {
+		dto = h.commentWithPush(ctx, comment)
+	}
 	if images, err := h.Queries.ListTicketImages(ctx, id); err == nil {
 		dto.Images = imagesOfComment(images, comment.ID)
 	}

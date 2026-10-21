@@ -10,6 +10,7 @@ import { Organization, OrganizationsService } from '../../core/organizations/org
 import { I18nService } from '../../core/i18n/i18n.service';
 import { MessageKey } from '../../core/i18n/messages';
 import { problemDetail } from '../../core/http-error';
+import { AdminGlpiWriteComponent } from './admin-glpi-write';
 import { AdminGlpiTicketsComponent } from './admin-glpi-tickets';
 
 import '../../core/i18n/packs/admin';
@@ -55,7 +56,7 @@ function toDraft(c: GlpiConfig): GlpiDraft {
 @Component({
   selector: 'app-admin-glpi',
   standalone: true,
-  imports: [DatePipe, FormsModule, MatIconModule, AdminGlpiTicketsComponent],
+  imports: [DatePipe, FormsModule, MatIconModule, AdminGlpiTicketsComponent, AdminGlpiWriteComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './admin-glpi.html',
   styleUrl: './admin-glpi.css',

@@ -39,6 +39,8 @@ type EntriesHandler struct {
 	Tickets  *TicketsHandler
 	AuditLog *audit.Logger
 	Now      func() time.Time
+	// Glpi: «Crear en GLPI» y «También en GLPI» (10d.2); nil = no.
+	Glpi *GlpiHandler
 }
 
 func (h *EntriesHandler) now() time.Time {
@@ -82,6 +84,11 @@ type entryDTO struct {
 	UpdatedAt      time.Time  `json:"updatedAt"`
 	// APIKeyName: la creó una llave de la API de integraciones (spec/19).
 	APIKeyName *string `json:"apiKeyName,omitempty"`
+	// Seguimiento (10j): abierta hasta que alguien la cierra; en la lista,
+	// cuántos seguimientos tiene y cuándo fue el último.
+	FollowUpOpen   bool       `json:"followUpOpen"`
+	FollowUpCount  int32      `json:"followUpCount"`
+	LastFollowUpAt *time.Time `json:"lastFollowUpAt,omitempty"`
 }
 
 func int4Ptr(v pgtype.Int4) *int32 {
@@ -96,7 +103,7 @@ func toEntryDTO(e db.Entry, authorUsername string) entryDTO {
 		ID: e.ID, AuthorUsername: authorUsername, EntryType: string(e.EntryType), Scope: string(e.Scope),
 		Content: e.Content, Tags: e.Tags, ServiceID: uuidPtr(e.ServiceID), AssetID: uuidPtr(e.AssetID),
 		ImageURL: textPtr(e.ImageUrl), ImageHash: textPtr(e.ImageHash), ImageSizeBytes: int4Ptr(e.ImageSizeBytes),
-		APIKeyName: textPtr(e.ApiKeyName),
+		APIKeyName: textPtr(e.ApiKeyName), FollowUpOpen: e.FollowUpOpen,
 	}
 	if e.CreatedAt.Valid {
 		dto.CreatedAt = e.CreatedAt.Time
@@ -108,7 +115,7 @@ func toEntryDTO(e db.Entry, authorUsername string) entryDTO {
 }
 
 func entryFromRow(row db.GetEntryRow) db.Entry {
-	return db.Entry{ID: row.ID, UserID: row.UserID, EntryType: row.EntryType, Scope: row.Scope, Content: row.Content, Tags: row.Tags, ServiceID: row.ServiceID, AssetID: row.AssetID, WorkShiftID: row.WorkShiftID, GlpiTicketID: row.GlpiTicketID, GlpiLinkedAt: row.GlpiLinkedAt, TicketID: row.TicketID, ImageUrl: row.ImageUrl, ImageHash: row.ImageHash, ImageSizeBytes: row.ImageSizeBytes, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt, ApiKeyName: row.ApiKeyName}
+	return db.Entry{ID: row.ID, UserID: row.UserID, EntryType: row.EntryType, Scope: row.Scope, Content: row.Content, Tags: row.Tags, ServiceID: row.ServiceID, AssetID: row.AssetID, WorkShiftID: row.WorkShiftID, GlpiTicketID: row.GlpiTicketID, GlpiLinkedAt: row.GlpiLinkedAt, TicketID: row.TicketID, ImageUrl: row.ImageUrl, ImageHash: row.ImageHash, ImageSizeBytes: row.ImageSizeBytes, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt, ApiKeyName: row.ApiKeyName, FollowUpOpen: row.FollowUpOpen}
 }
 
 type entryCommentDTO struct {
@@ -118,11 +125,21 @@ type entryCommentDTO struct {
 	Comment           string    `json:"comment"`
 	IsSystemGenerated bool      `json:"isSystemGenerated"`
 	CreatedAt         time.Time `json:"createdAt"`
+	// GlpiPush: «También en GLPI» (10d.2): queued | sent | failed.
+	GlpiPush      string  `json:"glpiPush,omitempty"`
+	GlpiPushError *string `json:"glpiPushError,omitempty"`
 }
 
 type entryDetailDTO struct {
 	entryDTO
 	Comments []entryCommentDTO `json:"comments"`
+	// GlpiWrite: «Escribir en GLPI» encendido (10d.2): se ofrece «Crear en
+	// GLPI» y «También en GLPI».
+	GlpiWrite bool `json:"glpiWrite"`
+	// Quién cerró el seguimiento, cuándo y con qué nota (10j).
+	FollowUpClosedAt  *time.Time `json:"followUpClosedAt,omitempty"`
+	FollowUpClosedBy  string     `json:"followUpClosedBy,omitempty"`
+	FollowUpCloseNote *string    `json:"followUpCloseNote,omitempty"`
 	// Enlaces a tickets (entry_links.go).
 	Ticket        *entryTicketDTO `json:"ticket,omitempty"`
 	GlpiTicketID  string          `json:"glpiTicketId,omitempty"`
@@ -141,6 +158,8 @@ type entryFilters struct {
 	// Autor y cliente (paridad con el legacy, 2026-10-16). author=me: el usuario.
 	AuthorID pgtype.UUID
 	ClientID pgtype.UUID
+	// followUp=open: solo las que están en seguimiento (10j).
+	FollowUpOpen pgtype.Bool
 }
 
 func parseEntryFilters(r *http.Request) (entryFilters, error) {
@@ -154,6 +173,9 @@ func parseEntryFilters(r *http.Request) (entryFilters, error) {
 	}
 	f.Tag = queryText(q.Get("tag"))
 	f.Q = queryText(q.Get("q"))
+	if q.Get("followUp") == "open" {
+		f.FollowUpOpen = pgtype.Bool{Bool: true, Valid: true}
+	}
 	switch v := q.Get("author"); v {
 	case "":
 	case "me":
@@ -203,7 +225,7 @@ func (h *EntriesHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx := r.Context()
 	rows, err := h.Queries.ListEntries(ctx, db.ListEntriesParams{
-		Scope: f.Scope, EntryType: f.EntryType, Tag: f.Tag, FromDate: f.FromDate, ToDate: f.ToDate, Q: f.Q, AuthorID: f.AuthorID, ClientID: f.ClientID,
+		Scope: f.Scope, EntryType: f.EntryType, Tag: f.Tag, FromDate: f.FromDate, ToDate: f.ToDate, Q: f.Q, AuthorID: f.AuthorID, ClientID: f.ClientID, FollowUpOpen: f.FollowUpOpen,
 		PageSize: int32(pageSize), PageOffset: int32((page - 1) * pageSize),
 	})
 	if err != nil {
@@ -211,7 +233,7 @@ func (h *EntriesHandler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	total, err := h.Queries.CountEntries(ctx, db.CountEntriesParams{
-		Scope: f.Scope, EntryType: f.EntryType, Tag: f.Tag, FromDate: f.FromDate, ToDate: f.ToDate, Q: f.Q, AuthorID: f.AuthorID, ClientID: f.ClientID,
+		Scope: f.Scope, EntryType: f.EntryType, Tag: f.Tag, FromDate: f.FromDate, ToDate: f.ToDate, Q: f.Q, AuthorID: f.AuthorID, ClientID: f.ClientID, FollowUpOpen: f.FollowUpOpen,
 	})
 	if err != nil {
 		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudieron contar las entradas")
@@ -219,11 +241,14 @@ func (h *EntriesHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 	items := make([]entryDTO, 0, len(rows))
 	for _, row := range rows {
-		items = append(items, toEntryDTO(db.Entry{
+		item := toEntryDTO(db.Entry{
 			ID: row.ID, UserID: row.UserID, EntryType: row.EntryType, Scope: row.Scope, Content: row.Content, Tags: row.Tags,
 			ServiceID: row.ServiceID, AssetID: row.AssetID, ImageUrl: row.ImageUrl, ImageHash: row.ImageHash,
 			ImageSizeBytes: row.ImageSizeBytes, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt, ApiKeyName: row.ApiKeyName,
-		}, row.AuthorUsername))
+			FollowUpOpen: row.FollowUpOpen,
+		}, row.AuthorUsername)
+		item.FollowUpCount, item.LastFollowUpAt = row.FollowUpCount, timestamptzPtr(row.LastFollowUpAt)
+		items = append(items, item)
 	}
 	writeData(w, http.StatusOK, map[string]any{"items": items, "total": total})
 }
@@ -277,7 +302,8 @@ func (h *EntriesHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 	comments := make([]entryCommentDTO, 0, len(commentRows))
 	for _, c := range commentRows {
-		comment := entryCommentDTO{ID: c.ID, EntryID: c.EntryID, AuthorUsername: c.AuthorUsername, Comment: c.Comment, IsSystemGenerated: c.IsSystemGenerated}
+		comment := entryCommentDTO{ID: c.ID, EntryID: c.EntryID, AuthorUsername: c.AuthorUsername, Comment: c.Comment, IsSystemGenerated: c.IsSystemGenerated,
+			GlpiPush: c.GlpiPushState.String, GlpiPushError: textPtr(c.GlpiPushError)}
 		if c.CreatedAt.Valid {
 			comment.CreatedAt = c.CreatedAt.Time
 		}
@@ -287,8 +313,12 @@ func (h *EntriesHandler) Get(w http.ResponseWriter, r *http.Request) {
 		ID: row.ID, UserID: row.UserID, EntryType: row.EntryType, Scope: row.Scope, Content: row.Content, Tags: row.Tags,
 		ServiceID: row.ServiceID, AssetID: row.AssetID, ImageUrl: row.ImageUrl, ImageHash: row.ImageHash,
 		ImageSizeBytes: row.ImageSizeBytes, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt, ApiKeyName: row.ApiKeyName,
+		FollowUpOpen: row.FollowUpOpen,
 	}
-	dto := entryDetailDTO{entryDTO: toEntryDTO(entry, row.AuthorUsername), Comments: comments}
+	dto := entryDetailDTO{entryDTO: toEntryDTO(entry, row.AuthorUsername), Comments: comments,
+		FollowUpClosedAt: timestamptzPtr(row.FollowUpClosedAt), FollowUpClosedBy: row.FollowUpClosedByName, FollowUpCloseNote: textPtr(row.FollowUpCloseNote)}
+	dto.FollowUpCount = int32(len(comments))
+	dto.GlpiWrite = h.Glpi.WriteReady(ctx)
 	h.entryLinks(ctx, &dto, row.TicketID, row.GlpiTicketID)
 	writeData(w, http.StatusOK, dto)
 }
@@ -425,7 +455,7 @@ func (h *EntriesHandler) Export(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx := r.Context()
 	rows, err := h.Queries.ListEntriesForExport(ctx, db.ListEntriesForExportParams{
-		Scope: f.Scope, EntryType: f.EntryType, Tag: f.Tag, FromDate: f.FromDate, ToDate: f.ToDate, Q: f.Q, AuthorID: f.AuthorID, ClientID: f.ClientID,
+		Scope: f.Scope, EntryType: f.EntryType, Tag: f.Tag, FromDate: f.FromDate, ToDate: f.ToDate, Q: f.Q, AuthorID: f.AuthorID, ClientID: f.ClientID, FollowUpOpen: f.FollowUpOpen,
 	})
 	if err != nil {
 		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo exportar")
@@ -451,6 +481,8 @@ func (h *EntriesHandler) Export(w http.ResponseWriter, r *http.Request) {
 type createCommentRequest struct {
 	Comment      string `json:"comment"`
 	SyncToTicket bool   `json:"syncToTicket"`
+	// SyncToGlpi: «También en GLPI», al ticket de GLPI enlazado (10d.2).
+	SyncToGlpi bool `json:"syncToGlpi"`
 }
 
 func (h *EntriesHandler) AddComment(w http.ResponseWriter, r *http.Request) {
@@ -492,7 +524,58 @@ func (h *EntriesHandler) AddComment(w http.ResponseWriter, r *http.Request) {
 	if comment.CreatedAt.Valid {
 		dto.CreatedAt = comment.CreatedAt.Time
 	}
+	if req.SyncToGlpi && h.pushEntryComment(ctx, entry, comment.ID, req.Comment) != "" {
+		if push, err := h.Queries.GetEntryCommentPush(ctx, comment.ID); err == nil {
+			dto.GlpiPush, dto.GlpiPushError = push.GlpiPushState.String, textPtr(push.GlpiPushError)
+		}
+	}
 	writeData(w, http.StatusCreated, dto)
+}
+
+// ===== Seguimiento (10j) =====
+
+type followUpRequest struct {
+	Open bool   `json:"open"`
+	Note string `json:"note"`
+}
+
+// SetFollowUp es PUT /api/entries/{id}/follow-up: cerrar el seguimiento (con
+// nota opcional) o ponerla en seguimiento sin agregar uno. Un seguimiento
+// nuevo la vuelve a abrir sola.
+func (h *EntriesHandler) SetFollowUp(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-path", "id inválido")
+		return
+	}
+	var req followUpRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "cuerpo de la request inválido")
+		return
+	}
+	note := strings.TrimSpace(req.Note)
+	if len([]rune(note)) > 500 {
+		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "la nota de cierre admite hasta 500 caracteres")
+		return
+	}
+	ctx := r.Context()
+	user, _ := middleware.UserFromContext(ctx)
+	row, err := h.Queries.SetEntryFollowUp(ctx, db.SetEntryFollowUpParams{ID: id, Open: req.Open, ClosedBy: pgUUIDOf(user.ID),
+		Note: pgtype.Text{String: note, Valid: note != ""}})
+	if errors.Is(err, pgx.ErrNoRows) {
+		problemdetails.Write(w, r, http.StatusNotFound, "not-found", "entrada no encontrada")
+		return
+	}
+	if err != nil {
+		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo cambiar el seguimiento")
+		return
+	}
+	event := "entry.follow_up.closed"
+	if row.FollowUpOpen {
+		event = "entry.follow_up.opened"
+	}
+	h.AuditLog.Log(ctx, event, audit.LevelInfo, audit.Success(), map[string]any{"entryId": id.String(), "note": note})
+	writeData(w, http.StatusOK, map[string]any{"followUpOpen": row.FollowUpOpen, "followUpClosedAt": timestamptzPtr(row.FollowUpClosedAt)})
 }
 
 // ===== Imagen simple (versión sin WebP/EXIF, ver spec/00-mapa-mental.md) =====

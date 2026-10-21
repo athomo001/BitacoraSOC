@@ -4,6 +4,29 @@ Registro de cambios relevantes del proyecto.
 
 > Las entradas `[Rewrite]` registran avance de la reescritura Go/Angular especificada en `spec/` (ver `spec/02-alcance-y-roadmap.md`), fase por fase. No llevan número de versión de `package.json` porque documentan spec/decisiones/código de un sistema todavía no desplegado — el sistema en producción sigue siendo el de las entradas versionadas de abajo hasta el corte (Fase 14).
 
+## [Rewrite] GLPI en la Ticketera, fase 2: de la app a GLPI (10d.2) - 2026-10-21
+
+- Diseño aprobado por el dueño con las cinco propuestas de `spec/18` §4.8: <https://claude.ai/artifact/Pju4VRF871FM2jcSqSocG3>. El dueño pidió construirla sin esperar la prueba de la 10d.1 con su GLPI real («tengo un GLPI de pruebas, construye no más»); se probó contra el GLPI falso de las pruebas.
+- **Comentar un `GLPI-…` desde la app** (con «Escribir en GLPI» encendido): sale como seguimiento, **privado** salvo «Visible para el solicitante», firmado «— Nombre (desde Bitácora Ops)». Cada comentario muestra si quedó enviado, en cola o si no se envió (con el motivo). Lo demás de un `GLPI-…` sigue de solo lectura.
+- **Crear en GLPI** desde un ticket de la app: vista previa con la entidad del cliente y el grupo del área (los mapeos de la 10d.1 al revés), tipo, urgencia e impacto (baja 2, media 3, alta 4, crítica 5), título y descripción con el número `TKT-…`; el solicitante es la persona de la app si existe en GLPI con su correo. El ticket queda con **Copia en GLPI-…**: los comentarios **van y vuelven** (lo que escriban en GLPI llega «desde GLPI») y al resolver, cerrar o reabrir en la app la copia hace lo mismo.
+- **Crear en GLPI** desde una entrada de la Bitácora: la entrada queda enlazada y el ticket llega a la Ticketera como `GLPI-…`. Sus seguimientos ofrecen **También en GLPI**.
+- **Administración → GLPI → Escribir en GLPI**: interruptor (apagado por defecto), User-Token de escritura aparte del de solo lectura (cifrado; «Probar» no crea nada), tipo por defecto, a qué entidad y a qué grupo va lo que se crea cuando hay más de uno, y la **cola de envíos** con «Reintentar».
+- **Sin bucles**: lo que la app escribe lleva la marca invisible del legacy (`<!-- bitacora-soc-sync -->`) y su número de GLPI; la sincronización no lo trae de vuelta. **Nada se pierde**: si GLPI no responde, el envío queda en cola y se reintenta hasta 24 horas; después avisa en la campana. Con dos nodos, envía uno solo.
+- **Modelo** (migración 000054): escritura en `glpi_config`, la copia en `tickets`, el estado del envío en `ticket_comments` y `entry_comments`, y la cola `glpi_outbox`. Probada hacia adelante y hacia atrás.
+- La Ticketera abre sus transacciones por la misma interfaz que el resto de los handlers (así las pruebas corren dentro de una transacción que se deshace).
+- Pruebas: el GLPI falso ahora acepta escrituras solo con el token de escritura; una de integración de punta a punta (apagado de solo lectura, encender y probar, comentar privado y visible, GLPI caído y reintento, error permanente y «Reintentar», crear copia con entidad, grupo y solicitante, van y vuelven sin duplicar, resolver y reabrir la copia, crear desde una entrada y «También en GLPI»); unitarias de la marca, el HTML y qué errores no se reintentan; y las de la pantalla.
+
+## [Rewrite] Seguimiento de entradas de la Bitácora (10j) - 2026-10-21
+
+- Idea del dueño: una entrada con seguimiento, tres días después, no había cómo encontrarla. El seguimiento vivía solo dentro del detalle, la lista no lo mostraba y el buscador no miraba su texto. El legacy tampoco lo resolvía. Se construyeron los puntos 1 a 4 de la propuesta, directo en la Bitácora (decisión del dueño); «Seguir» con aviso en la campana queda para después.
+- **En la lista**: junto al resumen, cuántos seguimientos tiene la entrada y cuándo fue el último («3 · hace 2 h»), en amarillo si sigue abierta.
+- **En seguimiento hasta cerrarla**: el primer seguimiento (también los avisos que deja Escalamiento) deja la entrada **En seguimiento**. En el detalle, **Cerrar seguimiento** con una nota opcional de cómo terminó; un seguimiento nuevo la vuelve a abrir y **Poner en seguimiento** la abre sin escribir nada. Se ve quién la cerró, cuándo y la nota.
+- **Filtro «En seguimiento»** junto a «Mías»: solo las abiertas, primero la que tuvo un seguimiento más reciente.
+- **El buscador encuentra el texto de los seguimientos**, con su índice de texto completo.
+- **Modelo** (migración 000053): `entries.follow_up_open`, `follow_up_closed_at`, `follow_up_closed_by` y `follow_up_close_note`. Al aplicarla parten abiertas solo las que tuvieron seguimiento en la última semana, para que no aparezca todo el historial. Probada hacia adelante y hacia atrás.
+- Ruta nueva `PUT /api/entries/{id}/follow-up`; `GET /api/entries?followUp=open`. Auditoría `entry.follow_up.closed|opened` (también llegan al SIEM con el grupo Bitácora).
+- Pruebas: una de integración (abrir con un seguimiento propio y uno de Escalamiento, orden del filtro, búsqueda en los seguimientos, cerrar con nota, reabrir con un seguimiento nuevo, poner en seguimiento sin escribir) y la de la pantalla.
+
 ## [Rewrite] Reenvío de eventos a un SIEM y API de integraciones (10b) - 2026-10-21
 
 - Decisiones del dueño: **cualquier SIEM** (syslog y HTTP, sin código especial por producto), **cada destino elige** qué recibe, la API hace entradas, guardia y contactos, tickets e informe de incidente (se quita «listar usuarios» del legacy), y **las dos piezas juntas**. Diseño aprobado con las seis propuestas de `spec/19` §7: <https://claude.ai/artifact/Qra3CSJqouUWn4KkftWpkh>. En producción, el legacy no usa ninguna de las dos (0 destinos, 0 llaves).

@@ -113,7 +113,7 @@ func (h *TicketsHandler) requireTicketAccess(w http.ResponseWriter, r *http.Requ
 		return false
 	}
 	// Los de GLPI son solo para mirar: se editan en GLPI (spec/18).
-	if t.Source == ticketSourceGlpi && r.Method != http.MethodGet {
+	if t.Source == ticketSourceGlpi && r.Method != http.MethodGet && !(isCommentRequest(r) && h.Glpi.WriteReady(ctx)) {
 		problemdetails.Write(w, r, http.StatusConflict, "glpi-readonly", glpiReadOnlyMessage)
 		return false
 	}

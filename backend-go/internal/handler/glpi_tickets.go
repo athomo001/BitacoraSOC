@@ -496,6 +496,13 @@ func (sy *glpiTicketSync) sync(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("papelera de tickets: %w", err)
 	}
+	copies, err := h.Queries.ListGlpiCopies(ctx)
+	if err != nil {
+		return err
+	}
+	for _, c := range copies {
+		sy.done[int(c.GlpiCopyID)] = true // una copia no es un GLPI-…: es el mismo ticket de la app
+	}
 	links := map[int]uuid.UUID{}
 	if rows, err := h.Queries.ListGlpiHandLinks(ctx); err == nil {
 		for _, x := range rows {
@@ -536,7 +543,61 @@ func (sy *glpiTicketSync) sync(ctx context.Context) error {
 	for _, id := range ids {
 		sy.process(ctx, id, links, false)
 	}
+	for _, c := range copies {
+		sy.copy(ctx, c)
+	}
 	return nil
+}
+
+// copy trae a un ticket de la app lo que alguien escribió en GLPI sobre su
+// copia (10d.2, «van y vuelven»). Solo si la copia cambió en GLPI; lo que
+// escribió la app (con SyncMarker) no se trae de vuelta.
+func (sy *glpiTicketSync) copy(ctx context.Context, c db.ListGlpiCopiesRow) {
+	h := sy.h
+	var head map[string]any
+	if err := sy.s.Get(ctx, fmt.Sprintf("%s/%d", glpi.Ticket, c.GlpiCopyID), nil, &head); err != nil {
+		if !errors.Is(err, glpi.ErrNotFound) {
+			sy.warn(fmt.Sprintf("No se pudieron leer copias en GLPI: %s", glpi.Explain(err).Error))
+		}
+		return
+	}
+	dateMod := glpi.Str(head["date_mod"])
+	if c.GlpiCopyDateMod.Valid && c.GlpiCopyDateMod.String == dateMod {
+		return
+	}
+	td, err := glpi.FetchTicket(ctx, sy.s, int(c.GlpiCopyID))
+	if err != nil {
+		sy.errs = append(sy.errs, fmt.Sprintf("copia GLPI-%d: %s", c.GlpiCopyID, glpi.Explain(err).Error))
+		return
+	}
+	keep := []string{}
+	for _, n := range td.Notes {
+		keep = append(keep, fmt.Sprintf("%s:%d", n.Kind, n.ID))
+		if n.Ours {
+			continue
+		}
+		person := sy.person(ctx, n.UserID)
+		when := pgtype.Timestamptz{Time: h.now(), Valid: true}
+		if t, ok := glpi.ParseDate(n.Date, sy.loc); ok {
+			when = pgtype.Timestamptz{Time: t, Valid: true}
+		}
+		cp := db.UpsertGlpiCopyCommentParams{TicketID: c.ID, UserID: person.userID, AuthorName: person.name, Content: n.Content,
+			IsPublic: !n.Private, GlpiID: int32(n.ID), GlpiKind: n.Kind, CreatedAt: when}
+		if n.Kind == "task" && n.Seconds > 0 {
+			cp.GlpiTimeSeconds = pgtype.Int4{Int32: int32(n.Seconds), Valid: true}
+		}
+		if err := h.Queries.UpsertGlpiCopyComment(ctx, cp); err != nil {
+			sy.errs = append(sy.errs, fmt.Sprintf("copia GLPI-%d: %v", c.GlpiCopyID, err))
+			return
+		}
+	}
+	if err := h.Queries.DeleteGlpiCopyCommentsExcept(ctx, db.DeleteGlpiCopyCommentsExceptParams{TicketID: c.ID, Keep: keep}); err != nil {
+		sy.errs = append(sy.errs, fmt.Sprintf("copia GLPI-%d: %v", c.GlpiCopyID, err))
+		return
+	}
+	_ = h.Queries.SetGlpiCopyDateMod(ctx, db.SetGlpiCopyDateModParams{ID: c.ID, GlpiCopyDateMod: pgtype.Text{String: dateMod, Valid: dateMod != ""}})
+	sy.run.Updated++
+	publishSync(ctx, h.Hub, "ticket.updated", map[string]string{"id": c.ID.String()})
 }
 
 // prepare lee de GLPI las entidades y los grupos, y de la app las áreas.
@@ -825,6 +886,11 @@ func (sy *glpiTicketSync) save(ctx context.Context, td glpi.TicketData, client, 
 	}
 	keep := make([]string, 0, len(notes))
 	for _, n := range notes {
+		if n.Ours {
+			// Lo escribió la app (10d.2): su comentario ya está, con su autor.
+			keep = append(keep, fmt.Sprintf("%s:%d", n.Kind, n.ID))
+			continue
+		}
 		when := at(n.Date)
 		if !when.Valid {
 			when = created

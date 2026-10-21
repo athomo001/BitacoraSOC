@@ -1764,6 +1764,10 @@ type Entry struct {
 	OwnerComplementName pgtype.Text        `json:"owner_complement_name"`
 	ApiKeyID            pgtype.UUID        `json:"api_key_id"`
 	ApiKeyName          pgtype.Text        `json:"api_key_name"`
+	FollowUpOpen        bool               `json:"follow_up_open"`
+	FollowUpClosedAt    pgtype.Timestamptz `json:"follow_up_closed_at"`
+	FollowUpClosedBy    pgtype.UUID        `json:"follow_up_closed_by"`
+	FollowUpCloseNote   pgtype.Text        `json:"follow_up_close_note"`
 }
 
 type EntryAttachment struct {
@@ -1785,6 +1789,9 @@ type EntryComment struct {
 	IsSystemGenerated bool               `json:"is_system_generated"`
 	CreatedAt         pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+	GlpiFollowupID    pgtype.Int4        `json:"glpi_followup_id"`
+	GlpiPushState     pgtype.Text        `json:"glpi_push_state"`
+	GlpiPushError     pgtype.Text        `json:"glpi_push_error"`
 }
 
 type EntryDraft struct {
@@ -1949,6 +1956,12 @@ type GlpiConfig struct {
 	GroupAreas               []byte             `json:"group_areas"`
 	TicketsLastAutoAt        pgtype.Timestamptz `json:"tickets_last_auto_at"`
 	TicketsFailureNotifiedOn pgtype.Date        `json:"tickets_failure_notified_on"`
+	WriteEnabled             bool               `json:"write_enabled"`
+	WriteTokenEncrypted      pgtype.Text        `json:"write_token_encrypted"`
+	WriteDefaultType         int32              `json:"write_default_type"`
+	ClientEntities           []byte             `json:"client_entities"`
+	AreaGroups               []byte             `json:"area_groups"`
+	WriteFailureNotifiedOn   pgtype.Date        `json:"write_failure_notified_on"`
 }
 
 type GlpiImportRun struct {
@@ -1966,6 +1979,28 @@ type GlpiImportRun struct {
 	Unchanged   int32              `json:"unchanged"`
 	HeldBack    int32              `json:"held_back"`
 	Message     string             `json:"message"`
+}
+
+type GlpiOutbox struct {
+	ID              uuid.UUID          `json:"id"`
+	Kind            string             `json:"kind"`
+	GlpiTicketID    int32              `json:"glpi_ticket_id"`
+	TicketID        pgtype.UUID        `json:"ticket_id"`
+	TicketCommentID pgtype.UUID        `json:"ticket_comment_id"`
+	EntryID         pgtype.UUID        `json:"entry_id"`
+	EntryCommentID  pgtype.UUID        `json:"entry_comment_id"`
+	Content         string             `json:"content"`
+	IsPrivate       bool               `json:"is_private"`
+	State           string             `json:"state"`
+	Attempts        int32              `json:"attempts"`
+	NextAttemptAt   pgtype.Timestamptz `json:"next_attempt_at"`
+	LockedUntil     pgtype.Timestamptz `json:"locked_until"`
+	LastAttemptAt   pgtype.Timestamptz `json:"last_attempt_at"`
+	LastError       pgtype.Text        `json:"last_error"`
+	GlpiItemID      pgtype.Int4        `json:"glpi_item_id"`
+	CreatedBy       pgtype.UUID        `json:"created_by"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	DoneAt          pgtype.Timestamptz `json:"done_at"`
 }
 
 type GlpiTicketRun struct {
@@ -2616,6 +2651,9 @@ type Ticket struct {
 	GlpiTechnician                pgtype.Text        `json:"glpi_technician"`
 	ApiKeyID                      pgtype.UUID        `json:"api_key_id"`
 	ApiKeyName                    pgtype.Text        `json:"api_key_name"`
+	GlpiCopyID                    pgtype.Int4        `json:"glpi_copy_id"`
+	GlpiCopyDateMod               pgtype.Text        `json:"glpi_copy_date_mod"`
+	GlpiCopySyncedAt              pgtype.Timestamptz `json:"glpi_copy_synced_at"`
 }
 
 type TicketComment struct {
@@ -2630,6 +2668,8 @@ type TicketComment struct {
 	GlpiID          pgtype.Int4        `json:"glpi_id"`
 	GlpiKind        pgtype.Text        `json:"glpi_kind"`
 	GlpiTimeSeconds pgtype.Int4        `json:"glpi_time_seconds"`
+	GlpiPushState   pgtype.Text        `json:"glpi_push_state"`
+	GlpiPushError   pgtype.Text        `json:"glpi_push_error"`
 }
 
 type TicketImage struct {

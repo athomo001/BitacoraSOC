@@ -172,7 +172,7 @@ func (q *Queries) FinishGlpiTicketRun(ctx context.Context, arg FinishGlpiTicketR
 
 const getGlpiConfig = `-- name: GetGlpiConfig :one
 
-SELECT id, api_url, app_token_encrypted, user_token_encrypted, verify_tls, timeout_seconds, import_computers, import_network, area_id, computer_types, entities, auto_mode, last_auto_at, last_failure_notified_on, last_test_at, last_test_ok, last_test, updated_at, tickets_enabled, tickets_every, tickets_since_days, tickets_cursor, ticket_entities, group_areas, tickets_last_auto_at, tickets_failure_notified_on FROM glpi_config WHERE id
+SELECT id, api_url, app_token_encrypted, user_token_encrypted, verify_tls, timeout_seconds, import_computers, import_network, area_id, computer_types, entities, auto_mode, last_auto_at, last_failure_notified_on, last_test_at, last_test_ok, last_test, updated_at, tickets_enabled, tickets_every, tickets_since_days, tickets_cursor, ticket_entities, group_areas, tickets_last_auto_at, tickets_failure_notified_on, write_enabled, write_token_encrypted, write_default_type, client_entities, area_groups, write_failure_notified_on FROM glpi_config WHERE id
 `
 
 // Importación desde GLPI (spec/16 §5.1, 9.6, 000043).
@@ -206,6 +206,12 @@ func (q *Queries) GetGlpiConfig(ctx context.Context) (GlpiConfig, error) {
 		&i.GroupAreas,
 		&i.TicketsLastAutoAt,
 		&i.TicketsFailureNotifiedOn,
+		&i.WriteEnabled,
+		&i.WriteTokenEncrypted,
+		&i.WriteDefaultType,
+		&i.ClientEntities,
+		&i.AreaGroups,
+		&i.WriteFailureNotifiedOn,
 	)
 	return i, err
 }

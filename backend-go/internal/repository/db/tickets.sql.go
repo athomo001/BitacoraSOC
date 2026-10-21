@@ -178,7 +178,7 @@ INSERT INTO tickets (ticket_number, ticket_type, scope, client_id, asset_id, ser
 VALUES ($1, $2, $3, $4, $15, $16, $5, $17, 'new', $6, $7, $8, $9, $10, $11, $12, $13, $14, $18,
   COALESCE((SELECT a.territorial_unit_id FROM assets a WHERE a.id = $15::uuid), $19::uuid),
   $20, $21)
-RETURNING id, ticket_number, ticket_type, scope, client_id, asset_id, service_id, assigned_team_id, assigned_user_id, assigned_contact_id, status, impact, urgency, priority, title, description, sla_response_due_at, sla_resolution_due_at, sla_on_hold_since, sla_paused_seconds, first_responded_at, resolved_at, closed_at, reopened_count, reopened_at, public_tracking_token, public_tracking_enabled, public_tracking_pin, created_by, created_at, updated_at, parent_id, merged_into_id, affects_client, notify_to, notify_cc, sla_response_breach_notified_at, sla_resolution_warn_notified_at, sla_resolution_breach_notified_at, territorial_unit_id, area_id, requested_area_id, source, glpi_id, glpi_date_mod, glpi_synced_at, glpi_deleted, glpi_linked_only, glpi_group_id, glpi_group_name, glpi_technician, api_key_id, api_key_name
+RETURNING id, ticket_number, ticket_type, scope, client_id, asset_id, service_id, assigned_team_id, assigned_user_id, assigned_contact_id, status, impact, urgency, priority, title, description, sla_response_due_at, sla_resolution_due_at, sla_on_hold_since, sla_paused_seconds, first_responded_at, resolved_at, closed_at, reopened_count, reopened_at, public_tracking_token, public_tracking_enabled, public_tracking_pin, created_by, created_at, updated_at, parent_id, merged_into_id, affects_client, notify_to, notify_cc, sla_response_breach_notified_at, sla_resolution_warn_notified_at, sla_resolution_breach_notified_at, territorial_unit_id, area_id, requested_area_id, source, glpi_id, glpi_date_mod, glpi_synced_at, glpi_deleted, glpi_linked_only, glpi_group_id, glpi_group_name, glpi_technician, api_key_id, api_key_name, glpi_copy_id, glpi_copy_date_mod, glpi_copy_synced_at
 `
 
 type CreateTicketParams struct {
@@ -285,13 +285,16 @@ func (q *Queries) CreateTicket(ctx context.Context, arg CreateTicketParams) (Tic
 		&i.GlpiTechnician,
 		&i.ApiKeyID,
 		&i.ApiKeyName,
+		&i.GlpiCopyID,
+		&i.GlpiCopyDateMod,
+		&i.GlpiCopySyncedAt,
 	)
 	return i, err
 }
 
 const createTicketComment = `-- name: CreateTicketComment :one
 INSERT INTO ticket_comments (ticket_id, user_id, author_name, content, is_public, origin)
-VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, ticket_id, user_id, author_name, content, is_public, created_at, origin, glpi_id, glpi_kind, glpi_time_seconds
+VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, ticket_id, user_id, author_name, content, is_public, created_at, origin, glpi_id, glpi_kind, glpi_time_seconds, glpi_push_state, glpi_push_error
 `
 
 type CreateTicketCommentParams struct {
@@ -325,6 +328,8 @@ func (q *Queries) CreateTicketComment(ctx context.Context, arg CreateTicketComme
 		&i.GlpiID,
 		&i.GlpiKind,
 		&i.GlpiTimeSeconds,
+		&i.GlpiPushState,
+		&i.GlpiPushError,
 	)
 	return i, err
 }
@@ -465,7 +470,7 @@ func (q *Queries) DeriveTicket(ctx context.Context, arg DeriveTicketParams) erro
 }
 
 const getPublicTicket = `-- name: GetPublicTicket :one
-SELECT id, ticket_number, ticket_type, scope, client_id, asset_id, service_id, assigned_team_id, assigned_user_id, assigned_contact_id, status, impact, urgency, priority, title, description, sla_response_due_at, sla_resolution_due_at, sla_on_hold_since, sla_paused_seconds, first_responded_at, resolved_at, closed_at, reopened_count, reopened_at, public_tracking_token, public_tracking_enabled, public_tracking_pin, created_by, created_at, updated_at, parent_id, merged_into_id, affects_client, notify_to, notify_cc, sla_response_breach_notified_at, sla_resolution_warn_notified_at, sla_resolution_breach_notified_at, territorial_unit_id, area_id, requested_area_id, source, glpi_id, glpi_date_mod, glpi_synced_at, glpi_deleted, glpi_linked_only, glpi_group_id, glpi_group_name, glpi_technician, api_key_id, api_key_name FROM tickets WHERE public_tracking_token = $1 AND public_tracking_enabled = true
+SELECT id, ticket_number, ticket_type, scope, client_id, asset_id, service_id, assigned_team_id, assigned_user_id, assigned_contact_id, status, impact, urgency, priority, title, description, sla_response_due_at, sla_resolution_due_at, sla_on_hold_since, sla_paused_seconds, first_responded_at, resolved_at, closed_at, reopened_count, reopened_at, public_tracking_token, public_tracking_enabled, public_tracking_pin, created_by, created_at, updated_at, parent_id, merged_into_id, affects_client, notify_to, notify_cc, sla_response_breach_notified_at, sla_resolution_warn_notified_at, sla_resolution_breach_notified_at, territorial_unit_id, area_id, requested_area_id, source, glpi_id, glpi_date_mod, glpi_synced_at, glpi_deleted, glpi_linked_only, glpi_group_id, glpi_group_name, glpi_technician, api_key_id, api_key_name, glpi_copy_id, glpi_copy_date_mod, glpi_copy_synced_at FROM tickets WHERE public_tracking_token = $1 AND public_tracking_enabled = true
 `
 
 func (q *Queries) GetPublicTicket(ctx context.Context, publicTrackingToken pgtype.Text) (Ticket, error) {
@@ -525,12 +530,15 @@ func (q *Queries) GetPublicTicket(ctx context.Context, publicTrackingToken pgtyp
 		&i.GlpiTechnician,
 		&i.ApiKeyID,
 		&i.ApiKeyName,
+		&i.GlpiCopyID,
+		&i.GlpiCopyDateMod,
+		&i.GlpiCopySyncedAt,
 	)
 	return i, err
 }
 
 const getTicket = `-- name: GetTicket :one
-SELECT id, ticket_number, ticket_type, scope, client_id, asset_id, service_id, assigned_team_id, assigned_user_id, assigned_contact_id, status, impact, urgency, priority, title, description, sla_response_due_at, sla_resolution_due_at, sla_on_hold_since, sla_paused_seconds, first_responded_at, resolved_at, closed_at, reopened_count, reopened_at, public_tracking_token, public_tracking_enabled, public_tracking_pin, created_by, created_at, updated_at, parent_id, merged_into_id, affects_client, notify_to, notify_cc, sla_response_breach_notified_at, sla_resolution_warn_notified_at, sla_resolution_breach_notified_at, territorial_unit_id, area_id, requested_area_id, source, glpi_id, glpi_date_mod, glpi_synced_at, glpi_deleted, glpi_linked_only, glpi_group_id, glpi_group_name, glpi_technician, api_key_id, api_key_name FROM tickets WHERE id = $1
+SELECT id, ticket_number, ticket_type, scope, client_id, asset_id, service_id, assigned_team_id, assigned_user_id, assigned_contact_id, status, impact, urgency, priority, title, description, sla_response_due_at, sla_resolution_due_at, sla_on_hold_since, sla_paused_seconds, first_responded_at, resolved_at, closed_at, reopened_count, reopened_at, public_tracking_token, public_tracking_enabled, public_tracking_pin, created_by, created_at, updated_at, parent_id, merged_into_id, affects_client, notify_to, notify_cc, sla_response_breach_notified_at, sla_resolution_warn_notified_at, sla_resolution_breach_notified_at, territorial_unit_id, area_id, requested_area_id, source, glpi_id, glpi_date_mod, glpi_synced_at, glpi_deleted, glpi_linked_only, glpi_group_id, glpi_group_name, glpi_technician, api_key_id, api_key_name, glpi_copy_id, glpi_copy_date_mod, glpi_copy_synced_at FROM tickets WHERE id = $1
 `
 
 func (q *Queries) GetTicket(ctx context.Context, id uuid.UUID) (Ticket, error) {
@@ -590,6 +598,9 @@ func (q *Queries) GetTicket(ctx context.Context, id uuid.UUID) (Ticket, error) {
 		&i.GlpiTechnician,
 		&i.ApiKeyID,
 		&i.ApiKeyName,
+		&i.GlpiCopyID,
+		&i.GlpiCopyDateMod,
+		&i.GlpiCopySyncedAt,
 	)
 	return i, err
 }
@@ -614,7 +625,7 @@ func (q *Queries) GetTicketAreas(ctx context.Context, id uuid.UUID) (GetTicketAr
 }
 
 const getTicketByNumber = `-- name: GetTicketByNumber :one
-SELECT id, ticket_number, ticket_type, scope, client_id, asset_id, service_id, assigned_team_id, assigned_user_id, assigned_contact_id, status, impact, urgency, priority, title, description, sla_response_due_at, sla_resolution_due_at, sla_on_hold_since, sla_paused_seconds, first_responded_at, resolved_at, closed_at, reopened_count, reopened_at, public_tracking_token, public_tracking_enabled, public_tracking_pin, created_by, created_at, updated_at, parent_id, merged_into_id, affects_client, notify_to, notify_cc, sla_response_breach_notified_at, sla_resolution_warn_notified_at, sla_resolution_breach_notified_at, territorial_unit_id, area_id, requested_area_id, source, glpi_id, glpi_date_mod, glpi_synced_at, glpi_deleted, glpi_linked_only, glpi_group_id, glpi_group_name, glpi_technician, api_key_id, api_key_name FROM tickets WHERE ticket_number = $1
+SELECT id, ticket_number, ticket_type, scope, client_id, asset_id, service_id, assigned_team_id, assigned_user_id, assigned_contact_id, status, impact, urgency, priority, title, description, sla_response_due_at, sla_resolution_due_at, sla_on_hold_since, sla_paused_seconds, first_responded_at, resolved_at, closed_at, reopened_count, reopened_at, public_tracking_token, public_tracking_enabled, public_tracking_pin, created_by, created_at, updated_at, parent_id, merged_into_id, affects_client, notify_to, notify_cc, sla_response_breach_notified_at, sla_resolution_warn_notified_at, sla_resolution_breach_notified_at, territorial_unit_id, area_id, requested_area_id, source, glpi_id, glpi_date_mod, glpi_synced_at, glpi_deleted, glpi_linked_only, glpi_group_id, glpi_group_name, glpi_technician, api_key_id, api_key_name, glpi_copy_id, glpi_copy_date_mod, glpi_copy_synced_at FROM tickets WHERE ticket_number = $1
 `
 
 func (q *Queries) GetTicketByNumber(ctx context.Context, ticketNumber string) (Ticket, error) {
@@ -674,12 +685,15 @@ func (q *Queries) GetTicketByNumber(ctx context.Context, ticketNumber string) (T
 		&i.GlpiTechnician,
 		&i.ApiKeyID,
 		&i.ApiKeyName,
+		&i.GlpiCopyID,
+		&i.GlpiCopyDateMod,
+		&i.GlpiCopySyncedAt,
 	)
 	return i, err
 }
 
 const getTicketByNumberForMerge = `-- name: GetTicketByNumberForMerge :one
-SELECT id, ticket_number, ticket_type, scope, client_id, asset_id, service_id, assigned_team_id, assigned_user_id, assigned_contact_id, status, impact, urgency, priority, title, description, sla_response_due_at, sla_resolution_due_at, sla_on_hold_since, sla_paused_seconds, first_responded_at, resolved_at, closed_at, reopened_count, reopened_at, public_tracking_token, public_tracking_enabled, public_tracking_pin, created_by, created_at, updated_at, parent_id, merged_into_id, affects_client, notify_to, notify_cc, sla_response_breach_notified_at, sla_resolution_warn_notified_at, sla_resolution_breach_notified_at, territorial_unit_id, area_id, requested_area_id, source, glpi_id, glpi_date_mod, glpi_synced_at, glpi_deleted, glpi_linked_only, glpi_group_id, glpi_group_name, glpi_technician, api_key_id, api_key_name FROM tickets WHERE ticket_number = $1
+SELECT id, ticket_number, ticket_type, scope, client_id, asset_id, service_id, assigned_team_id, assigned_user_id, assigned_contact_id, status, impact, urgency, priority, title, description, sla_response_due_at, sla_resolution_due_at, sla_on_hold_since, sla_paused_seconds, first_responded_at, resolved_at, closed_at, reopened_count, reopened_at, public_tracking_token, public_tracking_enabled, public_tracking_pin, created_by, created_at, updated_at, parent_id, merged_into_id, affects_client, notify_to, notify_cc, sla_response_breach_notified_at, sla_resolution_warn_notified_at, sla_resolution_breach_notified_at, territorial_unit_id, area_id, requested_area_id, source, glpi_id, glpi_date_mod, glpi_synced_at, glpi_deleted, glpi_linked_only, glpi_group_id, glpi_group_name, glpi_technician, api_key_id, api_key_name, glpi_copy_id, glpi_copy_date_mod, glpi_copy_synced_at FROM tickets WHERE ticket_number = $1
 `
 
 func (q *Queries) GetTicketByNumberForMerge(ctx context.Context, ticketNumber string) (Ticket, error) {
@@ -739,6 +753,9 @@ func (q *Queries) GetTicketByNumberForMerge(ctx context.Context, ticketNumber st
 		&i.GlpiTechnician,
 		&i.ApiKeyID,
 		&i.ApiKeyName,
+		&i.GlpiCopyID,
+		&i.GlpiCopyDateMod,
+		&i.GlpiCopySyncedAt,
 	)
 	return i, err
 }
@@ -820,7 +837,7 @@ func (q *Queries) GetTicketTask(ctx context.Context, id uuid.UUID) (TicketTask, 
 }
 
 const getTicketView = `-- name: GetTicketView :one
-SELECT t.id, t.ticket_number, t.ticket_type, t.scope, t.client_id, t.asset_id, t.service_id, t.assigned_team_id, t.assigned_user_id, t.assigned_contact_id, t.status, t.impact, t.urgency, t.priority, t.title, t.description, t.sla_response_due_at, t.sla_resolution_due_at, t.sla_on_hold_since, t.sla_paused_seconds, t.first_responded_at, t.resolved_at, t.closed_at, t.reopened_count, t.reopened_at, t.public_tracking_token, t.public_tracking_enabled, t.public_tracking_pin, t.created_by, t.created_at, t.updated_at, t.parent_id, t.merged_into_id, t.affects_client, t.notify_to, t.notify_cc, t.sla_response_breach_notified_at, t.sla_resolution_warn_notified_at, t.sla_resolution_breach_notified_at, t.territorial_unit_id, t.area_id, t.requested_area_id, t.source, t.glpi_id, t.glpi_date_mod, t.glpi_synced_at, t.glpi_deleted, t.glpi_linked_only, t.glpi_group_id, t.glpi_group_name, t.glpi_technician, t.api_key_id, t.api_key_name, o.name AS client_name, tm.name AS team_name, u.username AS assignee_username,
+SELECT t.id, t.ticket_number, t.ticket_type, t.scope, t.client_id, t.asset_id, t.service_id, t.assigned_team_id, t.assigned_user_id, t.assigned_contact_id, t.status, t.impact, t.urgency, t.priority, t.title, t.description, t.sla_response_due_at, t.sla_resolution_due_at, t.sla_on_hold_since, t.sla_paused_seconds, t.first_responded_at, t.resolved_at, t.closed_at, t.reopened_count, t.reopened_at, t.public_tracking_token, t.public_tracking_enabled, t.public_tracking_pin, t.created_by, t.created_at, t.updated_at, t.parent_id, t.merged_into_id, t.affects_client, t.notify_to, t.notify_cc, t.sla_response_breach_notified_at, t.sla_resolution_warn_notified_at, t.sla_resolution_breach_notified_at, t.territorial_unit_id, t.area_id, t.requested_area_id, t.source, t.glpi_id, t.glpi_date_mod, t.glpi_synced_at, t.glpi_deleted, t.glpi_linked_only, t.glpi_group_id, t.glpi_group_name, t.glpi_technician, t.api_key_id, t.api_key_name, t.glpi_copy_id, t.glpi_copy_date_mod, t.glpi_copy_synced_at, o.name AS client_name, tm.name AS team_name, u.username AS assignee_username,
   COALESCE(NULLIF(cu.full_name, ''), cu.username, '')::text AS created_by_name,
   pl.name AS place_name, plp.name AS place_parent_name, pa.name AS asset_name,
   ar.code AS area_code, ar.name AS area_name, rq.code AS requested_area_code, rq.name AS requested_area_name
@@ -909,6 +926,9 @@ func (q *Queries) GetTicketView(ctx context.Context, id uuid.UUID) (GetTicketVie
 		&i.Ticket.GlpiTechnician,
 		&i.Ticket.ApiKeyID,
 		&i.Ticket.ApiKeyName,
+		&i.Ticket.GlpiCopyID,
+		&i.Ticket.GlpiCopyDateMod,
+		&i.Ticket.GlpiCopySyncedAt,
 		&i.ClientName,
 		&i.TeamName,
 		&i.AssigneeUsername,
@@ -925,7 +945,7 @@ func (q *Queries) GetTicketView(ctx context.Context, id uuid.UUID) (GetTicketVie
 }
 
 const linkEntryToTicket = `-- name: LinkEntryToTicket :one
-UPDATE entries SET ticket_id = $2, updated_at = now() WHERE id = $1 RETURNING id, user_id, entry_type, scope, content, tags, service_id, asset_id, work_shift_id, glpi_ticket_id, glpi_linked_at, ticket_id, image_url, image_hash, image_size_bytes, created_at, updated_at, owner_complement_id, owner_complement_name, api_key_id, api_key_name
+UPDATE entries SET ticket_id = $2, updated_at = now() WHERE id = $1 RETURNING id, user_id, entry_type, scope, content, tags, service_id, asset_id, work_shift_id, glpi_ticket_id, glpi_linked_at, ticket_id, image_url, image_hash, image_size_bytes, created_at, updated_at, owner_complement_id, owner_complement_name, api_key_id, api_key_name, follow_up_open, follow_up_closed_at, follow_up_closed_by, follow_up_close_note
 `
 
 type LinkEntryToTicketParams struct {
@@ -958,12 +978,16 @@ func (q *Queries) LinkEntryToTicket(ctx context.Context, arg LinkEntryToTicketPa
 		&i.OwnerComplementName,
 		&i.ApiKeyID,
 		&i.ApiKeyName,
+		&i.FollowUpOpen,
+		&i.FollowUpClosedAt,
+		&i.FollowUpClosedBy,
+		&i.FollowUpCloseNote,
 	)
 	return i, err
 }
 
 const listOpenChildTickets = `-- name: ListOpenChildTickets :many
-SELECT id, ticket_number, ticket_type, scope, client_id, asset_id, service_id, assigned_team_id, assigned_user_id, assigned_contact_id, status, impact, urgency, priority, title, description, sla_response_due_at, sla_resolution_due_at, sla_on_hold_since, sla_paused_seconds, first_responded_at, resolved_at, closed_at, reopened_count, reopened_at, public_tracking_token, public_tracking_enabled, public_tracking_pin, created_by, created_at, updated_at, parent_id, merged_into_id, affects_client, notify_to, notify_cc, sla_response_breach_notified_at, sla_resolution_warn_notified_at, sla_resolution_breach_notified_at, territorial_unit_id, area_id, requested_area_id, source, glpi_id, glpi_date_mod, glpi_synced_at, glpi_deleted, glpi_linked_only, glpi_group_id, glpi_group_name, glpi_technician, api_key_id, api_key_name FROM tickets WHERE parent_id = $1 AND status NOT IN ('resolved', 'closed', 'cancelled') ORDER BY created_at
+SELECT id, ticket_number, ticket_type, scope, client_id, asset_id, service_id, assigned_team_id, assigned_user_id, assigned_contact_id, status, impact, urgency, priority, title, description, sla_response_due_at, sla_resolution_due_at, sla_on_hold_since, sla_paused_seconds, first_responded_at, resolved_at, closed_at, reopened_count, reopened_at, public_tracking_token, public_tracking_enabled, public_tracking_pin, created_by, created_at, updated_at, parent_id, merged_into_id, affects_client, notify_to, notify_cc, sla_response_breach_notified_at, sla_resolution_warn_notified_at, sla_resolution_breach_notified_at, territorial_unit_id, area_id, requested_area_id, source, glpi_id, glpi_date_mod, glpi_synced_at, glpi_deleted, glpi_linked_only, glpi_group_id, glpi_group_name, glpi_technician, api_key_id, api_key_name, glpi_copy_id, glpi_copy_date_mod, glpi_copy_synced_at FROM tickets WHERE parent_id = $1 AND status NOT IN ('resolved', 'closed', 'cancelled') ORDER BY created_at
 `
 
 func (q *Queries) ListOpenChildTickets(ctx context.Context, parentID pgtype.UUID) ([]Ticket, error) {
@@ -1029,6 +1053,9 @@ func (q *Queries) ListOpenChildTickets(ctx context.Context, parentID pgtype.UUID
 			&i.GlpiTechnician,
 			&i.ApiKeyID,
 			&i.ApiKeyName,
+			&i.GlpiCopyID,
+			&i.GlpiCopyDateMod,
+			&i.GlpiCopySyncedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -1041,7 +1068,7 @@ func (q *Queries) ListOpenChildTickets(ctx context.Context, parentID pgtype.UUID
 }
 
 const listPublicTicketComments = `-- name: ListPublicTicketComments :many
-SELECT id, ticket_id, user_id, author_name, content, is_public, created_at, origin, glpi_id, glpi_kind, glpi_time_seconds FROM ticket_comments WHERE ticket_id = $1 AND is_public = true ORDER BY created_at ASC
+SELECT id, ticket_id, user_id, author_name, content, is_public, created_at, origin, glpi_id, glpi_kind, glpi_time_seconds, glpi_push_state, glpi_push_error FROM ticket_comments WHERE ticket_id = $1 AND is_public = true ORDER BY created_at ASC
 `
 
 func (q *Queries) ListPublicTicketComments(ctx context.Context, ticketID uuid.UUID) ([]TicketComment, error) {
@@ -1065,6 +1092,8 @@ func (q *Queries) ListPublicTicketComments(ctx context.Context, ticketID uuid.UU
 			&i.GlpiID,
 			&i.GlpiKind,
 			&i.GlpiTimeSeconds,
+			&i.GlpiPushState,
+			&i.GlpiPushError,
 		); err != nil {
 			return nil, err
 		}
@@ -1152,7 +1181,7 @@ func (q *Queries) ListTicketChildren(ctx context.Context, parentID pgtype.UUID) 
 }
 
 const listTicketComments = `-- name: ListTicketComments :many
-SELECT id, ticket_id, user_id, author_name, content, is_public, created_at, origin, glpi_id, glpi_kind, glpi_time_seconds FROM ticket_comments WHERE ticket_id = $1 ORDER BY created_at ASC
+SELECT id, ticket_id, user_id, author_name, content, is_public, created_at, origin, glpi_id, glpi_kind, glpi_time_seconds, glpi_push_state, glpi_push_error FROM ticket_comments WHERE ticket_id = $1 ORDER BY created_at ASC
 `
 
 func (q *Queries) ListTicketComments(ctx context.Context, ticketID uuid.UUID) ([]TicketComment, error) {
@@ -1176,6 +1205,8 @@ func (q *Queries) ListTicketComments(ctx context.Context, ticketID uuid.UUID) ([
 			&i.GlpiID,
 			&i.GlpiKind,
 			&i.GlpiTimeSeconds,
+			&i.GlpiPushState,
+			&i.GlpiPushError,
 		); err != nil {
 			return nil, err
 		}
@@ -1188,7 +1219,7 @@ func (q *Queries) ListTicketComments(ctx context.Context, ticketID uuid.UUID) ([
 }
 
 const listTicketEntries = `-- name: ListTicketEntries :many
-SELECT id, user_id, entry_type, scope, content, tags, service_id, asset_id, work_shift_id, glpi_ticket_id, glpi_linked_at, ticket_id, image_url, image_hash, image_size_bytes, created_at, updated_at, owner_complement_id, owner_complement_name, api_key_id, api_key_name FROM entries WHERE ticket_id = $1 ORDER BY created_at ASC
+SELECT id, user_id, entry_type, scope, content, tags, service_id, asset_id, work_shift_id, glpi_ticket_id, glpi_linked_at, ticket_id, image_url, image_hash, image_size_bytes, created_at, updated_at, owner_complement_id, owner_complement_name, api_key_id, api_key_name, follow_up_open, follow_up_closed_at, follow_up_closed_by, follow_up_close_note FROM entries WHERE ticket_id = $1 ORDER BY created_at ASC
 `
 
 func (q *Queries) ListTicketEntries(ctx context.Context, ticketID pgtype.UUID) ([]Entry, error) {
@@ -1222,6 +1253,10 @@ func (q *Queries) ListTicketEntries(ctx context.Context, ticketID pgtype.UUID) (
 			&i.OwnerComplementName,
 			&i.ApiKeyID,
 			&i.ApiKeyName,
+			&i.FollowUpOpen,
+			&i.FollowUpClosedAt,
+			&i.FollowUpClosedBy,
+			&i.FollowUpCloseNote,
 		); err != nil {
 			return nil, err
 		}
@@ -1447,7 +1482,7 @@ func (q *Queries) ListTicketTasksWithUser(ctx context.Context, ticketID uuid.UUI
 }
 
 const listTickets = `-- name: ListTickets :many
-SELECT t.id, t.ticket_number, t.ticket_type, t.scope, t.client_id, t.asset_id, t.service_id, t.assigned_team_id, t.assigned_user_id, t.assigned_contact_id, t.status, t.impact, t.urgency, t.priority, t.title, t.description, t.sla_response_due_at, t.sla_resolution_due_at, t.sla_on_hold_since, t.sla_paused_seconds, t.first_responded_at, t.resolved_at, t.closed_at, t.reopened_count, t.reopened_at, t.public_tracking_token, t.public_tracking_enabled, t.public_tracking_pin, t.created_by, t.created_at, t.updated_at, t.parent_id, t.merged_into_id, t.affects_client, t.notify_to, t.notify_cc, t.sla_response_breach_notified_at, t.sla_resolution_warn_notified_at, t.sla_resolution_breach_notified_at, t.territorial_unit_id, t.area_id, t.requested_area_id, t.source, t.glpi_id, t.glpi_date_mod, t.glpi_synced_at, t.glpi_deleted, t.glpi_linked_only, t.glpi_group_id, t.glpi_group_name, t.glpi_technician, t.api_key_id, t.api_key_name
+SELECT t.id, t.ticket_number, t.ticket_type, t.scope, t.client_id, t.asset_id, t.service_id, t.assigned_team_id, t.assigned_user_id, t.assigned_contact_id, t.status, t.impact, t.urgency, t.priority, t.title, t.description, t.sla_response_due_at, t.sla_resolution_due_at, t.sla_on_hold_since, t.sla_paused_seconds, t.first_responded_at, t.resolved_at, t.closed_at, t.reopened_count, t.reopened_at, t.public_tracking_token, t.public_tracking_enabled, t.public_tracking_pin, t.created_by, t.created_at, t.updated_at, t.parent_id, t.merged_into_id, t.affects_client, t.notify_to, t.notify_cc, t.sla_response_breach_notified_at, t.sla_resolution_warn_notified_at, t.sla_resolution_breach_notified_at, t.territorial_unit_id, t.area_id, t.requested_area_id, t.source, t.glpi_id, t.glpi_date_mod, t.glpi_synced_at, t.glpi_deleted, t.glpi_linked_only, t.glpi_group_id, t.glpi_group_name, t.glpi_technician, t.api_key_id, t.api_key_name, t.glpi_copy_id, t.glpi_copy_date_mod, t.glpi_copy_synced_at
 FROM tickets t
 WHERE ($1::ticket_type IS NULL OR t.ticket_type = $1::ticket_type)
   AND ($2::entry_scope IS NULL OR t.scope = $2::entry_scope)
@@ -1542,6 +1577,9 @@ func (q *Queries) ListTickets(ctx context.Context, arg ListTicketsParams) ([]Tic
 			&i.GlpiTechnician,
 			&i.ApiKeyID,
 			&i.ApiKeyName,
+			&i.GlpiCopyID,
+			&i.GlpiCopyDateMod,
+			&i.GlpiCopySyncedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -1554,7 +1592,7 @@ func (q *Queries) ListTickets(ctx context.Context, arg ListTicketsParams) ([]Tic
 }
 
 const listTicketsView = `-- name: ListTicketsView :many
-SELECT t.id, t.ticket_number, t.ticket_type, t.scope, t.client_id, t.asset_id, t.service_id, t.assigned_team_id, t.assigned_user_id, t.assigned_contact_id, t.status, t.impact, t.urgency, t.priority, t.title, t.description, t.sla_response_due_at, t.sla_resolution_due_at, t.sla_on_hold_since, t.sla_paused_seconds, t.first_responded_at, t.resolved_at, t.closed_at, t.reopened_count, t.reopened_at, t.public_tracking_token, t.public_tracking_enabled, t.public_tracking_pin, t.created_by, t.created_at, t.updated_at, t.parent_id, t.merged_into_id, t.affects_client, t.notify_to, t.notify_cc, t.sla_response_breach_notified_at, t.sla_resolution_warn_notified_at, t.sla_resolution_breach_notified_at, t.territorial_unit_id, t.area_id, t.requested_area_id, t.source, t.glpi_id, t.glpi_date_mod, t.glpi_synced_at, t.glpi_deleted, t.glpi_linked_only, t.glpi_group_id, t.glpi_group_name, t.glpi_technician, t.api_key_id, t.api_key_name, o.name AS client_name, tm.name AS team_name, u.username AS assignee_username,
+SELECT t.id, t.ticket_number, t.ticket_type, t.scope, t.client_id, t.asset_id, t.service_id, t.assigned_team_id, t.assigned_user_id, t.assigned_contact_id, t.status, t.impact, t.urgency, t.priority, t.title, t.description, t.sla_response_due_at, t.sla_resolution_due_at, t.sla_on_hold_since, t.sla_paused_seconds, t.first_responded_at, t.resolved_at, t.closed_at, t.reopened_count, t.reopened_at, t.public_tracking_token, t.public_tracking_enabled, t.public_tracking_pin, t.created_by, t.created_at, t.updated_at, t.parent_id, t.merged_into_id, t.affects_client, t.notify_to, t.notify_cc, t.sla_response_breach_notified_at, t.sla_resolution_warn_notified_at, t.sla_resolution_breach_notified_at, t.territorial_unit_id, t.area_id, t.requested_area_id, t.source, t.glpi_id, t.glpi_date_mod, t.glpi_synced_at, t.glpi_deleted, t.glpi_linked_only, t.glpi_group_id, t.glpi_group_name, t.glpi_technician, t.api_key_id, t.api_key_name, t.glpi_copy_id, t.glpi_copy_date_mod, t.glpi_copy_synced_at, o.name AS client_name, tm.name AS team_name, u.username AS assignee_username,
   p.ticket_number AS parent_number, m.ticket_number AS merged_into_number,
   (SELECT count(*) FROM tickets c WHERE c.parent_id = t.id)::int AS child_count,
   pl.name AS place_name, plp.name AS place_parent_name, pa.name AS asset_name,
@@ -1698,6 +1736,9 @@ func (q *Queries) ListTicketsView(ctx context.Context, arg ListTicketsViewParams
 			&i.Ticket.GlpiTechnician,
 			&i.Ticket.ApiKeyID,
 			&i.Ticket.ApiKeyName,
+			&i.Ticket.GlpiCopyID,
+			&i.Ticket.GlpiCopyDateMod,
+			&i.Ticket.GlpiCopySyncedAt,
 			&i.ClientName,
 			&i.TeamName,
 			&i.AssigneeUsername,
@@ -1888,7 +1929,7 @@ SET client_id = $1,
     public_tracking_pin = CASE WHEN public_tracking_pin IS NULL THEN NULL ELSE $3 END,
     updated_at = now()
 WHERE tickets.id = $4
-RETURNING id, ticket_number, ticket_type, scope, client_id, asset_id, service_id, assigned_team_id, assigned_user_id, assigned_contact_id, status, impact, urgency, priority, title, description, sla_response_due_at, sla_resolution_due_at, sla_on_hold_since, sla_paused_seconds, first_responded_at, resolved_at, closed_at, reopened_count, reopened_at, public_tracking_token, public_tracking_enabled, public_tracking_pin, created_by, created_at, updated_at, parent_id, merged_into_id, affects_client, notify_to, notify_cc, sla_response_breach_notified_at, sla_resolution_warn_notified_at, sla_resolution_breach_notified_at, territorial_unit_id, area_id, requested_area_id, source, glpi_id, glpi_date_mod, glpi_synced_at, glpi_deleted, glpi_linked_only, glpi_group_id, glpi_group_name, glpi_technician, api_key_id, api_key_name
+RETURNING id, ticket_number, ticket_type, scope, client_id, asset_id, service_id, assigned_team_id, assigned_user_id, assigned_contact_id, status, impact, urgency, priority, title, description, sla_response_due_at, sla_resolution_due_at, sla_on_hold_since, sla_paused_seconds, first_responded_at, resolved_at, closed_at, reopened_count, reopened_at, public_tracking_token, public_tracking_enabled, public_tracking_pin, created_by, created_at, updated_at, parent_id, merged_into_id, affects_client, notify_to, notify_cc, sla_response_breach_notified_at, sla_resolution_warn_notified_at, sla_resolution_breach_notified_at, territorial_unit_id, area_id, requested_area_id, source, glpi_id, glpi_date_mod, glpi_synced_at, glpi_deleted, glpi_linked_only, glpi_group_id, glpi_group_name, glpi_technician, api_key_id, api_key_name, glpi_copy_id, glpi_copy_date_mod, glpi_copy_synced_at
 `
 
 type SetTicketClientParams struct {
@@ -1963,6 +2004,9 @@ func (q *Queries) SetTicketClient(ctx context.Context, arg SetTicketClientParams
 		&i.GlpiTechnician,
 		&i.ApiKeyID,
 		&i.ApiKeyName,
+		&i.GlpiCopyID,
+		&i.GlpiCopyDateMod,
+		&i.GlpiCopySyncedAt,
 	)
 	return i, err
 }
@@ -2000,7 +2044,7 @@ func (q *Queries) SetTicketPlace(ctx context.Context, arg SetTicketPlaceParams) 
 }
 
 const setTicketPublicPin = `-- name: SetTicketPublicPin :one
-UPDATE tickets SET public_tracking_pin = $2, updated_at = now() WHERE id = $1 RETURNING id, ticket_number, ticket_type, scope, client_id, asset_id, service_id, assigned_team_id, assigned_user_id, assigned_contact_id, status, impact, urgency, priority, title, description, sla_response_due_at, sla_resolution_due_at, sla_on_hold_since, sla_paused_seconds, first_responded_at, resolved_at, closed_at, reopened_count, reopened_at, public_tracking_token, public_tracking_enabled, public_tracking_pin, created_by, created_at, updated_at, parent_id, merged_into_id, affects_client, notify_to, notify_cc, sla_response_breach_notified_at, sla_resolution_warn_notified_at, sla_resolution_breach_notified_at, territorial_unit_id, area_id, requested_area_id, source, glpi_id, glpi_date_mod, glpi_synced_at, glpi_deleted, glpi_linked_only, glpi_group_id, glpi_group_name, glpi_technician, api_key_id, api_key_name
+UPDATE tickets SET public_tracking_pin = $2, updated_at = now() WHERE id = $1 RETURNING id, ticket_number, ticket_type, scope, client_id, asset_id, service_id, assigned_team_id, assigned_user_id, assigned_contact_id, status, impact, urgency, priority, title, description, sla_response_due_at, sla_resolution_due_at, sla_on_hold_since, sla_paused_seconds, first_responded_at, resolved_at, closed_at, reopened_count, reopened_at, public_tracking_token, public_tracking_enabled, public_tracking_pin, created_by, created_at, updated_at, parent_id, merged_into_id, affects_client, notify_to, notify_cc, sla_response_breach_notified_at, sla_resolution_warn_notified_at, sla_resolution_breach_notified_at, territorial_unit_id, area_id, requested_area_id, source, glpi_id, glpi_date_mod, glpi_synced_at, glpi_deleted, glpi_linked_only, glpi_group_id, glpi_group_name, glpi_technician, api_key_id, api_key_name, glpi_copy_id, glpi_copy_date_mod, glpi_copy_synced_at
 `
 
 type SetTicketPublicPinParams struct {
@@ -2065,6 +2109,9 @@ func (q *Queries) SetTicketPublicPin(ctx context.Context, arg SetTicketPublicPin
 		&i.GlpiTechnician,
 		&i.ApiKeyID,
 		&i.ApiKeyName,
+		&i.GlpiCopyID,
+		&i.GlpiCopyDateMod,
+		&i.GlpiCopySyncedAt,
 	)
 	return i, err
 }
@@ -2137,7 +2184,7 @@ UPDATE tickets SET
   reopened_at = $15,
   updated_at = now()
 WHERE id = $1
-RETURNING id, ticket_number, ticket_type, scope, client_id, asset_id, service_id, assigned_team_id, assigned_user_id, assigned_contact_id, status, impact, urgency, priority, title, description, sla_response_due_at, sla_resolution_due_at, sla_on_hold_since, sla_paused_seconds, first_responded_at, resolved_at, closed_at, reopened_count, reopened_at, public_tracking_token, public_tracking_enabled, public_tracking_pin, created_by, created_at, updated_at, parent_id, merged_into_id, affects_client, notify_to, notify_cc, sla_response_breach_notified_at, sla_resolution_warn_notified_at, sla_resolution_breach_notified_at, territorial_unit_id, area_id, requested_area_id, source, glpi_id, glpi_date_mod, glpi_synced_at, glpi_deleted, glpi_linked_only, glpi_group_id, glpi_group_name, glpi_technician, api_key_id, api_key_name
+RETURNING id, ticket_number, ticket_type, scope, client_id, asset_id, service_id, assigned_team_id, assigned_user_id, assigned_contact_id, status, impact, urgency, priority, title, description, sla_response_due_at, sla_resolution_due_at, sla_on_hold_since, sla_paused_seconds, first_responded_at, resolved_at, closed_at, reopened_count, reopened_at, public_tracking_token, public_tracking_enabled, public_tracking_pin, created_by, created_at, updated_at, parent_id, merged_into_id, affects_client, notify_to, notify_cc, sla_response_breach_notified_at, sla_resolution_warn_notified_at, sla_resolution_breach_notified_at, territorial_unit_id, area_id, requested_area_id, source, glpi_id, glpi_date_mod, glpi_synced_at, glpi_deleted, glpi_linked_only, glpi_group_id, glpi_group_name, glpi_technician, api_key_id, api_key_name, glpi_copy_id, glpi_copy_date_mod, glpi_copy_synced_at
 `
 
 type UpdateTicketParams struct {
@@ -2231,6 +2278,9 @@ func (q *Queries) UpdateTicket(ctx context.Context, arg UpdateTicketParams) (Tic
 		&i.GlpiTechnician,
 		&i.ApiKeyID,
 		&i.ApiKeyName,
+		&i.GlpiCopyID,
+		&i.GlpiCopyDateMod,
+		&i.GlpiCopySyncedAt,
 	)
 	return i, err
 }

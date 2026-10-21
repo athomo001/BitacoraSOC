@@ -1,7 +1,8 @@
-// Package glpi lee equipos de GLPI por su API clásica (apirest.php, App-Token
-// + User-Token), igual que el legacy (utils/glpi-dispatch.js): abre sesión,
-// lee y la cierra siempre. Solo lee: la Bitácora nunca escribe en GLPI
-// (spec/16 §5.1, 9.6). La API v2 de GLPI 11 (api.php/v2, OAuth2) pide guardar
+// Package glpi habla con GLPI por su API clásica (apirest.php, App-Token +
+// User-Token), igual que el legacy (utils/glpi-dispatch.js): abre sesión,
+// trabaja y la cierra siempre. Lee equipos y tickets con el usuario de solo
+// lectura; escribe (comentarios y copias de tickets, 10d.2) solo con el
+// User-Token de escritura, que el admin enciende aparte (spec/18 §4). La API v2 de GLPI 11 (api.php/v2, OAuth2) pide guardar
 // usuario y contraseña de GLPI; si algún día GLPI retira la clásica, se
 // cambia este paquete y nada más.
 package glpi

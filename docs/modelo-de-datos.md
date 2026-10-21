@@ -2,7 +2,7 @@
 
 > Generado por `backend-go/cmd/er-docs` desde `backend-go/sql/schema/0001_init_schema.sql`, el esquema que usa sqlc, con todas las migraciones aplicadas. **No se edita a mano**: si cambia el esquema, se regenera con `go run ./cmd/er-docs` desde `backend-go/`.
 
-117 tablas en PostgreSQL, agrupadas en 17 dominios. Notación pata de gallo: `||` uno, `|o` / `o|` cero o uno, `o{` cero o muchos. La etiqueta de cada línea es la columna que hace la referencia.
+118 tablas en PostgreSQL, agrupadas en 17 dominios. Notación pata de gallo: `||` uno, `|o` / `o|` cero o uno, `o{` cero o muchos. La etiqueta de cada línea es la columna que hace la referencia.
 
 - Cada entidad muestra todas sus columnas salvo `created_at` y `updated_at`. `PK` clave primaria, `FK` referencia a otra tabla, `UK` valor único.
 - Las tablas de otros dominios aparecen como cajas sin columnas: son la misma tabla, dibujada donde se une.
@@ -14,7 +14,7 @@ Correspondencia con el legacy (MongoDB): [modelo-er-legacy-2.0.md](modelo-er-leg
 ## Índice
 
 1. [Usuarios, acceso y permisos](#1-usuarios-acceso-y-permisos) — 8 tablas
-2. [Territorio, organizaciones y activos](#2-territorio-organizaciones-y-activos) — 15 tablas
+2. [Territorio, organizaciones y activos](#2-territorio-organizaciones-y-activos) — 16 tablas
 3. [Directorio de contactos](#3-directorio-de-contactos) — 2 tablas
 4. [Ticketera](#4-ticketera) — 8 tablas
 5. [Equipos y escalamiento](#5-equipos-y-escalamiento) — 15 tablas
@@ -279,6 +279,12 @@ erDiagram
         jsonb group_areas
         timestamptz tickets_last_auto_at
         date tickets_failure_notified_on
+        boolean write_enabled
+        text write_token_encrypted
+        int write_default_type
+        jsonb client_entities
+        jsonb area_groups
+        date write_failure_notified_on
     }
     GLPI_IMPORT_RUNS {
         uuid id PK
@@ -310,6 +316,26 @@ erDiagram
         int deleted
         text message
     }
+    GLPI_OUTBOX {
+        uuid id PK
+        text kind
+        int glpi_ticket_id
+        uuid ticket_id FK
+        uuid ticket_comment_id FK
+        uuid entry_id FK
+        uuid entry_comment_id FK
+        text content
+        boolean is_private
+        text state
+        int attempts
+        timestamptz next_attempt_at
+        timestamptz locked_until
+        timestamptz last_attempt_at
+        text last_error
+        int glpi_item_id
+        uuid created_by FK
+        timestamptz done_at
+    }
 
     AREAS |o--o{ ASSET_RESPONSIBLES : "area_id"
     AREAS |o--o{ GLPI_CONFIG : "area_id"
@@ -321,6 +347,8 @@ erDiagram
     ASSETS ||--o{ ASSET_RESPONSIBLES : "asset_id"
     ASSET_KINDS |o--o{ ASSETS : "kind_code"
     CATALOG_LOG_SOURCES |o--o{ ASSETS : "log_source_id"
+    ENTRIES |o--o{ GLPI_OUTBOX : "entry_id"
+    ENTRY_COMMENTS |o--o{ GLPI_OUTBOX : "entry_comment_id"
     ORGANIZATIONS |o--o{ ASSETS : "client_id"
     ORGANIZATIONS |o--o{ ASSETS : "contractor_id"
     ORGANIZATIONS |o--o{ ASSET_RESPONSIBLES : "organization_id"
@@ -331,6 +359,8 @@ erDiagram
     TERRITORIAL_UNITS |o--o{ ASSETS : "territorial_unit_id"
     TERRITORIAL_UNITS |o--o{ TERRITORIAL_UNITS : "parent_id"
     TICKETS |o--o{ ASSET_EVENTS : "ticket_id"
+    TICKETS |o--o{ GLPI_OUTBOX : "ticket_id"
+    TICKET_COMMENTS |o--o{ GLPI_OUTBOX : "ticket_comment_id"
     USERS |o--o{ ASSET_EVENTS : "user_id"
     USERS |o--o{ ASSET_RESPONSIBLES : "user_id"
     USERS |o--o{ GLPI_IMPORT_RUNS : "user_id"
@@ -438,6 +468,9 @@ erDiagram
         text glpi_technician
         uuid api_key_id FK
         text api_key_name
+        int glpi_copy_id
+        text glpi_copy_date_mod
+        timestamptz glpi_copy_synced_at
     }
     TICKET_COMMENTS {
         uuid id PK
@@ -450,6 +483,8 @@ erDiagram
         int glpi_id
         text glpi_kind
         int glpi_time_seconds
+        text glpi_push_state
+        text glpi_push_error
     }
     TICKET_TASKS {
         uuid id PK
@@ -1402,6 +1437,10 @@ erDiagram
         text owner_complement_name
         uuid api_key_id FK
         text api_key_name
+        boolean follow_up_open
+        timestamptz follow_up_closed_at
+        uuid follow_up_closed_by FK
+        text follow_up_close_note
     }
     ENTRY_COMMENTS {
         uuid id PK
@@ -1409,6 +1448,9 @@ erDiagram
         uuid user_id FK
         text comment
         boolean is_system_generated
+        int glpi_followup_id
+        text glpi_push_state
+        text glpi_push_error
     }
     ENTRY_ATTACHMENTS {
         uuid id PK

@@ -13,8 +13,14 @@ import (
 )
 
 const createEntryComment = `-- name: CreateEntryComment :one
-INSERT INTO entry_comments (entry_id, user_id, comment, is_system_generated)
-VALUES ($1, $2, $3, $4) RETURNING id, entry_id, user_id, comment, is_system_generated, created_at, updated_at
+WITH inserted AS (
+  INSERT INTO entry_comments (entry_id, user_id, comment, is_system_generated)
+  VALUES ($1, $2, $3, $4) RETURNING id, entry_id, user_id, comment, is_system_generated, created_at, updated_at, glpi_followup_id, glpi_push_state, glpi_push_error
+), opened AS (
+  UPDATE entries SET follow_up_open = true, follow_up_closed_at = NULL, follow_up_closed_by = NULL, follow_up_close_note = NULL
+  WHERE id = $1
+)
+SELECT id, entry_id, user_id, comment, is_system_generated, created_at, updated_at, glpi_followup_id, glpi_push_state, glpi_push_error FROM inserted
 `
 
 type CreateEntryCommentParams struct {
@@ -24,14 +30,29 @@ type CreateEntryCommentParams struct {
 	IsSystemGenerated bool      `json:"is_system_generated"`
 }
 
-func (q *Queries) CreateEntryComment(ctx context.Context, arg CreateEntryCommentParams) (EntryComment, error) {
+type CreateEntryCommentRow struct {
+	ID                uuid.UUID          `json:"id"`
+	EntryID           uuid.UUID          `json:"entry_id"`
+	UserID            uuid.UUID          `json:"user_id"`
+	Comment           string             `json:"comment"`
+	IsSystemGenerated bool               `json:"is_system_generated"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+	GlpiFollowupID    pgtype.Int4        `json:"glpi_followup_id"`
+	GlpiPushState     pgtype.Text        `json:"glpi_push_state"`
+	GlpiPushError     pgtype.Text        `json:"glpi_push_error"`
+}
+
+// Un seguimiento deja la entrada «En seguimiento» (10j), también los de
+// sistema que deja Escalamiento.
+func (q *Queries) CreateEntryComment(ctx context.Context, arg CreateEntryCommentParams) (CreateEntryCommentRow, error) {
 	row := q.db.QueryRow(ctx, createEntryComment,
 		arg.EntryID,
 		arg.UserID,
 		arg.Comment,
 		arg.IsSystemGenerated,
 	)
-	var i EntryComment
+	var i CreateEntryCommentRow
 	err := row.Scan(
 		&i.ID,
 		&i.EntryID,
@@ -40,12 +61,15 @@ func (q *Queries) CreateEntryComment(ctx context.Context, arg CreateEntryComment
 		&i.IsSystemGenerated,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.GlpiFollowupID,
+		&i.GlpiPushState,
+		&i.GlpiPushError,
 	)
 	return i, err
 }
 
 const listEntryComments = `-- name: ListEntryComments :many
-SELECT c.id, c.entry_id, c.user_id, c.comment, c.is_system_generated, c.created_at, c.updated_at, u.username AS author_username
+SELECT c.id, c.entry_id, c.user_id, c.comment, c.is_system_generated, c.created_at, c.updated_at, c.glpi_followup_id, c.glpi_push_state, c.glpi_push_error, u.username AS author_username
 FROM entry_comments c JOIN users u ON u.id = c.user_id
 WHERE c.entry_id = $1
 ORDER BY c.created_at ASC
@@ -59,6 +83,9 @@ type ListEntryCommentsRow struct {
 	IsSystemGenerated bool               `json:"is_system_generated"`
 	CreatedAt         pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+	GlpiFollowupID    pgtype.Int4        `json:"glpi_followup_id"`
+	GlpiPushState     pgtype.Text        `json:"glpi_push_state"`
+	GlpiPushError     pgtype.Text        `json:"glpi_push_error"`
 	AuthorUsername    string             `json:"author_username"`
 }
 
@@ -79,6 +106,9 @@ func (q *Queries) ListEntryComments(ctx context.Context, entryID uuid.UUID) ([]L
 			&i.IsSystemGenerated,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.GlpiFollowupID,
+			&i.GlpiPushState,
+			&i.GlpiPushError,
 			&i.AuthorUsername,
 		); err != nil {
 			return nil, err

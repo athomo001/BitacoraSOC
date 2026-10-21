@@ -30,6 +30,7 @@ const (
 	NotifInventoryReq   = "inventory.request"
 	NotifGlpiImport     = "glpi.import"
 	NotifForwardDown    = "forward.down"
+	NotifGlpiWrite      = "glpi.write"
 	NotifWindow         = "window"
 	NotifNotice         = "notice"
 )
@@ -60,6 +61,8 @@ var notifKinds = []notifKind{
 	{NotifGlpiImport, true, false, false, true},
 	// Un destino del reenvío a un SIEM no recibe eventos hace 15 minutos, o volvió (solo admin).
 	{NotifForwardDown, true, false, false, true},
+	// Un envío a GLPI (comentario o estado de una copia) no se pudo hacer en 24 horas (solo admin).
+	{NotifGlpiWrite, true, false, false, true},
 	{NotifWindow, false, false, false, true},
 	// El aviso con acuse se muestra como ventana: no tiene emergente ni correo propio.
 	{NotifNotice, false, false, false, false},

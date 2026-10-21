@@ -24,8 +24,11 @@ import { RouterLink } from '@angular/router';
 import { ModuleAccessService } from '../../core/auth/module-access.service';
 import { PlacePickerComponent, placeLabel } from './place-picker';
 import { TicketFollowupsComponent } from '../management/ticket-followups';
+import { TicketGlpiCommentComponent } from './ticket-glpi-comment';
+import { GlpiCreateDialogComponent, GlpiCreateDialogData } from './glpi-create-dialog';
 
 import '../../core/i18n/packs/tickets';
+import '../../core/i18n/packs/glpi';
 type Tab = 'activity' | 'images' | 'tasks' | 'entries';
 
 /** Tope del diseño aprobado (comentario del dueño #14); el backend también lo exige. */
@@ -57,7 +60,7 @@ const TASK_PRESETS = [15, 30, 60] as const;
 @Component({
   selector: 'app-ticket-detail',
   standalone: true,
-  imports: [DatePipe, FormsModule, MatIconModule, MarkdownComponent, AuthImgDirective, TicketRelationsComponent, TicketMailComponent, RouterLink, PlacePickerComponent, TicketFollowupsComponent],
+  imports: [DatePipe, FormsModule, MatIconModule, MarkdownComponent, AuthImgDirective, TicketRelationsComponent, TicketMailComponent, RouterLink, PlacePickerComponent, TicketFollowupsComponent, TicketGlpiCommentComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './ticket-detail.html',
   styleUrl: './ticket-detail.css',
@@ -335,6 +338,31 @@ export class TicketDetailComponent {
       this.commentPublic.set(false);
       this.tab.set('activity');
     });
+  }
+
+  /** «Crear en GLPI» (10d.2): vista previa, crea la copia y recarga. */
+  protected createInGlpi(): void {
+    const id = this.detail()?.ticket.id;
+    if (!id) return;
+    const data: GlpiCreateDialogData<{ id: number }> = {
+      load: () => this.api.glpiCopyPreview(id),
+      create: (input) => this.api.createGlpiCopy(id, input),
+    };
+    this.dialog.open<{ id: number }>(GlpiCreateDialogComponent, { data, injector: this.injector, ariaLabel: this.i18n.t('gw.create') })
+      .closed.subscribe((made) => made && void this.reloadAll());
+  }
+
+  /** Estado del envío a GLPI de un comentario (10d.2). */
+  protected pushTone(state: string): string {
+    return state === 'sent' ? 'pill tone-ok' : state === 'failed' ? 'pill tone-bad' : 'pill tone-warn';
+  }
+
+  protected pushIcon(state: string): string {
+    return state === 'sent' ? 'cloud_done' : state === 'failed' ? 'cloud_off' : 'cloud_upload';
+  }
+
+  protected pushKey(state: string): MessageKey {
+    return `gw.push.${state}` as MessageKey;
   }
 
   /** Tras unir, hacer hijo o cambiar cliente: recarga y avisa a la lista. */

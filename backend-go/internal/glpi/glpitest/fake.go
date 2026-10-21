@@ -1,6 +1,7 @@
 // Package glpitest es un GLPI falso (API clásica, apirest.php) para las
 // pruebas: sesión con App-Token + User-Token, listas paginadas con
 // Content-Range, papelera (is_deleted) y errores con el formato de GLPI.
+// Con WriteToken también acepta escrituras (10d.2), solo en esa sesión.
 package glpitest
 
 import (
@@ -29,11 +30,30 @@ type Server struct {
 	Calls  []string
 	// Searches: las consultas recibidas en search/<itemtype>.
 	Searches []url.Values
+	// WriteToken: el User-Token de escritura; solo su sesión puede escribir.
+	WriteToken string
+	// Posts: lo que se escribió (POST y PUT), en orden.
+	Posts []Post
+	// FailWrite: itemtype → estado HTTP con que falla la próxima escritura.
+	FailWrite map[string]int
+	nextID    int
+	clock     int
 }
+
+// Post es una escritura recibida.
+type Post struct {
+	Method   string
+	Itemtype string
+	Input    map[string]any
+}
+
+// WriteUserID es el usuario de GLPI del token de escritura.
+const WriteUserID = 77
 
 // New arranca el GLPI falso. Ciérralo con Close.
 func New(appToken, userToken string) *Server {
-	s := &Server{AppToken: appToken, UserToken: userToken, Rows: map[string][]map[string]any{}, Fail: map[string]string{}}
+	s := &Server{AppToken: appToken, UserToken: userToken, Rows: map[string][]map[string]any{}, Fail: map[string]string{},
+		FailWrite: map[string]int{}, nextID: 9000}
 	s.Server = httptest.NewServer(http.HandlerFunc(s.serve))
 	return s
 }
@@ -65,15 +85,24 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	if path == "initSession" {
-		if r.Header.Get("Authorization") != "user_token "+s.UserToken {
+		auth := r.Header.Get("Authorization")
+		switch {
+		case auth == "user_token "+s.UserToken:
+			_ = json.NewEncoder(w).Encode(map[string]string{"session_token": "sess-1"})
+		case s.WriteToken != "" && auth == "user_token "+s.WriteToken:
+			_ = json.NewEncoder(w).Encode(map[string]string{"session_token": "sess-w"})
+		default:
 			writeErr(w, http.StatusUnauthorized, "ERROR_GLPI_LOGIN_USER_TOKEN", "parameter user_token seems invalid")
-			return
 		}
-		_ = json.NewEncoder(w).Encode(map[string]string{"session_token": "sess-1"})
 		return
 	}
-	if r.Header.Get("Session-Token") != "sess-1" {
+	session := r.Header.Get("Session-Token")
+	if session != "sess-1" && session != "sess-w" {
 		writeErr(w, http.StatusUnauthorized, "ERROR_SESSION_TOKEN_INVALID", "session_token seems invalid")
+		return
+	}
+	if (r.Method == http.MethodPost || r.Method == http.MethodPut) && path != "changeActiveEntities" {
+		s.write(w, r, path, session == "sess-w")
 		return
 	}
 	switch path {
@@ -85,7 +114,11 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte("true"))
 		return
 	case "getFullSession":
-		_ = json.NewEncoder(w).Encode(map[string]any{"session": map[string]any{"glpiname": "bitacora-lectura"}})
+		name, profile := "bitacora-lectura", "Observador"
+		if session == "sess-w" {
+			name, profile = "bitacora-escritura", "Técnico"
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"session": map[string]any{"glpiname": name, "glpiactiveprofile": map[string]any{"name": profile}}})
 		return
 	case "getMyEntities":
 		_ = json.NewEncoder(w).Encode(map[string]any{"myentities": []map[string]any{{"id": 0}, {"id": 1}}})
@@ -167,9 +200,16 @@ func (s *Server) search(w http.ResponseWriter, itemtype string, q url.Values) {
 	s.Searches = append(s.Searches, q)
 	deleted := q.Get("is_deleted") == "1"
 	after := q.Get("criteria[1][value]")
+	email := ""
+	if itemtype == "User" && q.Get("criteria[0][field]") == "5" {
+		email = q.Get("criteria[0][value]")
+	}
 	data := []map[string]any{}
 	for _, row := range s.Rows[itemtype] {
 		if (fmt.Sprint(row["is_deleted"]) == "1") != deleted {
+			continue
+		}
+		if email != "" && !strings.EqualFold(fmt.Sprint(row["email"]), email) {
 			continue
 		}
 		if after != "" && fmt.Sprint(row["date_mod"]) <= after {
@@ -193,4 +233,99 @@ func (s *Server) search(w http.ResponseWriter, itemtype string, q url.Values) {
 		data = data[start : end+1]
 	}
 	_ = json.NewEncoder(w).Encode(map[string]any{"totalcount": total, "count": len(data), "data": data})
+}
+
+// write imita las altas (POST <itemtype>) y los cambios (PUT <itemtype>/<id>):
+// solo la sesión del token de escritura; el resto responde ERROR_RIGHT_MISSING.
+func (s *Server) write(w http.ResponseWriter, r *http.Request, path string, canWrite bool) {
+	var body struct {
+		Input map[string]any `json:"input"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&body)
+	parts := strings.Split(path, "/")
+	itemtype := parts[0]
+	if !canWrite {
+		writeErr(w, http.StatusForbidden, "ERROR_RIGHT_MISSING", "You don't have permission to perform this action.")
+		return
+	}
+	if status, ok := s.FailWrite[itemtype]; ok {
+		delete(s.FailWrite, itemtype)
+		writeErr(w, status, "ERROR_GLPI_ADD", "No se pudo guardar")
+		return
+	}
+	s.Posts = append(s.Posts, Post{Method: r.Method, Itemtype: itemtype, Input: body.Input})
+	s.clock++
+	stamp := fmt.Sprintf("2026-10-21 12:%02d:%02d", s.clock/60%60, s.clock%60)
+	bump := func(ticketID string) {
+		for _, row := range s.Rows["Ticket"] {
+			if fmt.Sprint(row["id"]) == ticketID {
+				row["date_mod"] = stamp
+			}
+		}
+	}
+	if r.Method == http.MethodPut {
+		if len(parts) != 2 {
+			writeErr(w, http.StatusBadRequest, "ERROR_BAD_ARRAY", "id requerido")
+			return
+		}
+		for _, row := range s.Rows[itemtype] {
+			if fmt.Sprint(row["id"]) == parts[1] {
+				for k, v := range body.Input {
+					row[k] = v
+				}
+				row["date_mod"] = stamp
+				_ = json.NewEncoder(w).Encode([]map[string]any{{parts[1]: true, "message": ""}})
+				return
+			}
+		}
+		writeErr(w, http.StatusNotFound, "ERROR_ITEM_NOT_FOUND", "Item not found")
+		return
+	}
+	s.nextID++
+	id := s.nextID
+	switch itemtype {
+	case "ITILFollowup", "ITILSolution":
+		ticket := fmt.Sprint(body.Input["items_id"])
+		found := false
+		for _, row := range s.Rows["Ticket"] {
+			if fmt.Sprint(row["id"]) == ticket {
+				found = true
+			}
+		}
+		if !found {
+			writeErr(w, http.StatusBadRequest, "ERROR_GLPI_ADD", "El ticket no existe")
+			return
+		}
+		row := map[string]any{"id": id, "users_id": WriteUserID, "content": body.Input["content"], "is_private": body.Input["is_private"],
+			"date": stamp, "date_creation": stamp}
+		if itemtype == "ITILSolution" {
+			row["status"] = 2
+			for _, t := range s.Rows["Ticket"] {
+				if fmt.Sprint(t["id"]) == ticket {
+					t["status"] = 5
+				}
+			}
+		}
+		key := "Ticket/" + ticket + "/" + itemtype
+		s.Rows[key] = append(s.Rows[key], row)
+		bump(ticket)
+	case "Ticket":
+		row := map[string]any{"id": id, "status": 1, "date": stamp, "date_mod": stamp}
+		for k, v := range body.Input {
+			if !strings.HasPrefix(k, "_") {
+				row[k] = v
+			}
+		}
+		s.Rows["Ticket"] = append(s.Rows["Ticket"], row)
+		if g := body.Input["_groups_id_assign"]; g != nil {
+			s.Rows[fmt.Sprintf("Ticket/%d/Group_Ticket", id)] = []map[string]any{{"id": id, "groups_id": g, "type": 2}}
+		}
+		if u := body.Input["_users_id_requester"]; u != nil {
+			s.Rows[fmt.Sprintf("Ticket/%d/Ticket_User", id)] = []map[string]any{{"id": id, "users_id": u, "type": 1}}
+		}
+	default:
+		s.Rows[itemtype] = append(s.Rows[itemtype], map[string]any{"id": id})
+	}
+	w.WriteHeader(http.StatusCreated)
+	_ = json.NewEncoder(w).Encode(map[string]any{"id": id, "message": ""})
 }
