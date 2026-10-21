@@ -828,6 +828,40 @@ Los tickets traídos de GLPI (spec/18) llevan `source: "glpi"` y `glpi: {id, url
 | `POST` | `/api/complements/{slug}/embed` | Sesión · Complementos encendidos |
 | `POST` | `/api/complements/{slug}/entries` | Sesión · Complementos encendidos |
 
+### Integraciones
+
+Spec/19 (10b). Solo admin. Los secretos (llave de cliente mTLS, valores de las cabeceras HTTP) se mandan solo para cambiarlos y nunca vuelven: `null` mantiene, `""` quita. Auditoría: `config.forward.create|update|delete|test`, `apikey.create|revoke`.
+
+| Método | Ruta | Acceso |
+| --- | --- | --- |
+| `GET` | `/api/integrations/meta` | Admin — permisos de una llave (`scopes`, la única lista), áreas que reciben tickets y clientes |
+| `GET` | `/api/integrations/destinations` | Admin — destinos con su estado (`off`, `idle`, `ok`, `failing`), enviados hoy, en cola, perdidos en 7 días y el último error |
+| `POST` | `/api/integrations/destinations` | Admin — `{name, enabled, transport: udp\|tcp\|tls\|http, host, port, url, format: json\|rfc5424, batch, sendAudit, auditLevel, sendEntries, sendEscalation, sendTickets, caCert, clientCert, clientKey, headers: [{name, value}]}`; parte desde el último evento de la cola |
+| `PUT` | `/api/integrations/destinations/{id}` | Admin — igual; al encenderlo parte desde ahora |
+| `DELETE` | `/api/integrations/destinations/{id}` | Admin |
+| `POST` | `/api/integrations/destinations/{id}/test` | Admin — manda `bitacora.test` directo: `{ok, error}` |
+| `GET` | `/api/integrations/keys` | Admin — llaves con estado (`active`, `expired`, `revoked`), último uso y llamadas de 7 días |
+| `POST` | `/api/integrations/keys` | Admin — `{name, description, scopes, clientIds, areaId, expiresInDays: 90\|365\|0}`: devuelve `{key, secret}`; `secret` sale una sola vez |
+| `POST` | `/api/integrations/keys/{id}/revoke` | Admin — inmediato, no se deshace |
+| `GET` | `/api/integrations/keys/{id}/requests` | Admin — las últimas 50 llamadas (ruta, permiso, estado, ms, IP) |
+
+### API de integraciones
+
+Spec/19 §4: para n8n, un SIEM o un SOAR. Llave `bop_…` en `X-API-Key` o `Authorization: Bearer` (equivalentes); 600 llamadas cada 15 minutos por llave (`429` con `Retry-After`); cada respuesta lleva `X-API-Version: v1`. Los `POST` aceptan `Idempotency-Key` (24 horas). Solo ve y crea en los clientes de la llave. Manual con ejemplos: `docs/api-integraciones.md`.
+
+| Método | Ruta | Acceso |
+| --- | --- | --- |
+| `GET` | `/api/v1` | Llave — versión, permisos y vencimiento de la llave |
+| `GET` | `/api/v1/entries` | Llave (`entries:read`) — `?limit=&cursor=&client=&since=` |
+| `GET` | `/api/v1/entries/{id}` | Llave (`entries:read`) |
+| `POST` | `/api/v1/entries` | Llave (`entries:write`) — `{content, entryType, scope, client, tags}` |
+| `GET` | `/api/v1/oncall` | Llave (`oncall:read`) — guardias con quién está ahora y sus contactos descifrados |
+| `GET` | `/api/v1/tickets` | Llave (`tickets:read`) — `?limit=&cursor=&client=&status=&since=` |
+| `GET` | `/api/v1/tickets/{ref}` | Llave (`tickets:read`) — `ref`: id, `TKT-…` o `GLPI-…`; con los comentarios visibles al cliente |
+| `POST` | `/api/v1/tickets` | Llave (`tickets:write`) — `{title, description, type, client, impact, urgency}`; va al área de la llave |
+| `POST` | `/api/v1/tickets/{ref}/comments` | Llave (`tickets:write`) — `{content, public}`; los `GLPI-…` responden `409 glpi-readonly` |
+| `POST` | `/api/v1/reports/incident` | Llave (`reports:render`; con `"send": true`, `reports:send`) — los campos de `POST /api/reports/incident/preview` |
+
 ### API interna de complementos
 
 | Método | Ruta | Acceso |

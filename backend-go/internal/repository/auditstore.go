@@ -14,6 +14,9 @@ import (
 // audit.Entry se convierte a filas/columnas reales de Postgres.
 type AuditStore struct {
 	Queries *db.Queries
+	// After recibe cada registro ya guardado: el reenvío a un SIEM (spec/19)
+	// lo encola desde aquí, así todo lo auditado puede salir.
+	After func(ctx context.Context, entry audit.Entry)
 }
 
 func (s *AuditStore) InsertAuditLog(ctx context.Context, entry audit.Entry) error {
@@ -31,7 +34,7 @@ func (s *AuditStore) InsertAuditLog(ctx context.Context, entry audit.Entry) erro
 	if id == uuid.Nil {
 		id = uuid.New()
 	}
-	return s.Queries.InsertAuditLog(ctx, db.InsertAuditLogParams{
+	err = s.Queries.InsertAuditLog(ctx, db.InsertAuditLogParams{
 		ID:                id,
 		Event:             entry.Event,
 		Level:             string(entry.Level),
@@ -52,6 +55,10 @@ func (s *AuditStore) InsertAuditLog(ctx context.Context, entry audit.Entry) erro
 		SourceID:          textOrNull(entry.SourceID),
 		Metadata:          metadataJSON,
 	})
+	if err == nil && s.After != nil {
+		s.After(ctx, entry)
+	}
+	return err
 }
 
 // textOrNull evita persistir strings vacíos como "" en vez de NULL cuando

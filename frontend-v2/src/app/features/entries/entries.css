@@ -224,6 +224,12 @@ mat-icon {
   white-space: nowrap;
 }
 
+.en__api {
+  display: block;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
 /* Redactor */
 .en__composer {
   display: flex;

@@ -527,7 +527,7 @@ func (q *Queries) ListClientActions(ctx context.Context, organizationID pgtype.U
 }
 
 const listClientOpenTickets = `-- name: ListClientOpenTickets :many
-SELECT t.id, t.ticket_number, t.ticket_type, t.scope, t.client_id, t.asset_id, t.service_id, t.assigned_team_id, t.assigned_user_id, t.assigned_contact_id, t.status, t.impact, t.urgency, t.priority, t.title, t.description, t.sla_response_due_at, t.sla_resolution_due_at, t.sla_on_hold_since, t.sla_paused_seconds, t.first_responded_at, t.resolved_at, t.closed_at, t.reopened_count, t.reopened_at, t.public_tracking_token, t.public_tracking_enabled, t.public_tracking_pin, t.created_by, t.created_at, t.updated_at, t.parent_id, t.merged_into_id, t.affects_client, t.notify_to, t.notify_cc, t.sla_response_breach_notified_at, t.sla_resolution_warn_notified_at, t.sla_resolution_breach_notified_at, t.territorial_unit_id, t.area_id, t.requested_area_id, t.source, t.glpi_id, t.glpi_date_mod, t.glpi_synced_at, t.glpi_deleted, t.glpi_linked_only, t.glpi_group_id, t.glpi_group_name, t.glpi_technician, a.name AS area_name
+SELECT t.id, t.ticket_number, t.ticket_type, t.scope, t.client_id, t.asset_id, t.service_id, t.assigned_team_id, t.assigned_user_id, t.assigned_contact_id, t.status, t.impact, t.urgency, t.priority, t.title, t.description, t.sla_response_due_at, t.sla_resolution_due_at, t.sla_on_hold_since, t.sla_paused_seconds, t.first_responded_at, t.resolved_at, t.closed_at, t.reopened_count, t.reopened_at, t.public_tracking_token, t.public_tracking_enabled, t.public_tracking_pin, t.created_by, t.created_at, t.updated_at, t.parent_id, t.merged_into_id, t.affects_client, t.notify_to, t.notify_cc, t.sla_response_breach_notified_at, t.sla_resolution_warn_notified_at, t.sla_resolution_breach_notified_at, t.territorial_unit_id, t.area_id, t.requested_area_id, t.source, t.glpi_id, t.glpi_date_mod, t.glpi_synced_at, t.glpi_deleted, t.glpi_linked_only, t.glpi_group_id, t.glpi_group_name, t.glpi_technician, t.api_key_id, t.api_key_name, a.name AS area_name
 FROM tickets t
 JOIN areas a ON a.id = t.area_id
 WHERE t.client_id = $1 AND t.status NOT IN ('resolved', 'closed', 'cancelled') AND t.merged_into_id IS NULL AND NOT t.glpi_deleted
@@ -600,6 +600,8 @@ func (q *Queries) ListClientOpenTickets(ctx context.Context, clientID uuid.UUID)
 			&i.Ticket.GlpiGroupID,
 			&i.Ticket.GlpiGroupName,
 			&i.Ticket.GlpiTechnician,
+			&i.Ticket.ApiKeyID,
+			&i.Ticket.ApiKeyName,
 			&i.AreaName,
 		); err != nil {
 			return nil, err

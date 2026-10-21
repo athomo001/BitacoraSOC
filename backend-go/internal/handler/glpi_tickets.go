@@ -851,6 +851,8 @@ func (sy *glpiTicketSync) save(ctx context.Context, td glpi.TicketData, client, 
 		sy.run.Updated++
 	}
 	publishSync(ctx, h.Hub, "ticket.updated", map[string]string{"id": row.ID.String()})
+	h.Forward.FromAudit(ctx, audit.Entry{Event: "ticket.glpi_synced", Level: audit.LevelInfo, Success: true, ActorUsername: "GLPI",
+		Metadata: map[string]any{"ticketId": row.ID.String(), "created": row.Inserted}})
 	return nil
 }
 

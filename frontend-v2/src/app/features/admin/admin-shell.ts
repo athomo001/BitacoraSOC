@@ -30,6 +30,7 @@ import { AdminAreasComponent } from './admin-areas';
 import { AdminGlpiComponent } from './admin-glpi';
 import { AdminEntryTagsComponent } from './admin-entry-tags';
 import { AdminRaciComponent } from './admin-raci';
+import { AdminIntegrationsComponent } from './admin-integrations';
 import { SystemFeaturesService } from '../../core/system-features/system-features.service';
 
 import '../../core/i18n/packs/admin';
@@ -37,7 +38,7 @@ import '../../core/i18n/packs/raci';
 export type AdminSection =
   | 'access' | 'areas' | 'shifts' | 'checklist' | 'escalation' | 'raci' | 'tickets' | 'clientAlerts' | 'smtp' | 'reports'
   | 'agenda' | 'notifications' | 'organizations' | 'territory' | 'inventory' | 'teams'
-  | 'modules' | 'brand' | 'features' | 'glpi' | 'backups' | 'audit' | 'complements' | 'tags';
+  | 'modules' | 'brand' | 'features' | 'glpi' | 'integrations' | 'backups' | 'audit' | 'complements' | 'tags';
 
 interface NavItem {
   id: AdminSection;
@@ -93,6 +94,7 @@ const NAV: readonly { labelKey: MessageKey; items: readonly NavItem[] }[] = [
       { id: 'modules', icon: 'apps', labelKey: 'admin.nav.modules' },
       { id: 'features', icon: 'toggle_on', labelKey: 'admin.nav.features' },
       { id: 'glpi', icon: 'cloud_download', labelKey: 'admin.nav.glpi', requiresFeature: 'glpi_sync' },
+      { id: 'integrations', icon: 'cable', labelKey: 'admin.nav.integrations' },
       { id: 'backups', icon: 'backup', labelKey: 'admin.nav.backups' },
       { id: 'audit', icon: 'policy', labelKey: 'admin.nav.audit' },
       { id: 'complements', icon: 'extension', labelKey: 'admin.nav.complements', requiresFeature: 'complements' },
@@ -129,7 +131,7 @@ function normalize(text: string): string {
     MatIconModule, AdminModulesComponent, AdminBrandComponent, AdminFeaturesComponent, AdminTerritoryComponent, AdminInventoryComponent, AdminOrganizationsComponent, AdminTeamsComponent,
     AdminEscalationComponent, AdminShiftsComponent, AdminSmtpComponent, AdminReportsComponent, AdminBackupsComponent, AdminAuditComponent,
     AdminAccessComponent, AdminChecklistComponent, AdminComplementsComponent, AdminClientAlertsComponent, AdminTicketsComponent, AdminAreasComponent, AdminAgendaComponent, AdminNotificationsComponent, AdminGlpiComponent,
-    AdminEntryTagsComponent, AdminRaciComponent,
+    AdminEntryTagsComponent, AdminRaciComponent, AdminIntegrationsComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { '(document:keydown)': 'onKeydown($event)' },
@@ -184,6 +186,7 @@ function normalize(text: string): string {
           @case ('modules') { <app-admin-modules /> }
           @case ('features') { <app-admin-features /> }
           @case ('glpi') { <app-admin-glpi /> }
+          @case ('integrations') { <app-admin-integrations /> }
           @case ('backups') { <app-admin-backups (goToFeatures)="go('features')" /> }
           @case ('audit') { <app-admin-audit /> }
           @case ('complements') { <app-admin-complements /> }

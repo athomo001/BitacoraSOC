@@ -33,6 +33,8 @@ export interface Entry {
   imageSizeBytes?: number;
   createdAt: string;
   updatedAt: string;
+  /** La creó una llave de la API de integraciones (spec/19). */
+  apiKeyName?: string;
 }
 
 export interface EntryComment {

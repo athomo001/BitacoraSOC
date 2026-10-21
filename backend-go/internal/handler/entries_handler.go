@@ -80,6 +80,8 @@ type entryDTO struct {
 	ImageSizeBytes *int32     `json:"imageSizeBytes,omitempty"`
 	CreatedAt      time.Time  `json:"createdAt"`
 	UpdatedAt      time.Time  `json:"updatedAt"`
+	// APIKeyName: la creó una llave de la API de integraciones (spec/19).
+	APIKeyName *string `json:"apiKeyName,omitempty"`
 }
 
 func int4Ptr(v pgtype.Int4) *int32 {
@@ -94,6 +96,7 @@ func toEntryDTO(e db.Entry, authorUsername string) entryDTO {
 		ID: e.ID, AuthorUsername: authorUsername, EntryType: string(e.EntryType), Scope: string(e.Scope),
 		Content: e.Content, Tags: e.Tags, ServiceID: uuidPtr(e.ServiceID), AssetID: uuidPtr(e.AssetID),
 		ImageURL: textPtr(e.ImageUrl), ImageHash: textPtr(e.ImageHash), ImageSizeBytes: int4Ptr(e.ImageSizeBytes),
+		APIKeyName: textPtr(e.ApiKeyName),
 	}
 	if e.CreatedAt.Valid {
 		dto.CreatedAt = e.CreatedAt.Time
@@ -105,7 +108,7 @@ func toEntryDTO(e db.Entry, authorUsername string) entryDTO {
 }
 
 func entryFromRow(row db.GetEntryRow) db.Entry {
-	return db.Entry{ID: row.ID, UserID: row.UserID, EntryType: row.EntryType, Scope: row.Scope, Content: row.Content, Tags: row.Tags, ServiceID: row.ServiceID, AssetID: row.AssetID, WorkShiftID: row.WorkShiftID, GlpiTicketID: row.GlpiTicketID, GlpiLinkedAt: row.GlpiLinkedAt, TicketID: row.TicketID, ImageUrl: row.ImageUrl, ImageHash: row.ImageHash, ImageSizeBytes: row.ImageSizeBytes, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
+	return db.Entry{ID: row.ID, UserID: row.UserID, EntryType: row.EntryType, Scope: row.Scope, Content: row.Content, Tags: row.Tags, ServiceID: row.ServiceID, AssetID: row.AssetID, WorkShiftID: row.WorkShiftID, GlpiTicketID: row.GlpiTicketID, GlpiLinkedAt: row.GlpiLinkedAt, TicketID: row.TicketID, ImageUrl: row.ImageUrl, ImageHash: row.ImageHash, ImageSizeBytes: row.ImageSizeBytes, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt, ApiKeyName: row.ApiKeyName}
 }
 
 type entryCommentDTO struct {
@@ -219,7 +222,7 @@ func (h *EntriesHandler) List(w http.ResponseWriter, r *http.Request) {
 		items = append(items, toEntryDTO(db.Entry{
 			ID: row.ID, UserID: row.UserID, EntryType: row.EntryType, Scope: row.Scope, Content: row.Content, Tags: row.Tags,
 			ServiceID: row.ServiceID, AssetID: row.AssetID, ImageUrl: row.ImageUrl, ImageHash: row.ImageHash,
-			ImageSizeBytes: row.ImageSizeBytes, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt,
+			ImageSizeBytes: row.ImageSizeBytes, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt, ApiKeyName: row.ApiKeyName,
 		}, row.AuthorUsername))
 	}
 	writeData(w, http.StatusOK, map[string]any{"items": items, "total": total})
@@ -283,7 +286,7 @@ func (h *EntriesHandler) Get(w http.ResponseWriter, r *http.Request) {
 	entry := db.Entry{
 		ID: row.ID, UserID: row.UserID, EntryType: row.EntryType, Scope: row.Scope, Content: row.Content, Tags: row.Tags,
 		ServiceID: row.ServiceID, AssetID: row.AssetID, ImageUrl: row.ImageUrl, ImageHash: row.ImageHash,
-		ImageSizeBytes: row.ImageSizeBytes, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt,
+		ImageSizeBytes: row.ImageSizeBytes, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt, ApiKeyName: row.ApiKeyName,
 	}
 	dto := entryDetailDTO{entryDTO: toEntryDTO(entry, row.AuthorUsername), Comments: comments}
 	h.entryLinks(ctx, &dto, row.TicketID, row.GlpiTicketID)

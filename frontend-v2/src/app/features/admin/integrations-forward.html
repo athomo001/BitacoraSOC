@@ -1,0 +1,178 @@
+@if (error(); as e) { <p class="adm-error" role="alert">{{ e }}</p> }
+<div class="fw">
+  <section class="adm-card">
+    <div class="adm-card__head">
+      <h3 class="adm-card__title">{{ i18n.t('ig.fw.dests') }}</h3>
+      <button type="button" class="adm-btn adm-btn--primary adm-push" (click)="startNew()"><mat-icon>add</mat-icon>{{ i18n.t('ig.fw.new') }}</button>
+    </div>
+    @for (d of list(); track d.id) {
+      <button type="button" class="fw__row" [attr.aria-current]="selected() === d.id" (click)="select(d.id)">
+        <b>{{ d.name }}</b>
+        <span class="fw__state {{ stateTone(d) }}"><mat-icon>{{ stateIcon(d) }}</mat-icon>
+          @if (d.state === 'failing' && d.failingSince) { {{ i18n.tf('ig.fw.st.failing', (d.failingSince | date: 'dd/MM HH:mm') ?? '') }} } @else { {{ i18n.t(stateKey(d)) }} }
+        </span>
+        <span class="fw__sub">{{ i18n.t(key('ig.fw.tr', d.transport)) }}, <span class="mono">{{ where(d) }}</span>@if (d.pending > 0) {, {{ i18n.tf('ig.fw.inQueue', d.pending) }} }</span>
+      </button>
+    } @empty {
+      <p class="adm-empty">{{ i18n.t('ig.fw.empty') }}</p>
+    }
+    <p class="adm-hint fw__pad">{{ i18n.t('ig.fw.queueHint') }}</p>
+  </section>
+
+  <section class="adm-card">
+    @if (draft(); as d) {
+      <div class="adm-card__head">
+        <input class="adm-input fw__name" name="fwName" [attr.aria-label]="i18n.t('ig.fw.name')" [ngModel]="d.name" (ngModelChange)="patch({ name: $event })" />
+        <label class="adm-switch-row adm-push">
+          <span class="switch">
+            <input class="switch__input" type="checkbox" role="switch" name="fwEnabled" [checked]="d.enabled" (change)="patch({ enabled: !d.enabled })" />
+            <span class="switch__track" aria-hidden="true"></span>
+          </span>
+          <span class="adm-strong">{{ i18n.t(d.enabled ? 'ig.fw.on' : 'ig.fw.offLabel') }}</span>
+        </label>
+      </div>
+      <div class="adm-card__body fw__body">
+        @if (current(); as c) {
+          @if (c.state === 'failing') {
+            <p class="fw__note fw__note--bad" role="status"><mat-icon>error</mat-icon>
+              <span><b>{{ i18n.tf('ig.fw.downNote', (c.failingSince | date: 'dd/MM HH:mm') ?? '') }}</b> {{ c.lastError }}@if (c.pending > 0) { {{ i18n.tf('ig.fw.downQueue', c.pending) }} }</span></p>
+          }
+          <div class="fw__figs">
+            <span><span class="adm-hint">{{ i18n.t('ig.fw.sentToday') }}</span><b>{{ c.sentToday }}</b></span>
+            <span><span class="adm-hint">{{ i18n.t('ig.fw.pending') }}</span><b [class.text-warn]="c.pending > 0">{{ c.pending }}</b></span>
+            <span><span class="adm-hint">{{ i18n.t('ig.fw.lost') }}</span><b>{{ c.lostWeek }}</b></span>
+            <span><span class="adm-hint">{{ i18n.t('ig.fw.lastSent') }}</span><b class="fw__small">{{ c.lastSentAt ? (c.lastSentAt | date: 'dd/MM HH:mm:ss') : i18n.t('ig.fw.never') }}</b></span>
+          </div>
+        }
+
+        <div class="adm-field">
+          <span class="adm-label">{{ i18n.t('ig.fw.how') }}</span>
+          <span class="fw__line" role="group" [attr.aria-label]="i18n.t('ig.fw.how')">
+            @for (t of transports; track t) { <button type="button" class="seg" [attr.aria-pressed]="d.transport === t" (click)="setTransport(t)">{{ i18n.t(key('ig.fw.tr', t)) }}</button> }
+          </span>
+        </div>
+
+        @if (d.transport === 'http') {
+          <label class="adm-field"><span class="adm-label">{{ i18n.t('ig.fw.url') }}</span>
+            <input class="adm-input mono" name="fwUrl" placeholder="https://" [ngModel]="d.url" (ngModelChange)="patch({ url: $event })" />
+            <span class="adm-hint">{{ i18n.t('ig.fw.urlHint') }}</span></label>
+          <label class="fw__check"><input type="checkbox" name="fwBatch" [checked]="d.batch" (change)="patch({ batch: !d.batch })" />
+            <span>{{ i18n.t('ig.fw.batch') }}<span class="adm-hint fw__block">{{ i18n.t('ig.fw.batchHint') }}</span></span></label>
+          <div class="adm-field">
+            <span class="adm-label">{{ i18n.t('ig.fw.headers') }}</span>
+            @for (h of d.headers; track $index; let i = $index) {
+              <span class="fw__line">
+                @if (h.saved) {
+                  <span class="mono">{{ h.name }}</span>
+                  @if (h.replace) {
+                    <input class="adm-input mono fw__grow" type="password" autocomplete="off" [name]="'fwHv' + i" [attr.aria-label]="i18n.t('ig.fw.headerValue')" [ngModel]="h.value" (ngModelChange)="setHeader(i, { value: $event })" />
+                    <button type="button" class="adm-btn" (click)="setHeader(i, { replace: false, value: '' })">{{ i18n.t('ig.fw.keep') }}</button>
+                  } @else {
+                    <span class="fw__secret"><mat-icon>lock</mat-icon>{{ i18n.t('ig.fw.saved') }}</span>
+                    <button type="button" class="adm-btn" (click)="setHeader(i, { replace: true })">{{ i18n.t('ig.fw.replace') }}</button>
+                  }
+                } @else {
+                  <input class="adm-input mono" [name]="'fwHn' + i" placeholder="Authorization" [attr.aria-label]="i18n.t('ig.fw.headerName')" [ngModel]="h.name" (ngModelChange)="setHeader(i, { name: $event })" />
+                  <input class="adm-input mono fw__grow" type="password" autocomplete="off" [name]="'fwHv' + i" [attr.aria-label]="i18n.t('ig.fw.headerValue')" [ngModel]="h.value" (ngModelChange)="setHeader(i, { value: $event })" />
+                }
+                <button type="button" class="adm-icon-btn" [attr.aria-label]="i18n.tf('ig.fw.removeHeader', h.name)" (click)="removeHeader(i)"><mat-icon>close</mat-icon></button>
+              </span>
+            }
+            <button type="button" class="adm-btn fw__start" (click)="addHeader()"><mat-icon>add</mat-icon>{{ i18n.t('ig.fw.addHeader') }}</button>
+            <span class="adm-hint">{{ i18n.t('ig.fw.headersHint') }}</span>
+          </div>
+        } @else {
+          <div class="fw__hp">
+            <label class="adm-field"><span class="adm-label">{{ i18n.t('ig.fw.host') }}</span>
+              <input class="adm-input mono" name="fwHost" [ngModel]="d.host" (ngModelChange)="patch({ host: $event })" /></label>
+            <label class="adm-field"><span class="adm-label">{{ i18n.t('ig.fw.port') }}</span>
+              <input class="adm-input mono" name="fwPort" type="number" min="1" max="65535" [ngModel]="d.port" (ngModelChange)="patch({ port: +$event })" /></label>
+          </div>
+          @if (d.transport === 'tls') {
+            <div class="adm-field">
+              <span class="adm-label">{{ i18n.t('ig.fw.certs') }}</span>
+              <span class="fw__line">
+                <span>{{ i18n.t('ig.fw.ca') }}</span>
+                @switch (caState()) {
+                  @case ('loaded') { <span class="fw__secret"><mat-icon>verified</mat-icon>{{ i18n.t('ig.fw.caLoaded') }}</span> }
+                  @case ('new') { <span class="fw__secret"><mat-icon>upload_file</mat-icon>{{ i18n.t('ig.fw.caNew') }}</span> }
+                  @default { <span class="adm-muted">{{ i18n.t('ig.fw.caNone') }}</span> }
+                }
+                <button type="button" class="adm-btn" (click)="caFile.click()">{{ i18n.t(caState() === 'none' ? 'ig.fw.load' : 'ig.fw.replace') }}</button>
+                @if (caState() !== 'none') { <button type="button" class="adm-btn" (click)="patch({ caCert: '' })">{{ i18n.t('ig.fw.remove') }}</button> }
+                <input #caFile type="file" accept=".pem,.crt,.cer" hidden (change)="loadPem('caCert', caFile)" />
+              </span>
+              <span class="fw__line">
+                <span>{{ i18n.t('ig.fw.mtls') }}</span>
+                @switch (mtlsState()) {
+                  @case ('loaded') { <span class="fw__secret"><mat-icon>lock</mat-icon>{{ i18n.t('ig.fw.mtlsLoaded') }}</span> }
+                  @case ('new') { <span class="fw__secret"><mat-icon>upload_file</mat-icon>{{ i18n.t('ig.fw.caNew') }}</span> }
+                  @default { <span class="adm-muted">{{ i18n.t('ig.fw.mtlsNone') }}</span> }
+                }
+                <button type="button" class="adm-btn" (click)="certFile.click()">{{ i18n.t('ig.fw.loadCert') }}</button>
+                <button type="button" class="adm-btn" (click)="keyFile.click()">{{ i18n.t('ig.fw.loadKey') }}</button>
+                @if (mtlsState() !== 'none') { <button type="button" class="adm-btn" (click)="clearMtls()">{{ i18n.t('ig.fw.remove') }}</button> }
+                <input #certFile type="file" accept=".pem,.crt,.cer" hidden (change)="loadPem('clientCert', certFile)" />
+                <input #keyFile type="file" accept=".pem,.key" hidden (change)="loadPem('clientKey', keyFile)" />
+              </span>
+              <span class="adm-hint">{{ i18n.t('ig.fw.tlsHint') }}</span>
+            </div>
+          }
+          @if (d.transport === 'udp') { <p class="adm-hint fw__flat">{{ i18n.t('ig.fw.udpHint') }}</p> }
+        }
+
+        <div class="adm-field">
+          <span class="adm-label">{{ i18n.t('ig.fw.format') }}</span>
+          <span class="fw__line" role="group" [attr.aria-label]="i18n.t('ig.fw.format')">
+            @for (f of formats; track f) { <button type="button" class="seg" [attr.aria-pressed]="d.format === f" (click)="patch({ format: f })">{{ i18n.t(key('ig.fw.fmt', f)) }}</button> }
+          </span>
+        </div>
+
+        <div class="adm-field">
+          <span class="adm-label">{{ i18n.t('ig.fw.what') }}</span>
+          <label class="fw__check"><input type="checkbox" name="fwAudit" [checked]="d.sendAudit" (change)="patch({ sendAudit: !d.sendAudit })" />
+            <span>{{ i18n.t('ig.fw.audit') }}
+              <select class="adm-input fw__level" name="fwLevel" [attr.aria-label]="i18n.t('ig.fw.levelLabel')" [ngModel]="d.auditLevel" (ngModelChange)="patch({ auditLevel: $event })">
+                @for (l of levels; track l) { <option [value]="l">{{ i18n.t(key('ig.fw.lv', l)) }}</option> }
+              </select>
+              <span class="adm-hint fw__block">{{ i18n.t('ig.fw.auditHint') }}</span></span></label>
+          <label class="fw__check"><input type="checkbox" name="fwEntries" [checked]="d.sendEntries" (change)="patch({ sendEntries: !d.sendEntries })" />
+            <span>{{ i18n.t('ig.fw.entries') }}<span class="adm-hint fw__block">{{ i18n.t('ig.fw.entriesHint') }}</span></span></label>
+          <label class="fw__check"><input type="checkbox" name="fwEsc" [checked]="d.sendEscalation" (change)="patch({ sendEscalation: !d.sendEscalation })" />
+            <span>{{ i18n.t('ig.fw.escalation') }}<span class="adm-hint fw__block">{{ i18n.t('ig.fw.escalationHint') }}</span></span></label>
+          <label class="fw__check"><input type="checkbox" name="fwTickets" [checked]="d.sendTickets" (change)="patch({ sendTickets: !d.sendTickets })" />
+            <span>{{ i18n.t('ig.fw.tickets') }}<span class="adm-hint fw__block">{{ i18n.t('ig.fw.ticketsHint') }}</span></span></label>
+        </div>
+
+        <div class="adm-field">
+          <span class="adm-label">{{ i18n.t('ig.fw.sample') }}</span>
+          <pre class="fw__pre">{{ sample() }}</pre>
+        </div>
+
+        @if (test(); as r) {
+          <p class="fw__note" [class.fw__note--bad]="!r.ok" role="status"><mat-icon>{{ r.ok ? 'check_circle' : 'error' }}</mat-icon><span>{{ testText(r) }}</span></p>
+        }
+        @if (confirmDelete() && current(); as c) {
+          <p class="fw__note fw__note--warn" role="alert"><mat-icon>warning</mat-icon><span class="fw__grow">{{ i18n.tf('ig.fw.deleteConfirm', c.name) }}</span>
+            <button type="button" class="adm-btn adm-btn--danger" [disabled]="!!busy()" (click)="remove()">{{ i18n.t('ig.fw.deleteYes') }}</button>
+            <button type="button" class="adm-btn" (click)="confirmDelete.set(false)">{{ i18n.t('ig.fw.cancel') }}</button></p>
+        }
+      </div>
+      <footer class="adm-foot">
+        <span class="adm-foot__status">
+          @if (notice(); as n) { <span class="text-ok adm-small">{{ n }}</span> }
+          @else if (dirty() && !isNew()) { <span class="adm-muted">{{ i18n.t('ig.fw.testSaveFirst') }}</span> }
+          @else if (!isNew()) { <span class="adm-muted">{{ i18n.t('admin.noChanges') }}</span> }
+        </span>
+        @if (dirty()) { <button type="button" class="adm-btn adm-push" (click)="discard()">{{ i18n.t('admin.discard') }}</button> }
+        @if (!isNew()) {
+          <button type="button" class="adm-btn" [class.adm-push]="!dirty()" [disabled]="dirty() || !!busy()" (click)="runTest()"><mat-icon>bolt</mat-icon>{{ i18n.t(busy() === 'test' ? 'ig.fw.testing' : 'ig.fw.test') }}</button>
+          <button type="button" class="adm-btn adm-btn--danger" [disabled]="!!busy()" (click)="confirmDelete.set(true)"><mat-icon>delete</mat-icon>{{ i18n.t('ig.fw.delete') }}</button>
+        }
+        <button type="button" class="adm-btn adm-btn--primary" [disabled]="!dirty() || !!busy()" (click)="save()"><mat-icon>save</mat-icon>{{ i18n.t(isNew() ? 'ig.fw.create' : 'ig.fw.save') }}</button>
+      </footer>
+    } @else {
+      <p class="adm-empty">{{ i18n.t('ig.fw.pick') }}</p>
+    }
+  </section>
+</div>

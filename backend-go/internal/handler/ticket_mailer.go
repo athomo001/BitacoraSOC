@@ -278,6 +278,15 @@ func (m *TicketMailer) scanSLA(ctx context.Context, s db.TicketSetting) {
 		for _, ev := range events {
 			m.Emit(ctx, mailEmission{Event: ev, TicketID: t.ID})
 		}
+		// SLA vencido: queda en Auditoría y, por ahí, llega al SIEM (spec/19).
+		if m.AuditLog != nil {
+			if p.ResponseBreach.Valid {
+				m.AuditLog.Log(ctx, "ticket.sla_breached", audit.LevelWarn, audit.Success(), map[string]any{"ticketId": t.ID.String(), "sla": "response"})
+			}
+			if p.ResolutionBreach.Valid {
+				m.AuditLog.Log(ctx, "ticket.sla_breached", audit.LevelWarn, audit.Success(), map[string]any{"ticketId": t.ID.String(), "sla": "resolution"})
+			}
+		}
 	}
 }
 

@@ -1,0 +1,146 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+mat-icon {
+  width: 15px;
+  height: 15px;
+  font-size: 15px;
+  vertical-align: -3px;
+}
+
+tr[aria-current="true"] td {
+  background: var(--accent-soft);
+}
+
+.ik__scope {
+  display: block;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+}
+
+.ik__body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.ik__two {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.ik__scopes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 6px 16px;
+}
+
+.ik__clients {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.ik__check {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  font-size: 12.5px;
+}
+
+.ik__check input {
+  margin: 2px 0 0;
+}
+
+.ik__line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ik__state {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.ik__secret {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid var(--status-warning);
+  border-radius: var(--radius-md);
+  background: var(--status-warning-bg);
+}
+
+.ik__secret code {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  word-break: break-all;
+}
+
+.ik__grow {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+.ik__pre {
+  margin: 0;
+  padding: 10px 12px;
+  overflow-x: auto;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-app);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1.55;
+  white-space: pre;
+}
+
+.ik__note {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 0;
+  padding: 9px 11px;
+  border-radius: var(--radius-md);
+  background: var(--status-warning-bg);
+  font-size: 12.5px;
+}
+
+.ik__facts {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  gap: 6px 12px;
+  margin: 0;
+  font-size: 12.5px;
+}
+
+.ik__facts dt {
+  color: var(--text-muted);
+}
+
+.ik__facts dd {
+  margin: 0;
+}
+
+@media (width <= 900px) {
+  .ik__two,
+  .ik__facts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

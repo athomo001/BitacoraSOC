@@ -1,0 +1,163 @@
+@if (error(); as e) { <p class="adm-error" role="alert">{{ e }}</p> }
+<section class="adm-card">
+  <div class="adm-card__head">
+    <h3 class="adm-card__title">{{ i18n.t('ig.k.title') }}</h3>
+    <span class="adm-hint">{{ i18n.t('ig.k.hint') }}</span>
+    <button type="button" class="adm-btn adm-btn--primary adm-push" (click)="startNew()"><mat-icon>add</mat-icon>{{ i18n.t('ig.k.new') }}</button>
+  </div>
+  <div class="adm-table-wrap">
+    <table class="adm-table">
+      <thead><tr>
+        <th>{{ i18n.t('ig.k.col.key') }}</th><th>{{ i18n.t('ig.k.col.scopes') }}</th><th>{{ i18n.t('ig.k.col.clients') }}</th>
+        <th>{{ i18n.t('ig.k.col.lastUsed') }}</th><th class="adm-num">{{ i18n.t('ig.k.col.calls') }}</th><th>{{ i18n.t('ig.k.col.expires') }}</th>
+      </tr></thead>
+      <tbody>
+        @for (k of keys(); track k.id) {
+          <tr class="adm-row-click" [attr.aria-current]="selected() === k.id && !draft() && !created()" tabindex="0" (click)="select(k.id)" (keydown.enter)="select(k.id)">
+            <td><b>{{ k.name }}</b><br /><span class="mono adm-muted">{{ k.prefix }}…</span></td>
+            <td>@for (s of k.scopes; track s) { <span class="ik__scope">{{ s }}</span> }</td>
+            <td>{{ clientNames(k) }}</td>
+            <td>{{ k.lastUsedAt ? (k.lastUsedAt | date: 'dd/MM HH:mm') : i18n.t('ig.k.never') }}</td>
+            <td class="adm-num">{{ k.callsWeek }}</td>
+            <td>
+              @switch (k.state) {
+                @case ('revoked') { <span class="text-neutral">{{ i18n.tf('ig.k.revoked', (k.revokedAt | date: 'dd/MM/yyyy') ?? '') }}</span> }
+                @case ('expired') { <span class="text-bad">{{ i18n.tf('ig.k.expired', (k.expiresAt | date: 'dd/MM/yyyy') ?? '') }}</span> }
+                @default {
+                  @if (k.expiresAt) {
+                    {{ k.expiresAt | date: 'dd/MM/yyyy' }}
+                    @if ((daysLeft(k) ?? 999) <= 90) { <br /><span class="text-warn adm-small"><mat-icon>schedule</mat-icon>{{ i18n.tf('ig.k.expiresIn', daysLeft(k) ?? 0) }}</span> }
+                  } @else { {{ i18n.t('ig.k.noExpiry') }} }
+                }
+              }
+            </td>
+          </tr>
+        } @empty {
+          <tr><td colspan="6" class="adm-empty">{{ i18n.t('ig.k.empty') }}</td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="adm-card">
+  @if (draft(); as d) {
+    <div class="adm-card__head"><h3 class="adm-card__title">{{ i18n.t('ig.k.new') }}</h3></div>
+    <div class="adm-card__body ik__body">
+      <div class="ik__two">
+        <label class="adm-field"><span class="adm-label">{{ i18n.t('ig.k.name') }}</span>
+          <input class="adm-input" name="ikName" [placeholder]="i18n.t('ig.k.namePh')" [ngModel]="d.name" (ngModelChange)="patch({ name: $event })" /></label>
+        <label class="adm-field"><span class="adm-label">{{ i18n.t('ig.k.desc') }}</span>
+          <input class="adm-input" name="ikDesc" [placeholder]="i18n.t('ig.k.descPh')" [ngModel]="d.description" (ngModelChange)="patch({ description: $event })" /></label>
+      </div>
+      <div class="adm-field">
+        <span class="adm-label">{{ i18n.t('ig.k.scopes') }}</span>
+        <div class="ik__scopes">
+          @for (s of meta().scopes; track s) {
+            <label class="ik__check"><input type="checkbox" [name]="'ikSc' + s" [checked]="d.scopes.includes(s)" (change)="toggle('scopes', s)" />
+              <span>{{ i18n.t(scopeKey(s)) }}<span class="ik__scope">{{ s }}</span></span></label>
+          }
+        </div>
+      </div>
+      <div class="ik__two">
+        <div class="adm-field">
+          <span class="adm-label">{{ i18n.t('ig.k.clients') }}</span>
+          <span class="ik__line">
+            <button type="button" class="seg" [attr.aria-pressed]="!d.someClients" (click)="patch({ someClients: false })">{{ i18n.t('ig.k.clientsAll') }}</button>
+            <button type="button" class="seg" [attr.aria-pressed]="d.someClients" (click)="patch({ someClients: true })">{{ i18n.t('ig.k.clientsSome') }}</button>
+          </span>
+          @if (d.someClients) {
+            <div class="ik__clients">
+              @for (c of meta().clients; track c.id) {
+                <label class="ik__check"><input type="checkbox" [name]="'ikCl' + c.id" [checked]="d.clientIds.includes(c.id)" (change)="toggle('clientIds', c.id)" /><span>{{ c.name }}</span></label>
+              }
+            </div>
+          }
+        </div>
+        @if (needsArea()) {
+          <label class="adm-field"><span class="adm-label">{{ i18n.t('ig.k.area') }}</span>
+            <select class="adm-input" name="ikArea" [ngModel]="d.areaId" (ngModelChange)="patch({ areaId: $event })">
+              <option value="">{{ i18n.t('ig.k.areaPick') }}</option>
+              @for (a of meta().areas; track a.id) { <option [value]="a.id">{{ a.name }}</option> }
+            </select>
+            <span class="adm-hint">{{ i18n.t('ig.k.areaHint') }}</span></label>
+        }
+      </div>
+      <div class="adm-field">
+        <span class="adm-label">{{ i18n.t('ig.k.expires') }}</span>
+        <span class="ik__line">
+          @for (e of expires; track e) { <button type="button" class="seg" [attr.aria-pressed]="d.expiresInDays === e" (click)="patch({ expiresInDays: e })">{{ i18n.t(expKey(e)) }}</button> }
+        </span>
+      </div>
+      <span class="adm-hint">{{ i18n.t('ig.k.authorHint') }}</span>
+    </div>
+    <footer class="adm-foot">
+      <span class="adm-foot__status">@if (problem(); as p) { <span class="adm-muted">{{ p }}</span> }</span>
+      <button type="button" class="adm-btn adm-push" (click)="draft.set(null)">{{ i18n.t('ig.k.cancel') }}</button>
+      <button type="button" class="adm-btn adm-btn--primary" [disabled]="!!problem() || busy()" (click)="create()"><mat-icon>key</mat-icon>{{ i18n.t('ig.k.create') }}</button>
+    </footer>
+  } @else if (created(); as c) {
+    <div class="adm-card__head"><h3 class="adm-card__title">{{ c.key.name }}</h3><span class="text-ok adm-push ik__state"><mat-icon>check_circle</mat-icon>{{ i18n.t('ig.k.created') }}</span></div>
+    <div class="adm-card__body ik__body">
+      <div class="ik__secret"><code #secretField class="ik__grow">{{ c.secret }}</code>
+        <button type="button" class="adm-btn" (click)="copy(secretField)"><mat-icon>content_copy</mat-icon>{{ i18n.t(copied() ? 'ig.k.copied' : 'ig.k.copy') }}</button></div>
+      <span class="adm-hint">{{ i18n.t('ig.k.onceHint') }}</span>
+      <div class="adm-field"><span class="adm-label">{{ i18n.t('ig.k.tryIt') }}</span><pre class="ik__pre">{{ curl() }}</pre></div>
+    </div>
+    <footer class="adm-foot"><button type="button" class="adm-btn adm-btn--primary adm-push" (click)="done()">{{ i18n.t('ig.k.done') }}</button></footer>
+  } @else if (current(); as k) {
+    <div class="adm-card__head">
+      <h3 class="adm-card__title">{{ k.name }}</h3><span class="mono adm-muted">{{ k.prefix }}…</span>
+      @switch (k.state) {
+        @case ('revoked') { <span class="text-neutral adm-push ik__state"><mat-icon>block</mat-icon>{{ i18n.t('ig.k.statusRevoked') }}</span> }
+        @case ('expired') { <span class="text-bad adm-push ik__state"><mat-icon>event_busy</mat-icon>{{ i18n.t('ig.k.statusExpired') }}</span> }
+        @default { <button type="button" class="adm-btn adm-btn--danger adm-push" (click)="confirmRevoke.set(true)"><mat-icon>block</mat-icon>{{ i18n.t('ig.k.revoke') }}</button> }
+      }
+    </div>
+    <div class="adm-card__body ik__body">
+      @if (confirmRevoke()) {
+        <p class="ik__note" role="alert"><mat-icon>warning</mat-icon><span class="ik__grow">{{ i18n.tf('ig.k.revokeConfirm', k.name) }}</span>
+          <button type="button" class="adm-btn adm-btn--danger" [disabled]="busy()" (click)="revoke()">{{ i18n.t('ig.k.revoke') }}</button>
+          <button type="button" class="adm-btn" (click)="confirmRevoke.set(false)">{{ i18n.t('ig.k.cancel') }}</button></p>
+      }
+      @if (k.description) { <span>{{ k.description }}</span> }
+      <dl class="ik__facts">
+        <dt>{{ i18n.t('ig.k.scopes') }}</dt><dd>@for (s of k.scopes; track s; let last = $last) { {{ i18n.t(scopeKey(s)) }}@if (!last) {, } }</dd>
+        <dt>{{ i18n.t('ig.k.clients') }}</dt><dd>{{ clientNames(k) }}</dd>
+        @if (k.areaName) { <dt>{{ i18n.t('ig.k.area') }}</dt><dd>{{ k.areaName }}</dd> }
+        <dt>{{ i18n.t('ig.k.createdBy') }}</dt><dd>{{ two('ig.k.createdByValue', k.createdByName, (k.createdAt | date: 'dd/MM/yyyy') ?? '') }}</dd>
+        <dt>{{ i18n.t('ig.k.expires') }}</dt><dd>
+          @if (k.state === 'revoked') {
+            {{ k.revokedByName ? two('ig.k.revokedBy', (k.revokedAt | date: 'dd/MM/yyyy') ?? '', k.revokedByName) : i18n.tf('ig.k.revoked', (k.revokedAt | date: 'dd/MM/yyyy') ?? '') }}
+            @if (k.revokeReason) { ({{ k.revokeReason }}) }
+          } @else { {{ k.expiresAt ? (k.expiresAt | date: 'dd/MM/yyyy') : i18n.t('ig.k.noExpiry') }} }
+        </dd>
+      </dl>
+      <div class="adm-field">
+        <span class="adm-label">{{ i18n.t('ig.k.lastCalls') }}</span>
+        @if (requests().length) {
+          <div class="adm-table-wrap"><table class="adm-table">
+            <thead><tr><th>{{ i18n.t('ig.k.col.at') }}</th><th>{{ i18n.t('ig.k.col.call') }}</th><th>{{ i18n.t('ig.k.col.scope') }}</th>
+              <th class="adm-num">{{ i18n.t('ig.k.col.status') }}</th><th class="adm-num">{{ i18n.t('ig.k.col.ms') }}</th><th>{{ i18n.t('ig.k.col.ip') }}</th></tr></thead>
+            <tbody>
+              @for (r of requests(); track $index) {
+                <tr>
+                  <td class="mono">{{ r.at | date: 'dd/MM HH:mm:ss' }}</td>
+                  <td class="mono">{{ r.method }} {{ r.path }}@if (r.note) { <br /><span class="adm-hint">{{ r.note }}</span> }</td>
+                  <td><span class="ik__scope">{{ r.scope ?? '—' }}</span></td>
+                  <td class="adm-num" [class.text-ok]="r.status < 300" [class.text-bad]="r.status >= 400">{{ r.status }}</td>
+                  <td class="adm-num">{{ r.latencyMs }}</td>
+                  <td class="mono">{{ r.ip ?? '—' }}</td>
+                </tr>
+              }
+            </tbody>
+          </table></div>
+        } @else {
+          <span class="adm-hint">{{ i18n.t('ig.k.noCalls') }}</span>
+        }
+      </div>
+    </div>
+  } @else {
+    <p class="adm-empty">{{ i18n.t('ig.k.pick') }}</p>
+  }
+</section>

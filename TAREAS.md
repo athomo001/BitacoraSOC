@@ -25,6 +25,7 @@ Lo hecho, lo que está en revisión y lo que falta hasta el corte. Marca con `[x
 - [x] Gestión CSM (9.4): diseño rehecho con el feedback del CSM (2026-10-19)
 - [ ] Tema Rosa con efecto 8-bit (construido el 2026-10-19, ver CHANGELOG): revisarlo en la app — Dueño
 - [x] Gestión CSM (9.4): la CSM aprobó el diseño rehecho (<https://claude.ai/artifact/MkPD5Eipnsgiy95BPQudob>) — CSM
+- [ ] Probar la 10b (Integraciones): `migrate … up` para la 000052; en Administración → Integraciones crear un destino hacia tu SIEM y «Probar»; crear una llave y probarla con el `curl` que muestra (manual: `docs/api-integraciones.md`) — Dueño
 - [ ] Revisar en la app la Gestión CSM (9.4): antes correr `migrate … up` para la 000051; ponerle a cada cliente su CSM, inicio del servicio y renovación (Gestión → ficha → Datos de la cuenta) — Dueño y CSM
 
 ## Por hacer
@@ -54,7 +55,7 @@ Lo hecho, lo que está en revisión y lo que falta hasta el corte. Marca con `[x
 
 ### Backlog
 - [x] 10a RACI por cliente (hecho el 2026-10-20; ver «En curso»)
-- [ ] 10b Logs a SIEM/SOAR y API externa — falta saber a qué SIEM
+- [x] 10b Reenvío de eventos a un SIEM y API de integraciones (2026-10-21; ver «En curso»)
 - [ ] 10c SSO con Microsoft 365 — un admin del tenant registra la app en Entra ID
 - [x] 10d.1 Tickets de GLPI en la Ticketera, solo para mirar (2026-10-20; ver «En curso»)
 - [ ] 10d.2 De la app a GLPI: comentar en un ticket de GLPI y «Crear en GLPI» — se diseña cuando la 10d.1 esté probada con el GLPI real
@@ -97,3 +98,4 @@ Lo hecho, lo que está en revisión y lo que falta hasta el corte. Marca con `[x
 - [x] Documentación: instalación, operación, API, modelo de datos y guía de uso
 - [x] RACI por cliente como el legacy, con las notas que el ETL perdía (2026-10-20)
 - [x] Tickets de GLPI en la Ticketera, solo para mirar (10d.1, 2026-10-20)
+- [x] Reenvío de eventos a un SIEM y API de integraciones (10b, 2026-10-21)

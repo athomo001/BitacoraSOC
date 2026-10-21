@@ -67,6 +67,8 @@ export interface Ticket {
   /** Dónde nació: los de GLPI se ven y se enlazan, pero se editan en GLPI (spec/18). */
   source: TicketSource;
   glpi?: TicketGlpi;
+  /** Lo abrió una llave de la API de integraciones (spec/19). */
+  apiKeyName?: string;
 }
 
 export type TicketSource = 'app' | 'glpi';

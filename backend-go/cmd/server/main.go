@@ -19,6 +19,7 @@ import (
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/complements"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/crypto"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/eventbus"
+	"github.com/athomo001/BitacoraSOC/backend-go/internal/forward"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/handler"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/middleware"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/modules"
@@ -93,6 +94,10 @@ func run(logger *slog.Logger) error {
 	jwtIssuer := auth.NewJWTIssuer([]byte(jwtSigningKey))
 	auditStore := &repository.AuditStore{Queries: queries}
 	auditLog := audit.NewLogger(auditStore, logger)
+	// Reenvío de eventos a un SIEM (spec/19): todo lo auditado pasa por la cola.
+	hostname, _ := os.Hostname()
+	forwardEmitter := &forward.Emitter{Queries: queries, Logger: logger, Node: hostname}
+	auditStore.After = forwardEmitter.FromAudit
 
 	// ===== Hub SSE genérico (Fase 2) =====
 	eventStore := &repository.EventStore{Queries: queries}
@@ -166,7 +171,7 @@ func run(logger *slog.Logger) error {
 	directoryHandler := &handler.DirectoryHandler{Pool: pool, Queries: queries, Crypto: cryptoBox, AuditLog: auditLog}
 	smtpConfigHandler := &handler.SMTPConfigHandler{Queries: queries, Crypto: cryptoBox, AuditLog: auditLog}
 	// Importación de equipos desde GLPI (spec/16 §5.1, 9.6), detrás de glpi_sync.
-	glpiHandler := &handler.GlpiHandler{Queries: queries, Crypto: cryptoBox, AuditLog: auditLog, Notify: notifier, Inventory: inventoryHandler, Hub: hub}
+	glpiHandler := &handler.GlpiHandler{Queries: queries, Crypto: cryptoBox, AuditLog: auditLog, Notify: notifier, Inventory: inventoryHandler, Hub: hub, Forward: forwardEmitter}
 	escalationHandler := &handler.EscalationHandler{DB: pool, Queries: queries, Crypto: cryptoBox, AuditLog: auditLog, Modules: &repository.ModuleAccess{Queries: queries}}
 	teamsHandler := &handler.TeamsHandler{Pool: pool, Queries: queries, AuditLog: auditLog, NOCEnabled: func(r *http.Request) bool {
 		flags, err := (&repository.ModuleAccess{Queries: queries}).InstanceFlags(r.Context())
@@ -831,6 +836,30 @@ func run(logger *slog.Logger) error {
 	teamHandler.Reports = reportsHandler                            // el resumen mensual usa sus destinatarios válidos
 	managementHandler.Reports = reportsHandler                      // «Exportar resumen» por correo, mismos destinatarios válidos
 	escalationHandler.ClientNotice = managementHandler.WindowNotice // ventana de un cliente → «Avisar al cliente» al CSM
+	// Administración → Integraciones y API de integraciones (spec/19, 10b).
+	integrationsHandler := &handler.IntegrationsHandler{Queries: queries, AuditLog: auditLog, Crypto: cryptoBox, Forward: forwardEmitter, Hostname: hostname}
+	mux.Handle("GET /api/integrations/meta", admin(integrationsHandler.Meta))
+	mux.Handle("GET /api/integrations/destinations", admin(integrationsHandler.ListDestinations))
+	mux.Handle("POST /api/integrations/destinations", admin(integrationsHandler.CreateDestination))
+	mux.Handle("PUT /api/integrations/destinations/{id}", admin(integrationsHandler.UpdateDestination))
+	mux.Handle("DELETE /api/integrations/destinations/{id}", admin(integrationsHandler.DeleteDestination))
+	mux.Handle("POST /api/integrations/destinations/{id}/test", admin(integrationsHandler.TestDestination))
+	mux.Handle("GET /api/integrations/keys", admin(integrationsHandler.ListKeys))
+	mux.Handle("POST /api/integrations/keys", admin(integrationsHandler.CreateKey))
+	mux.Handle("POST /api/integrations/keys/{id}/revoke", admin(integrationsHandler.RevokeKey))
+	mux.Handle("GET /api/integrations/keys/{id}/requests", admin(integrationsHandler.KeyRequests))
+	integrationsAPI := &handler.IntegrationsAPI{Queries: queries, Pool: pool, AuditLog: auditLog, Crypto: cryptoBox,
+		Limiter: ratelimit.NewAPILimiter(600, 15*time.Minute), Tickets: ticketsHandler, Reports: reportsHandler, Hub: hub, AppVersion: os.Getenv("APP_VERSION")}
+	mux.Handle("GET /api/v1", integrationsAPI.Route("", integrationsAPI.Discovery))
+	mux.Handle("GET /api/v1/entries", integrationsAPI.Route("entries:read", integrationsAPI.ListEntries))
+	mux.Handle("GET /api/v1/entries/{id}", integrationsAPI.Route("entries:read", integrationsAPI.GetEntry))
+	mux.Handle("POST /api/v1/entries", integrationsAPI.Route("entries:write", integrationsAPI.CreateEntry))
+	mux.Handle("GET /api/v1/oncall", integrationsAPI.Route("oncall:read", integrationsAPI.OnCall))
+	mux.Handle("GET /api/v1/tickets", integrationsAPI.Route("tickets:read", integrationsAPI.ListTickets))
+	mux.Handle("GET /api/v1/tickets/{ref}", integrationsAPI.Route("tickets:read", integrationsAPI.GetTicket))
+	mux.Handle("POST /api/v1/tickets", integrationsAPI.Route("tickets:write", integrationsAPI.CreateTicket))
+	mux.Handle("POST /api/v1/tickets/{ref}/comments", integrationsAPI.Route("tickets:write", integrationsAPI.CommentTicket))
+	mux.Handle("POST /api/v1/reports/incident", integrationsAPI.Route("", integrationsAPI.IncidentReport))
 	mux.Handle("POST /api/reports/{kind}/preview", authed(reportsHandler.Preview))
 	mux.Handle("POST /api/reports/{kind}/send", operator(reportsHandler.Send))
 	mux.Handle("GET /api/reports/recipients", authed(reportsHandler.Recipients))
@@ -879,6 +908,21 @@ func run(logger *slog.Logger) error {
 	go scheduler.Run(ctx, time.Hour, teamHandler.FreezeMonthly)
 	go scheduler.Run(ctx, time.Minute, notificationsHandler.PublishDue)
 	go scheduler.Run(ctx, time.Hour, notifier.Purge)
+	forwardWorker := &forward.Worker{Queries: queries, Crypto: cryptoBox, Logger: logger, Owner: forward.Owner(hostname), Hostname: hostname,
+		Alert: func(ctx context.Context, down bool, d db.ForwardDestination, detail string) {
+			admins, err := queries.ListAdminUserIDs(ctx)
+			if err != nil || len(admins) == 0 {
+				return
+			}
+			title, body := "El SIEM «"+d.Name+"» volvió a recibir eventos", "Los que esperaban en la cola salen en orden."
+			if down {
+				title, body = "No se pueden enviar eventos a «"+d.Name+"»", detail+" Los eventos esperan en la cola hasta 7 días."
+			}
+			notifier.Send(ctx, admins, handler.NotifMsg{Kind: handler.NotifForwardDown, Title: title, Body: body,
+				Link: "/admin?section=integrations", GroupKey: "forward." + d.ID.String()})
+		}}
+	go scheduler.Run(ctx, 5*time.Second, forwardWorker.Tick)
+	go scheduler.Run(ctx, time.Hour, integrationsAPI.Purge)
 	// GLPI: la importación automática (cada noche a las 02:00 o cada 6 horas).
 	go scheduler.Run(ctx, time.Minute, glpiHandler.AutoTick)
 	go scheduler.Run(ctx, time.Minute, glpiHandler.TicketsAutoTick)

@@ -134,7 +134,7 @@ func (q *Queries) CreateComplement(ctx context.Context, arg CreateComplementPara
 const createComplementEntry = `-- name: CreateComplementEntry :one
 INSERT INTO entries (user_id, entry_type, scope, content, tags, owner_complement_id, owner_complement_name)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, user_id, entry_type, scope, content, tags, service_id, asset_id, work_shift_id, glpi_ticket_id, glpi_linked_at, ticket_id, image_url, image_hash, image_size_bytes, created_at, updated_at, owner_complement_id, owner_complement_name
+RETURNING id, user_id, entry_type, scope, content, tags, service_id, asset_id, work_shift_id, glpi_ticket_id, glpi_linked_at, ticket_id, image_url, image_hash, image_size_bytes, created_at, updated_at, owner_complement_id, owner_complement_name, api_key_id, api_key_name
 `
 
 type CreateComplementEntryParams struct {
@@ -179,6 +179,8 @@ func (q *Queries) CreateComplementEntry(ctx context.Context, arg CreateComplemen
 		&i.UpdatedAt,
 		&i.OwnerComplementID,
 		&i.OwnerComplementName,
+		&i.ApiKeyID,
+		&i.ApiKeyName,
 	)
 	return i, err
 }

@@ -9,7 +9,7 @@
 | Saber qué significa cada variable o ajuste | [Configuración](configuracion.md) |
 | Respaldar, restaurar, actualizar o resolver un problema | [Operación](operacion.md) |
 | Entender cómo está construido | [Arquitectura](arquitectura.md) |
-| Integrarme por API | [API](api.md) |
+| Integrarme por API | [API](api.md) y, para un SIEM, un SOAR o n8n, [API de integraciones y reenvío de eventos](api-integraciones.md) |
 | Programar en el proyecto | [Desarrollo](desarrollo.md) |
 | Ver las tablas y cómo se relacionan | [Modelo de datos](modelo-de-datos.md) |
 | Ver cómo se ve cada correo que envía la app y cuándo sale | [Correos](correos/README.md) |

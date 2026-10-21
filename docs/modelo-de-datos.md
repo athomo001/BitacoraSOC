@@ -2,7 +2,7 @@
 
 > Generado por `backend-go/cmd/er-docs` desde `backend-go/sql/schema/0001_init_schema.sql`, el esquema que usa sqlc, con todas las migraciones aplicadas. **No se edita a mano**: si cambia el esquema, se regenera con `go run ./cmd/er-docs` desde `backend-go/`.
 
-112 tablas en PostgreSQL, agrupadas en 16 dominios. Notación pata de gallo: `||` uno, `|o` / `o|` cero o uno, `o{` cero o muchos. La etiqueta de cada línea es la columna que hace la referencia.
+117 tablas en PostgreSQL, agrupadas en 17 dominios. Notación pata de gallo: `||` uno, `|o` / `o|` cero o uno, `o{` cero o muchos. La etiqueta de cada línea es la columna que hace la referencia.
 
 - Cada entidad muestra todas sus columnas salvo `created_at` y `updated_at`. `PK` clave primaria, `FK` referencia a otra tabla, `UK` valor único.
 - Las tablas de otros dominios aparecen como cajas sin columnas: son la misma tabla, dibujada donde se une.
@@ -13,7 +13,7 @@ Correspondencia con el legacy (MongoDB): [modelo-er-legacy-2.0.md](modelo-er-leg
 
 ## Índice
 
-1. [Usuarios, acceso y permisos](#1-usuarios-acceso-y-permisos) — 9 tablas
+1. [Usuarios, acceso y permisos](#1-usuarios-acceso-y-permisos) — 8 tablas
 2. [Territorio, organizaciones y activos](#2-territorio-organizaciones-y-activos) — 15 tablas
 3. [Directorio de contactos](#3-directorio-de-contactos) — 2 tablas
 4. [Ticketera](#4-ticketera) — 8 tablas
@@ -21,14 +21,15 @@ Correspondencia con el legacy (MongoDB): [modelo-er-legacy-2.0.md](modelo-er-leg
 6. [Turnos, guardias y dotación](#6-turnos-guardias-y-dotación) — 11 tablas
 7. [Agenda](#7-agenda) — 8 tablas
 8. [Gestión CSM](#8-gestión-csm) — 8 tablas
-9. [Notificaciones y avisos con acuse](#9-notificaciones-y-avisos-con-acuse) — 6 tablas
-10. [Checklists](#10-checklists) — 4 tablas
-11. [Bitácora](#11-bitácora) — 5 tablas
-12. [Reportes y avisos por cliente](#12-reportes-y-avisos-por-cliente) — 5 tablas
-13. [Auditoría, notas y alertas de sala](#13-auditoría-notas-y-alertas-de-sala) — 4 tablas
-14. [Configuración y respaldos](#14-configuración-y-respaldos) — 6 tablas
-15. [Complementos](#15-complementos) — 4 tablas
-16. [Ingesta de alertas (después del corte)](#16-ingesta-de-alertas-después-del-corte) — 2 tablas
+9. [Integraciones](#9-integraciones) — 6 tablas
+10. [Notificaciones y avisos con acuse](#10-notificaciones-y-avisos-con-acuse) — 6 tablas
+11. [Checklists](#11-checklists) — 4 tablas
+12. [Bitácora](#12-bitácora) — 5 tablas
+13. [Reportes y avisos por cliente](#13-reportes-y-avisos-por-cliente) — 5 tablas
+14. [Auditoría, notas y alertas de sala](#14-auditoría-notas-y-alertas-de-sala) — 4 tablas
+15. [Configuración y respaldos](#15-configuración-y-respaldos) — 6 tablas
+16. [Complementos](#16-complementos) — 4 tablas
+17. [Ingesta de alertas (después del corte)](#17-ingesta-de-alertas-después-del-corte) — 2 tablas
 
 ---
 
@@ -70,17 +71,6 @@ erDiagram
         uuid jti PK
         uuid user_id FK
         timestamptz expires_at
-    }
-    API_KEYS {
-        uuid id PK
-        text name
-        text key_prefix UK
-        text key_hash
-        text[] scopes
-        boolean active
-        timestamptz last_used_at
-        timestamptz expires_at
-        uuid created_by FK
     }
     PERMISSION_GROUPS {
         uuid id PK
@@ -446,6 +436,8 @@ erDiagram
         int glpi_group_id
         text glpi_group_name
         text glpi_technician
+        uuid api_key_id FK
+        text api_key_name
     }
     TICKET_COMMENTS {
         uuid id PK
@@ -549,6 +541,7 @@ erDiagram
         boolean is_default
     }
 
+    API_KEYS |o--o{ TICKETS : "api_key_id"
     AREAS ||--o{ TICKETS : "area_id"
     AREAS ||--o{ TICKETS : "requested_area_id"
     ASSETS |o--o{ TICKETS : "asset_id"
@@ -1171,7 +1164,103 @@ erDiagram
 
 ---
 
-## 9. Notificaciones y avisos con acuse
+## 9. Integraciones
+
+Reenvío de eventos a un SIEM: los destinos (syslog o HTTP, con qué grupos reciben y su cursor), la cola persistente y las cifras por día. Llaves de la API de integraciones (`/api/v1`) con su registro de llamadas y las Idempotency-Key de 24 horas. Lo creado por una llave lleva `api_key_id` y `api_key_name` en `entries` y `tickets`.
+
+```mermaid
+erDiagram
+    FORWARD_DESTINATIONS {
+        uuid id PK
+        text name
+        boolean enabled
+        text transport
+        text host
+        int port
+        text url
+        text format
+        boolean batch
+        boolean send_audit
+        text audit_level
+        boolean send_entries
+        boolean send_escalation
+        boolean send_tickets
+        text ca_cert
+        text client_cert
+        text client_key_encrypted
+        text[] header_names
+        text headers_encrypted
+        bigint cursor_id
+        timestamptz lease_until
+        text lease_owner
+        timestamptz next_attempt_at
+        int failures
+        timestamptz failing_since
+        boolean down_alerted
+        timestamptz last_sent_at
+        text last_error
+        timestamptz last_error_at
+        uuid created_by FK
+    }
+    FORWARD_OUTBOX {
+        bigserial id PK
+        text grp
+        text level
+        text event
+        jsonb payload
+    }
+    FORWARD_STATS {
+        uuid destination_id PK, FK
+        date day PK
+        int sent
+        int lost
+    }
+    API_KEYS {
+        uuid id PK
+        text name
+        text key_prefix UK
+        text key_hash
+        text[] scopes
+        boolean active
+        timestamptz last_used_at
+        timestamptz expires_at
+        uuid created_by FK
+        text description
+        uuid[] client_ids
+        uuid area_id FK
+        timestamptz revoked_at
+        uuid revoked_by FK
+        text revoke_reason
+    }
+    API_KEY_REQUESTS {
+        bigserial id PK
+        uuid api_key_id FK
+        text key_prefix
+        text method
+        text path
+        text scope
+        int status
+        int latency_ms
+        text ip
+        text note
+    }
+    API_IDEMPOTENCY {
+        uuid api_key_id PK, FK
+        text idem_key PK
+        text request_hash
+        int status
+        bytea body
+    }
+
+    API_KEYS |o--o{ API_KEY_REQUESTS : "api_key_id"
+    API_KEYS ||--o{ API_IDEMPOTENCY : "api_key_id"
+    AREAS |o--o{ API_KEYS : "area_id"
+    FORWARD_DESTINATIONS ||--o{ FORWARD_STATS : "destination_id"
+```
+
+---
+
+## 10. Notificaciones y avisos con acuse
 
 La campana de cada persona, sus preferencias, lo que fija el admin, los avisos de la Agenda ya enviados y los avisos con acuse de lectura con quién los leyó.
 
@@ -1235,7 +1324,7 @@ erDiagram
 
 ---
 
-## 10. Checklists
+## 11. Checklists
 
 Plantillas de checklist de inicio y cierre de turno y sus ejecuciones.
 
@@ -1287,7 +1376,7 @@ erDiagram
 
 ---
 
-## 11. Bitácora
+## 12. Bitácora
 
 Entradas, comentarios, adjuntos, borradores y eventos del sistema.
 
@@ -1311,6 +1400,8 @@ erDiagram
         int image_size_bytes
         uuid owner_complement_id FK
         text owner_complement_name
+        uuid api_key_id FK
+        text api_key_name
     }
     ENTRY_COMMENTS {
         uuid id PK
@@ -1343,6 +1434,7 @@ erDiagram
         jsonb payload
     }
 
+    API_KEYS |o--o{ ENTRIES : "api_key_id"
     ASSETS |o--o{ ENTRIES : "asset_id"
     COMPLEMENTS |o--o{ ENTRIES : "owner_complement_id"
     ENTRIES |o--o{ ENTRY_ATTACHMENTS : "entry_id"
@@ -1357,7 +1449,7 @@ erDiagram
 
 ---
 
-## 12. Reportes y avisos por cliente
+## 13. Reportes y avisos por cliente
 
 Historial de reportes enviados, tipos de operación, eventos del informe y las reglas de aviso por cliente con su acuse.
 
@@ -1428,7 +1520,7 @@ erDiagram
 
 ---
 
-## 13. Auditoría, notas y alertas de sala
+## 14. Auditoría, notas y alertas de sala
 
 Registro de auditoría (solo se agrega), notas del admin y personales, y alertas programadas en pantalla.
 
@@ -1492,7 +1584,7 @@ erDiagram
 
 ---
 
-## 14. Configuración y respaldos
+## 15. Configuración y respaldos
 
 Configuración única de la instalación, correo, marca, funcionalidades activables y respaldos.
 
@@ -1610,7 +1702,7 @@ erDiagram
 
 ---
 
-## 15. Complementos
+## 16. Complementos
 
 Complementos instalados, sus archivos y su almacenamiento.
 
@@ -1672,7 +1764,7 @@ erDiagram
 
 ---
 
-## 16. Ingesta de alertas (después del corte)
+## 17. Ingesta de alertas (después del corte)
 
 Tablas creadas para la ingesta de alertas del backlog posterior al corte; todavía sin uso.
 

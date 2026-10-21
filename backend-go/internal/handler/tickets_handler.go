@@ -97,10 +97,12 @@ type ticketDTO struct {
 	UpdatedAt           time.Time  `json:"updatedAt"`
 	// Source: app | glpi (los de GLPI son solo para mirar, spec/18).
 	Source string `json:"source"`
+	// APIKeyName: lo abrió una llave de la API de integraciones (spec/19).
+	APIKeyName *string `json:"apiKeyName,omitempty"`
 }
 
 func toTicketDTO(t db.Ticket, exposeToken bool) ticketDTO {
-	d := ticketDTO{ID: t.ID, TicketNumber: t.TicketNumber, TicketType: string(t.TicketType), Scope: string(t.Scope), ClientID: t.ClientID, AssetID: uuidPtr(t.AssetID), ServiceID: uuidPtr(t.ServiceID), AssignedTeamID: uuidPtr(t.AssignedTeamID), AssignedUserID: uuidPtr(t.AssignedUserID), Status: string(t.Status), Impact: string(t.Impact), Urgency: string(t.Urgency), Priority: string(t.Priority), Title: t.Title, Description: t.Description, SLAPausedSeconds: t.SlaPausedSeconds, ReopenedCount: t.ReopenedCount}
+	d := ticketDTO{ID: t.ID, TicketNumber: t.TicketNumber, TicketType: string(t.TicketType), Scope: string(t.Scope), ClientID: t.ClientID, AssetID: uuidPtr(t.AssetID), ServiceID: uuidPtr(t.ServiceID), AssignedTeamID: uuidPtr(t.AssignedTeamID), AssignedUserID: uuidPtr(t.AssignedUserID), Status: string(t.Status), Impact: string(t.Impact), Urgency: string(t.Urgency), Priority: string(t.Priority), Title: t.Title, Description: t.Description, SLAPausedSeconds: t.SlaPausedSeconds, ReopenedCount: t.ReopenedCount, APIKeyName: textPtr(t.ApiKeyName)}
 	if t.SlaResponseDueAt.Valid {
 		v := t.SlaResponseDueAt.Time
 		d.SLAResponseDueAt = &v

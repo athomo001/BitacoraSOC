@@ -179,7 +179,7 @@ func (q *Queries) CountShiftChecksForTemplate(ctx context.Context, checklistTemp
 
 const createChecklistEntry = `-- name: CreateChecklistEntry :one
 INSERT INTO entries (user_id, entry_type, scope, content, tags, work_shift_id)
-VALUES ($1, 'checklist', 'general', $2, $3, $4) RETURNING id, user_id, entry_type, scope, content, tags, service_id, asset_id, work_shift_id, glpi_ticket_id, glpi_linked_at, ticket_id, image_url, image_hash, image_size_bytes, created_at, updated_at, owner_complement_id, owner_complement_name
+VALUES ($1, 'checklist', 'general', $2, $3, $4) RETURNING id, user_id, entry_type, scope, content, tags, service_id, asset_id, work_shift_id, glpi_ticket_id, glpi_linked_at, ticket_id, image_url, image_hash, image_size_bytes, created_at, updated_at, owner_complement_id, owner_complement_name, api_key_id, api_key_name
 `
 
 type CreateChecklistEntryParams struct {
@@ -217,6 +217,8 @@ func (q *Queries) CreateChecklistEntry(ctx context.Context, arg CreateChecklistE
 		&i.UpdatedAt,
 		&i.OwnerComplementID,
 		&i.OwnerComplementName,
+		&i.ApiKeyID,
+		&i.ApiKeyName,
 	)
 	return i, err
 }

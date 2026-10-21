@@ -29,6 +29,7 @@ const (
 	NotifTicketComment  = "ticket.comment"
 	NotifInventoryReq   = "inventory.request"
 	NotifGlpiImport     = "glpi.import"
+	NotifForwardDown    = "forward.down"
 	NotifWindow         = "window"
 	NotifNotice         = "notice"
 )
@@ -57,6 +58,8 @@ var notifKinds = []notifKind{
 	{NotifInventoryReq, true, false, false, true},
 	// Importación automática desde GLPI que falló o retuvo bajas (solo admin).
 	{NotifGlpiImport, true, false, false, true},
+	// Un destino del reenvío a un SIEM no recibe eventos hace 15 minutos, o volvió (solo admin).
+	{NotifForwardDown, true, false, false, true},
 	{NotifWindow, false, false, false, true},
 	// El aviso con acuse se muestra como ventana: no tiene emergente ni correo propio.
 	{NotifNotice, false, false, false, false},

@@ -14,6 +14,7 @@ import (
 
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/audit"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/crypto"
+	"github.com/athomo001/BitacoraSOC/backend-go/internal/forward"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/glpi"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/problemdetails"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/repository/db"
@@ -50,6 +51,8 @@ type GlpiHandler struct {
 	Open func(context.Context, glpi.Config) (*glpi.Session, error)
 	// Hub avisa por SSE que llegaron tickets de GLPI (la Ticketera se refresca).
 	Hub eventPublisher
+	// Forward manda al SIEM los tickets de GLPI que llegaron o cambiaron (spec/19).
+	Forward *forward.Emitter
 	// SyncWait: «Sincronizar ahora» espera a que termine (en las pruebas).
 	SyncWait bool
 

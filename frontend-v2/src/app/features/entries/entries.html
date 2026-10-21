@@ -83,7 +83,7 @@
                 @if (entry.imageUrl) { <mat-icon class="en__clip" [title]="i18n.t('entries.hasImage')">attach_file</mat-icon> }
                 @for (tag of entry.tags; track tag) { <span class="pill tone-neutral en__tag">{{ tag }}</span> }
               </td>
-              <td class="en__author">{{ entry.authorUsername }}</td>
+              <td class="en__author">{{ entry.authorUsername }}@if (entry.apiKeyName) { <span class="en__api">API · {{ entry.apiKeyName }}</span> }</td>
             </tr>
           }
         </tbody>
@@ -194,7 +194,7 @@
           <button type="button" class="adm-icon-btn en__push" [attr.aria-label]="i18n.t('common.close')" (click)="closePanel()"><mat-icon>close</mat-icon></button>
         </div>
         <div class="en__side-body">
-          <p class="adm-small adm-secondary">{{ entry.authorUsername }} · <span class="mono">{{ entry.createdAt | date: 'dd/MM/yyyy HH:mm' }}</span>@if (targetName(entry) !== '—') { · {{ targetName(entry) }} }</p>
+          <p class="adm-small adm-secondary">{{ entry.authorUsername }}@if (entry.apiKeyName) { (API · {{ entry.apiKeyName }}) } · <span class="mono">{{ entry.createdAt | date: 'dd/MM/yyyy HH:mm' }}</span>@if (targetName(entry) !== '—') { · {{ targetName(entry) }} }</p>
           <app-markdown [content]="entry.content" />
           @if (entry.imageUrl) { <img class="en__detail-img" [appAuthSrc]="entry.imageUrl" [alt]="i18n.t('entries.evidence')" /> }
           @if (entry.tags.length) {

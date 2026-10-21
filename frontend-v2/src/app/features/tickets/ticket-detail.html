@@ -9,6 +9,7 @@
         <span class="td__glpi">GLPI</span>
         @if (g.url) { <a class="adm-btn td__glpi-open" [href]="g.url" target="_blank" rel="noopener"><mat-icon>open_in_new</mat-icon>{{ i18n.t('tickets.glpi.open') }}</a> }
       }
+      @if (t.apiKeyName) { <span class="pill tone-neutral">API · {{ t.apiKeyName }}</span> }
     </div>
     <h2 class="td__title">{{ t.title }}</h2>
     @if (t.glpi; as g) {

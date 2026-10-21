@@ -1331,17 +1331,46 @@ type AlertIngestionRule struct {
 	CreatedAt        pgtype.Timestamptz `json:"created_at"`
 }
 
+type ApiIdempotency struct {
+	ApiKeyID    uuid.UUID          `json:"api_key_id"`
+	IdemKey     string             `json:"idem_key"`
+	RequestHash string             `json:"request_hash"`
+	Status      int32              `json:"status"`
+	Body        []byte             `json:"body"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+}
+
 type ApiKey struct {
-	ID         uuid.UUID          `json:"id"`
-	Name       string             `json:"name"`
-	KeyPrefix  string             `json:"key_prefix"`
-	KeyHash    string             `json:"key_hash"`
-	Scopes     []string           `json:"scopes"`
-	Active     bool               `json:"active"`
-	LastUsedAt pgtype.Timestamptz `json:"last_used_at"`
-	ExpiresAt  pgtype.Timestamptz `json:"expires_at"`
-	CreatedBy  pgtype.UUID        `json:"created_by"`
-	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+	ID           uuid.UUID          `json:"id"`
+	Name         string             `json:"name"`
+	KeyPrefix    string             `json:"key_prefix"`
+	KeyHash      string             `json:"key_hash"`
+	Scopes       []string           `json:"scopes"`
+	Active       bool               `json:"active"`
+	LastUsedAt   pgtype.Timestamptz `json:"last_used_at"`
+	ExpiresAt    pgtype.Timestamptz `json:"expires_at"`
+	CreatedBy    pgtype.UUID        `json:"created_by"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	Description  string             `json:"description"`
+	ClientIds    []uuid.UUID        `json:"client_ids"`
+	AreaID       pgtype.UUID        `json:"area_id"`
+	RevokedAt    pgtype.Timestamptz `json:"revoked_at"`
+	RevokedBy    pgtype.UUID        `json:"revoked_by"`
+	RevokeReason pgtype.Text        `json:"revoke_reason"`
+}
+
+type ApiKeyRequest struct {
+	ID        int64              `json:"id"`
+	ApiKeyID  pgtype.UUID        `json:"api_key_id"`
+	KeyPrefix pgtype.Text        `json:"key_prefix"`
+	Method    string             `json:"method"`
+	Path      string             `json:"path"`
+	Scope     pgtype.Text        `json:"scope"`
+	Status    int32              `json:"status"`
+	LatencyMs int32              `json:"latency_ms"`
+	Ip        pgtype.Text        `json:"ip"`
+	Note      pgtype.Text        `json:"note"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
 
 type AppBranding struct {
@@ -1733,6 +1762,8 @@ type Entry struct {
 	UpdatedAt           pgtype.Timestamptz `json:"updated_at"`
 	OwnerComplementID   pgtype.UUID        `json:"owner_complement_id"`
 	OwnerComplementName pgtype.Text        `json:"owner_complement_name"`
+	ApiKeyID            pgtype.UUID        `json:"api_key_id"`
+	ApiKeyName          pgtype.Text        `json:"api_key_name"`
 }
 
 type EntryAttachment struct {
@@ -1838,6 +1869,57 @@ type EscalationStep struct {
 	Mode                      EscalationMode `json:"mode"`
 	WaitBeforeEscalateMinutes int32          `json:"wait_before_escalate_minutes"`
 	Title                     pgtype.Text    `json:"title"`
+}
+
+type ForwardDestination struct {
+	ID                 uuid.UUID          `json:"id"`
+	Name               string             `json:"name"`
+	Enabled            bool               `json:"enabled"`
+	Transport          string             `json:"transport"`
+	Host               pgtype.Text        `json:"host"`
+	Port               pgtype.Int4        `json:"port"`
+	Url                pgtype.Text        `json:"url"`
+	Format             string             `json:"format"`
+	Batch              bool               `json:"batch"`
+	SendAudit          bool               `json:"send_audit"`
+	AuditLevel         string             `json:"audit_level"`
+	SendEntries        bool               `json:"send_entries"`
+	SendEscalation     bool               `json:"send_escalation"`
+	SendTickets        bool               `json:"send_tickets"`
+	CaCert             pgtype.Text        `json:"ca_cert"`
+	ClientCert         pgtype.Text        `json:"client_cert"`
+	ClientKeyEncrypted pgtype.Text        `json:"client_key_encrypted"`
+	HeaderNames        []string           `json:"header_names"`
+	HeadersEncrypted   pgtype.Text        `json:"headers_encrypted"`
+	CursorID           int64              `json:"cursor_id"`
+	LeaseUntil         pgtype.Timestamptz `json:"lease_until"`
+	LeaseOwner         pgtype.Text        `json:"lease_owner"`
+	NextAttemptAt      pgtype.Timestamptz `json:"next_attempt_at"`
+	Failures           int32              `json:"failures"`
+	FailingSince       pgtype.Timestamptz `json:"failing_since"`
+	DownAlerted        bool               `json:"down_alerted"`
+	LastSentAt         pgtype.Timestamptz `json:"last_sent_at"`
+	LastError          pgtype.Text        `json:"last_error"`
+	LastErrorAt        pgtype.Timestamptz `json:"last_error_at"`
+	CreatedBy          pgtype.UUID        `json:"created_by"`
+	CreatedAt          pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
+}
+
+type ForwardOutbox struct {
+	ID        int64              `json:"id"`
+	Grp       string             `json:"grp"`
+	Level     string             `json:"level"`
+	Event     string             `json:"event"`
+	Payload   []byte             `json:"payload"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
+type ForwardStat struct {
+	DestinationID uuid.UUID   `json:"destination_id"`
+	Day           pgtype.Date `json:"day"`
+	Sent          int32       `json:"sent"`
+	Lost          int32       `json:"lost"`
 }
 
 type GlpiConfig struct {
@@ -2532,6 +2614,8 @@ type Ticket struct {
 	GlpiGroupID                   pgtype.Int4        `json:"glpi_group_id"`
 	GlpiGroupName                 pgtype.Text        `json:"glpi_group_name"`
 	GlpiTechnician                pgtype.Text        `json:"glpi_technician"`
+	ApiKeyID                      pgtype.UUID        `json:"api_key_id"`
+	ApiKeyName                    pgtype.Text        `json:"api_key_name"`
 }
 
 type TicketComment struct {
