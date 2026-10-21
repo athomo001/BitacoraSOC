@@ -62,6 +62,8 @@ export class GoalDetailComponent {
   protected readonly reopening = signal(false);
   protected readonly newDate = signal('');
   protected readonly confirmDelete = signal(false);
+  protected readonly failing = signal(false);
+  protected readonly failReason = signal('');
 
   protected readonly goalTone = GOAL_TONE;
   protected readonly goalIcon = GOAL_ICON;
@@ -77,7 +79,7 @@ export class GoalDetailComponent {
     const g = this.goal();
     return !!g && g.evidenceRequired && g.evidenceCount === 0;
   });
-  protected readonly closed = computed(() => ['done', 'failed'].includes(this.goal()?.state ?? ''));
+  protected readonly closed = computed(() => ['done', 'failed', 'not_needed'].includes(this.goal()?.state ?? ''));
 
   constructor() {
     effect(() => {
@@ -111,6 +113,16 @@ export class GoalDetailComponent {
     } finally {
       this.busy.set(false);
     }
+  }
+
+  /** Rindió y no pasó: queda el dato y sigue la regla de la persona. */
+  protected async markNotAchieved(): Promise<void> {
+    const g = this.goal();
+    const reason = this.failReason().trim();
+    if (!g || !reason) return;
+    await this.run(() => this.api.notAchieved(g.id, reason));
+    this.failing.set(false);
+    this.failReason.set('');
   }
 
   protected date(iso: string): string {

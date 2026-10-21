@@ -13,6 +13,7 @@
 </header>
 
 @if (error(); as message) { <p class="msg msg--error" role="alert">{{ message }}</p> }
+@if (notice(); as message) { <p class="msg msg--ok" role="status">{{ message }}</p> }
 
 @if (tab() === 'users') {
   <div class="aa">
@@ -32,6 +33,7 @@
                   <span class="aa-user">
                     <span class="aa-avatar" aria-hidden="true">{{ (user.fullName || user.username).charAt(0).toUpperCase() }}</span>
                     <span><strong>{{ user.username }}</strong><small>{{ user.fullName || user.email }}</small></span>
+                    @if (noArea().has(user.id)) { <span class="pill tone-warn" [attr.title]="i18n.t('access.noAreaHint')">{{ i18n.t('access.noArea') }}</span> }
                   </span>
                 </td>
                 <td><span class="pill" [class.tone-system]="user.role === 'admin'" [class.tone-info]="user.role === 'auditor'" [class.tone-neutral]="user.role === 'user'">{{ i18n.t(roleKey(user.role)) }}</span></td>
@@ -142,12 +144,12 @@
             @if (user.mustChangePassword) { <span class="aa__inline text-warn"><mat-icon>key</mat-icon>{{ i18n.t('access.pendingPassword') }}</span> }
             <span class="aa__seg-row">
               <button type="button" class="aa-btn" [disabled]="user.mustChangePassword" (click)="forcePasswordChange(user)">{{ i18n.t('access.forcePassword') }}</button>
-              @if (user.active) {
-                <button type="button" class="aa-btn aa-btn--danger-text" [disabled]="isMe()" (click)="setActive(user, false)">{{ i18n.t('access.deactivate') }}</button>
-              } @else {
+              @if (!user.active) {
                 <button type="button" class="aa-btn" (click)="setActive(user, true)">{{ i18n.t('access.activate') }}</button>
               }
             </span>
+            <app-user-retire [userId]="user.id" [name]="user.fullName || user.username" [active]="user.active" [isMe]="isMe()"
+              (block)="setActive(user, false)" (removed)="onRemoved(user, $event)" />
           </div>
         </div>
       </section>

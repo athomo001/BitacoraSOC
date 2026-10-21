@@ -269,7 +269,7 @@ func (h *TeamHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 	onGuard := func(id uuid.UUID, day time.Time) bool {
 		for _, s := range slots {
-			if s.UserID.Valid && uuid.UUID(s.UserID.Bytes) == id &&
+			if s.UserID.Valid && s.MemberActive && uuid.UUID(s.UserID.Bytes) == id &&
 				!day.Before(s.WeekStartDate.Time) && !day.After(s.WeekEndDate.Time) {
 				return true
 			}

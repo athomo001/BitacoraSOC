@@ -70,6 +70,8 @@ export interface MonthlyPerson {
   tickets: number;
   ticketsSla: number;
   absentDays: number;
+  /** Metas propias cumplidas en el mes (las del bono, confirmadas). */
+  goalsDone?: number;
 }
 
 export interface MonthlySummary {

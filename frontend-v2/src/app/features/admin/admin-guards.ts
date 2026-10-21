@@ -203,9 +203,9 @@ export class AdminGuardsComponent implements OnInit {
       const bars = mine.map((m, i) => ({
         id: m.slot.id,
         slot: m.slot,
-        label: m.slot.name,
-        title: `${m.slot.name} · ${this.f(m.from)} → ${this.f(m.to)}`,
-        state: m.slot.paused ? 'paused' : m.to <= now ? 'past' : m.from <= now ? 'now' : 'next',
+        label: m.slot.blocked ? this.fill('guards.blocked', { p: m.slot.name }) : m.slot.name,
+        title: `${m.slot.blocked ? this.fill('guards.blocked', { p: m.slot.name }) : m.slot.name} · ${this.f(m.from)} → ${this.f(m.to)}`,
+        state: m.slot.paused || m.slot.blocked ? 'paused' : m.to <= now ? 'past' : m.from <= now ? 'now' : 'next',
         selected: m.slot.id === selectedId,
         left: this.pct(m.from),
         width: Math.max(this.pct(m.to) - this.pct(m.from), 0.6),
@@ -223,7 +223,7 @@ export class AdminGuardsComponent implements OnInit {
         top: 8 + laneOf[mine.length + i] * 24,
         h,
       }));
-      const covered = mine.filter((m) => !m.slot.paused).map((m) => ({ from: m.from, to: m.to }));
+      const covered = mine.filter((m) => !m.slot.paused && !m.slot.blocked).map((m) => ({ from: m.from, to: m.to }));
       const holes = guard.mustBeCovered
         ? gaps(covered, Math.max(a, now), b).map((g) => ({
             ...g,
@@ -242,7 +242,7 @@ export class AdminGuardsComponent implements OnInit {
 
   private slotsOf(cycleId: string): (GuardSlot & { from: number; to: number })[] {
     return (this.upcoming()?.slots ?? [])
-      .filter((s) => s.cycleId === cycleId && !s.paused)
+      .filter((s) => s.cycleId === cycleId && !s.paused && !s.blocked)
       .map((s) => ({ ...s, ...interval(s) }))
       .sort((x, y) => x.from - y.from);
   }

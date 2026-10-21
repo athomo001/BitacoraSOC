@@ -114,9 +114,15 @@
       <div class="adm-tabs" role="tablist">
         <button type="button" role="tab" class="adm-tab" [attr.aria-selected]="tab() === 'summary'" (click)="tab.set('summary')">{{ i18n.t('mg.ct.summary') }}</button>
         <button type="button" role="tab" class="adm-tab" [attr.aria-selected]="tab() === 'timeline'" (click)="tab.set('timeline')">{{ i18n.t('mg.ct.timeline') }}</button>
+        @if (meta().gestion) {
+          <button type="button" role="tab" class="adm-tab" [attr.aria-selected]="tab() === 'notes'" (click)="tab.set('notes')">{{ i18n.t('mg.ct.notes') }} <span class="adm-cnt">{{ notesCount() ?? d.notesCount ?? 0 }}</span></button>
+        }
         <button type="button" class="mc__link mc__push" (click)="goPlaybook('qbr')"><mat-icon>library_add_check</mat-icon>{{ i18n.t('mg.applyPb') }}</button>
       </div>
 
+      @if (tab() === 'notes' && meta().gestion) {
+        <app-mgmt-notes [clientId]="d.client.id" (count)="notesCount.set($event)" (action)="newAction(undefined, false, $event)" />
+      }
       @if (tab() === 'timeline') {
         <div class="mc__tl">
           @for (e of d.timeline; track $index) {

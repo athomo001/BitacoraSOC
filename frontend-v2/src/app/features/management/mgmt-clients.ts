@@ -14,6 +14,7 @@ import {
   GOAL_TONE, HEALTH_ICON, HEALTH_RANK, HEALTH_TONE, contactText, day, durationText, goalStateKey, healthKey, kindKey, pct, reasonText,
 } from './mgmt-format';
 import { ActionDialogComponent, ActionDialogData } from './action-dialog';
+import { MgmtNotesComponent } from './mgmt-notes';
 import { AccountDialogComponent, AccountDialogData } from './account-dialog';
 import { ExportDialogComponent, ExportDialogData } from './export-dialog';
 import { GoalDialogComponent, GoalDialogData } from './goal-dialog';
@@ -42,7 +43,7 @@ interface RenewalView {
 @Component({
   selector: 'app-mgmt-clients',
   standalone: true,
-  imports: [DatePipe, MatIconModule, RouterLink],
+  imports: [DatePipe, MatIconModule, RouterLink, MgmtNotesComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './mgmt-clients.html',
   styleUrl: './mgmt-clients.css',
@@ -66,7 +67,9 @@ export class MgmtClientsComponent {
   protected readonly query = signal('');
   protected readonly selected = signal<string | null>(null);
   protected readonly detail = signal<MgmtClientDetail | null>(null);
-  protected readonly tab = signal<'summary' | 'timeline'>('summary');
+  protected readonly tab = signal<'summary' | 'timeline' | 'notes'>('summary');
+  /** Cuántas notas internas tiene el cliente (la pestaña lo muestra). */
+  protected readonly notesCount = signal<number | null>(null);
   protected readonly error = signal<string | null>(null);
   protected readonly busy = signal(false);
 
@@ -152,6 +155,7 @@ export class MgmtClientsComponent {
   protected select(id: string | null): void {
     this.selected.set(id);
     this.tab.set('summary');
+    this.notesCount.set(null);
     if (id) void this.loadDetail(id);
     else this.detail.set(null);
   }
@@ -258,10 +262,10 @@ export class MgmtClientsComponent {
     return c ? { id: c.id, name: c.name } : null;
   }
 
-  protected newAction(ticket?: MgmtTicket, meeting = false): void {
+  protected newAction(ticket?: MgmtTicket, meeting = false, name?: string): void {
     const client = this.clientRef();
     if (!client) return;
-    const data: ActionDialogData = { client, ticket: ticket ? { id: ticket.id, number: ticket.number } : undefined, meeting };
+    const data: ActionDialogData = { client, ticket: ticket ? { id: ticket.id, number: ticket.number } : undefined, meeting, name };
     this.dialog.open<boolean>(ActionDialogComponent, { data, ariaLabel: this.i18n.t(ticket ? 'mg.act.follow' : 'mg.act.new') })
       .closed.subscribe((ok) => ok && this.refreshAll());
   }

@@ -47,13 +47,23 @@ export interface GoalDialogData {
         @switch (scope()) {
           @case ('person') {
             @if (!editing) {
-              @if (data.meta.people.length) {
+              @if (data.meta.people.length || canExternal) {
                 <label class="field"><span>{{ i18n.t('mg.g.person') }}</span>
                   <select name="gPerson" (change)="person.set(val($event))">
                     @for (p of people(); track p.id) { <option [value]="p.id" [selected]="person() === p.id">{{ p.name }} ({{ p.label }})</option> }
+                    @if (canExternal) { <option [value]="EXTERNAL" [selected]="external()">{{ i18n.t('mg.gf.external') }}</option> }
                   </select>
                   @if (personName(); as n) { <span class="gd__hint">{{ i18n.tf('mg.gf.personHint', n) }}</span> }
                 </label>
+                @if (external()) {
+                  <div class="field-grid">
+                    <label class="field"><span>{{ i18n.t('mg.gf.extName') }}</span>
+                      <input name="gExtName" maxlength="120" autocomplete="off" [value]="extName()" (input)="extName.set(val($event))" /></label>
+                    <label class="field"><span>{{ i18n.t('mg.gf.extEmail') }}</span>
+                      <input name="gExtEmail" type="email" maxlength="254" autocomplete="off" [value]="extEmail()" (input)="extEmail.set(val($event))" /></label>
+                  </div>
+                  <span class="gd__hint">{{ i18n.t('mg.gf.extHint') }}</span>
+                }
               } @else {
                 <p class="gd__hint">{{ i18n.t('mg.gf.noPeople') }}</p>
               }
@@ -68,6 +78,7 @@ export interface GoalDialogData {
                 <button type="button" class="seg" [attr.aria-pressed]="bonus() === ''" (click)="bonus.set('')">{{ i18n.t('mg.gf.bonusNo') }}</button>
                 <button type="button" class="seg" [attr.aria-pressed]="bonus() === 'primary'" (click)="bonus.set('primary')">{{ i18n.t('mg.gf.bonusPrimary') }}</button>
                 <button type="button" class="seg" [attr.aria-pressed]="bonus() === 'secondary'" (click)="bonus.set('secondary')">{{ i18n.t('mg.gf.bonusSecondary') }}</button>
+                <button type="button" class="seg" [attr.aria-pressed]="bonus() === 'tertiary'" (click)="bonus.set('tertiary')">{{ i18n.t('mg.gf.bonusTertiary') }}</button>
               </div>
               @if (bonus()) { <span class="gd__hint">{{ i18n.t('mg.gf.bonusHint') }}</span> }
             </div>
@@ -160,6 +171,10 @@ export class GoalDialogComponent {
   private readonly api = inject(ManagementService);
 
   protected readonly editing = !!this.data.goal;
+  /** Opción «Alguien sin cuenta» del selector de persona. */
+  protected readonly EXTERNAL = '__external';
+  /** Una meta para alguien sin cuenta la registran el admin o una jefatura. */
+  protected readonly canExternal = this.data.meta.admin || this.data.meta.leadAreas.length > 0;
   protected readonly kinds: GoalKind[] = ['certification', 'action', 'other'];
   private readonly g = this.data.goal;
   private readonly p = this.data.preset ?? {};
@@ -167,7 +182,10 @@ export class GoalDialogComponent {
   protected readonly scope = signal<GoalScope>(this.g?.scope ?? this.p.scope ?? (this.data.meta.people.length && !this.p.clientId ? 'person' : 'client'));
   protected readonly client = signal(this.g?.clientId ?? this.p.clientId ?? '');
   protected readonly area = signal(this.g?.areaId ?? '');
-  protected readonly person = signal(this.g?.personId ?? this.p.personId ?? this.data.meta.people[0]?.id ?? '');
+  protected readonly person = signal(this.g?.personId ?? this.p.personId ?? this.data.meta.people[0]?.id ?? (this.canExternal ? this.EXTERNAL : ''));
+  protected readonly external = computed(() => this.person() === this.EXTERNAL);
+  protected readonly extName = signal('');
+  protected readonly extEmail = signal('');
   protected readonly kind = signal<GoalKind>(this.g?.kind ?? 'certification');
   protected readonly bonus = signal<GoalBonus | ''>(this.g?.bonus ?? (this.g ? '' : 'primary'));
   protected readonly name = signal(this.g?.name ?? '');
@@ -184,7 +202,7 @@ export class GoalDialogComponent {
   protected readonly people = computed(() => {
     const by = new Map<string, { id: string; name: string; label: string }>();
     for (const p of this.data.meta.people) {
-      const label = [p.areaName, p.level].filter(Boolean).join(' ');
+      const label = p.areaId ? [p.areaName, p.level].filter(Boolean).join(' ') : this.i18n.t('mg.gf.noAreaPerson');
       const cur = by.get(p.id);
       by.set(p.id, cur ? { ...cur, label: `${cur.label}, ${label}` } : { id: p.id, name: p.name, label });
     }
@@ -199,7 +217,7 @@ export class GoalDialogComponent {
     switch (this.scope()) {
       case 'client': return !!this.client();
       case 'area': return !!this.area();
-      case 'person': return !!this.person();
+      case 'person': return this.external() ? !!this.extName().trim() && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(this.extEmail().trim()) : !!this.person();
     }
   });
 
@@ -253,7 +271,11 @@ export class GoalDialogComponent {
     };
     if (scope === 'client') Object.assign(input, { clientId: this.client(), areaId: this.area() || undefined });
     if (scope === 'area') input.areaId = this.area();
-    if (scope === 'person') Object.assign(input, { personId: this.person(), kind: this.kind(), bonus: this.bonus() });
+    if (scope === 'person') {
+      Object.assign(input, { kind: this.kind(), bonus: this.bonus() });
+      if (this.external()) Object.assign(input, { personName: this.extName().trim(), personEmail: this.extEmail().trim() });
+      else input.personId = this.person();
+    }
     if (this.g?.ownerId && scope !== 'person') input.ownerId = this.g.ownerId;
     try {
       const saved = this.g ? await this.api.updateGoal(this.g.id, input) : await this.api.createGoal(input);

@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
+import { ActivatedRoute } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { AgendaMeta, AgendaOccurrence, AgendaService, AgendaTask, CalendarWindow } from '../../core/agenda/agenda.service';
 import { Organization, OrganizationsService } from '../../core/organizations/organizations.service';
@@ -62,6 +63,7 @@ export class AgendaComponent implements OnInit {
   protected readonly buckets = BUCKETS;
   protected readonly skipReasons = SKIP_REASONS;
   protected readonly tab = signal<Tab>('mine');
+  private readonly route = inject(ActivatedRoute, { optional: true });
   protected readonly meta = signal<AgendaMeta | null>(null);
   protected readonly error = signal<string | null>(null);
   protected readonly loaded = signal(false);
@@ -153,6 +155,9 @@ export class AgendaComponent implements OnInit {
   });
 
   async ngOnInit(): Promise<void> {
+    // ?tab=goals: el enlace de los avisos de una meta abre «Mis metas».
+    const tab = this.route?.snapshot.queryParamMap.get('tab');
+    if (tab === 'goals' || tab === 'calendar') this.tab.set(tab);
     try {
       const m = await this.api.meta();
       this.meta.set(m);

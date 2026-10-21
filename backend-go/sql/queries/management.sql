@@ -207,9 +207,10 @@ WHERE oc.status IN ('pending', 'done', 'skipped')
 -- ===== Metas (§4.4.5) =====
 
 -- name: CreateGoal :one
-INSERT INTO goals (name, scope, client_id, area_id, person_user_id, owner_user_id, kind, bonus_rank, due_date,
+INSERT INTO goals (name, scope, client_id, area_id, person_user_id, person_name, person_email, owner_user_id, kind, bonus_rank, due_date,
   estimate_biz_days, evidence_required, created_by)
 VALUES (sqlc.arg('name'), sqlc.arg('scope'), sqlc.narg('client_id'), sqlc.narg('area_id'), sqlc.narg('person_user_id'),
+  sqlc.narg('person_name'), sqlc.narg('person_email'),
   sqlc.narg('owner_user_id'), sqlc.narg('kind'), sqlc.narg('bonus_rank'), sqlc.arg('due_date'), sqlc.narg('estimate_biz_days'),
   sqlc.arg('evidence_required'), sqlc.narg('created_by'))
 RETURNING id;
@@ -227,13 +228,14 @@ DELETE FROM goals WHERE id = $1;
 -- name: ListGoals :many
 -- Las metas con los nombres que muestra la pantalla y su avance.
 SELECT g.*, COALESCE(o.name, '')::text AS client_name, COALESCE(a.name, '')::text AS area_name,
-  COALESCE(NULLIF(pu.full_name, ''), pu.username, '')::text AS person_name,
+  COALESCE(NULLIF(pu.full_name, ''), pu.username, g.person_name, '')::text AS person_display,
   COALESCE(NULLIF(ou.full_name, ''), ou.username, '')::text AS owner_name,
   COALESCE(NULLIF(cu.full_name, ''), cu.username, '')::text AS created_by_name,
   COALESCE(NULLIF(fu.full_name, ''), fu.username, '')::text AS confirmed_by_name,
   (SELECT count(*) FROM goal_milestones m WHERE m.goal_id = g.id)::int AS milestones,
   (SELECT count(*) FROM goal_milestones m WHERE m.goal_id = g.id AND m.done_at IS NOT NULL)::int AS milestones_done,
-  (SELECT count(*) FROM goal_evidence e WHERE e.goal_id = g.id)::int AS evidence_count
+  (SELECT count(*) FROM goal_evidence e WHERE e.goal_id = g.id)::int AS evidence_count,
+  COALESCE(rl.rule, 'all')::text AS person_rule
 FROM goals g
 LEFT JOIN organizations o ON o.id = g.client_id
 LEFT JOIN areas a ON a.id = g.area_id
@@ -241,6 +243,7 @@ LEFT JOIN users pu ON pu.id = g.person_user_id
 LEFT JOIN users ou ON ou.id = g.owner_user_id
 LEFT JOIN users cu ON cu.id = g.created_by
 LEFT JOIN users fu ON fu.id = g.confirmed_by
+LEFT JOIN goal_person_rules rl ON rl.user_id = g.person_user_id
 WHERE (sqlc.narg('goal_id')::uuid IS NULL OR g.id = sqlc.narg('goal_id')::uuid)
   AND (sqlc.narg('client_id')::uuid IS NULL OR g.client_id = sqlc.narg('client_id')::uuid)
   AND (sqlc.narg('person_id')::uuid IS NULL OR g.person_user_id = sqlc.narg('person_id')::uuid)
@@ -329,8 +332,22 @@ WHERE id = sqlc.arg('id');
 
 -- name: ReopenGoal :exec
 UPDATE goals SET due_date = sqlc.arg('due_date'), completed_at = NULL, completed_by = NULL, confirmed_at = NULL, confirmed_by = NULL,
-  manual_risk = false, updated_at = now()
+  manual_risk = false, outcome = NULL, outcome_reason = NULL, outcome_at = NULL, outcome_by = NULL, updated_at = now()
 WHERE id = sqlc.arg('id');
+
+-- name: SetGoalOutcome :exec
+-- No lograda / no hace falta (NULL lo vuelve a abrir).
+UPDATE goals SET outcome = sqlc.narg('outcome'), outcome_reason = sqlc.narg('outcome_reason'),
+  outcome_at = CASE WHEN sqlc.narg('outcome')::text IS NULL THEN NULL ELSE now() END,
+  outcome_by = sqlc.narg('outcome_by'), updated_at = now()
+WHERE id = sqlc.arg('id');
+
+-- name: SetGoalPersonRule :exec
+INSERT INTO goal_person_rules (user_id, rule, updated_by) VALUES ($1, $2, $3)
+ON CONFLICT (user_id) DO UPDATE SET rule = EXCLUDED.rule, updated_by = EXCLUDED.updated_by, updated_at = now();
+
+-- name: DeleteGoalPersonRule :exec
+DELETE FROM goal_person_rules WHERE user_id = $1;
 
 -- name: AddGoalEvent :exec
 INSERT INTO goal_events (goal_id, text, user_id) VALUES (sqlc.arg('goal_id'), sqlc.arg('text'), sqlc.narg('user_id'));
@@ -378,17 +395,25 @@ WHERE upg.user_id = $1
 ORDER BY a.sort_order, a.name;
 
 -- name: ListGoalPeople :many
--- A quién se le puede poner una meta: las personas de un área, con su nivel.
-SELECT DISTINCT u.id, COALESCE(NULLIF(u.full_name, ''), u.username)::text AS name, a.id AS area_id, a.name AS area_name,
-  COALESCE(l.name, '')::text AS level_name
+-- A quién se le puede poner una meta: los usuarios activos con cada área y
+-- nivel; quien no está en ningún área sale una vez sin área (solo lo ve el admin).
+SELECT u.id, COALESCE(NULLIF(u.full_name, ''), u.username)::text AS name, COALESCE(x.area_id::text, '')::text AS area_id, COALESCE(x.area_name, '')::text AS area_name,
+  COALESCE(x.level_name, '')::text AS level_name
 FROM users u
-JOIN user_permission_groups upg ON upg.user_id = u.id
-JOIN permission_groups pg ON pg.id = upg.permission_group_id AND pg.active
-JOIN permission_group_areas pa ON pa.permission_group_id = pg.id
-JOIN areas a ON a.id = pa.area_id AND a.active
-LEFT JOIN levels l ON l.id = pg.level_id
+LEFT JOIN (
+  SELECT DISTINCT upg.user_id, a.id AS area_id, a.name AS area_name, l.name AS level_name
+  FROM user_permission_groups upg
+  JOIN permission_groups pg ON pg.id = upg.permission_group_id AND pg.active
+  JOIN permission_group_areas pa ON pa.permission_group_id = pg.id
+  JOIN areas a ON a.id = pa.area_id AND a.active
+  LEFT JOIN levels l ON l.id = pg.level_id
+) x ON x.user_id = u.id
 WHERE u.active
 ORDER BY 2, 4;
+
+-- name: GetUserNameByEmail :one
+-- Una meta escrita a mano no puede llevar el correo de alguien que ya es usuario.
+SELECT id, COALESCE(NULLIF(full_name, ''), username)::text AS name FROM users WHERE lower(email) = lower(sqlc.arg('email')::text) LIMIT 1;
 
 -- ===== Plantillas =====
 
@@ -441,3 +466,41 @@ JOIN agenda_tasks k ON k.playbook_application_id = pa.id
 LEFT JOIN agenda_occurrences oc ON oc.task_id = k.id
 WHERE pa.client_id = $1
 ORDER BY pa.applied_at DESC, oc.due_date;
+
+-- name: ListGoalsForAlerts :many
+-- Metas sin cumplir que vencen pronto o se vencieron hace poco, con a quién
+-- avisar: la persona (o el responsable) y quien la creó.
+SELECT g.id, g.name, g.scope, g.due_date, g.person_user_id, g.owner_user_id, g.created_by,
+  COALESCE(o.name, '')::text AS client_name, COALESCE(a.name, '')::text AS area_name
+FROM goals g
+LEFT JOIN organizations o ON o.id = g.client_id
+LEFT JOIN areas a ON a.id = g.area_id
+WHERE g.completed_at IS NULL AND g.outcome IS NULL AND g.due_date BETWEEN sqlc.arg('from_day')::date AND sqlc.arg('to_day')::date;
+
+-- name: InsertGoalAlert :execrows
+INSERT INTO goal_alerts (goal_id, alert) VALUES ($1, $2) ON CONFLICT DO NOTHING;
+
+-- name: ListClientNotes :many
+-- Notas internas del CSM de un cliente: las fijadas arriba, después las más nuevas.
+SELECT * FROM client_notes WHERE client_id = $1 ORDER BY pinned DESC, created_at DESC;
+
+-- name: CountClientNotes :one
+SELECT count(*)::int FROM client_notes WHERE client_id = $1;
+
+-- name: GetClientNote :one
+SELECT * FROM client_notes WHERE id = $1;
+
+-- name: CreateClientNote :one
+INSERT INTO client_notes (client_id, author_id, author_name, content) VALUES ($1, $2, $3, $4) RETURNING *;
+
+-- name: UpdateClientNote :one
+UPDATE client_notes SET content = $2, edited_at = now() WHERE id = $1 RETURNING *;
+
+-- name: PinClientNote :one
+UPDATE client_notes SET pinned = sqlc.arg('pinned'),
+  pinned_by = CASE WHEN sqlc.arg('pinned')::boolean THEN sqlc.narg('pinned_by')::uuid END,
+  pinned_at = CASE WHEN sqlc.arg('pinned')::boolean THEN now() END
+WHERE id = sqlc.arg('id') RETURNING *;
+
+-- name: DeleteClientNote :execrows
+DELETE FROM client_notes WHERE id = $1;

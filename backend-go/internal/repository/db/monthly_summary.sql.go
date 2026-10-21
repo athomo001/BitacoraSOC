@@ -88,6 +88,45 @@ func (q *Queries) ListMonthAbsenceDays(ctx context.Context, arg ListMonthAbsence
 	return items, nil
 }
 
+const listMonthGoalsDone = `-- name: ListMonthGoalsDone :many
+SELECT person_user_id::uuid AS user_id, count(*)::int AS done FROM goals
+WHERE scope = 'person'
+  AND (CASE WHEN bonus_rank IS NOT NULL THEN confirmed_at ELSE completed_at END) >= $1::timestamptz
+  AND (CASE WHEN bonus_rank IS NOT NULL THEN confirmed_at ELSE completed_at END) < $2::timestamptz
+GROUP BY person_user_id
+`
+
+type ListMonthGoalsDoneParams struct {
+	FromAt pgtype.Timestamptz `json:"from_at"`
+	ToAt   pgtype.Timestamptz `json:"to_at"`
+}
+
+type ListMonthGoalsDoneRow struct {
+	UserID uuid.UUID `json:"user_id"`
+	Done   int32     `json:"done"`
+}
+
+// Metas de una persona cumplidas en el mes (las del bono, al confirmarlas).
+func (q *Queries) ListMonthGoalsDone(ctx context.Context, arg ListMonthGoalsDoneParams) ([]ListMonthGoalsDoneRow, error) {
+	rows, err := q.db.Query(ctx, listMonthGoalsDone, arg.FromAt, arg.ToAt)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListMonthGoalsDoneRow
+	for rows.Next() {
+		var i ListMonthGoalsDoneRow
+		if err := rows.Scan(&i.UserID, &i.Done); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listMonthOccurrences = `-- name: ListMonthOccurrences :many
 SELECT o.id, COALESCE(o.user_id, o.closed_by) AS user_id, o.status, o.due_date, o.closed_at
 FROM agenda_occurrences o

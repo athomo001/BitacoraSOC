@@ -29,3 +29,11 @@ SELECT user_id, count(DISTINCT assigned_date)::int AS days
 FROM work_shift_assignments
 WHERE condition IN ('vacation', 'medical_leave') AND assigned_date BETWEEN sqlc.arg('from_day')::date AND sqlc.arg('to_day')::date
 GROUP BY user_id;
+
+-- name: ListMonthGoalsDone :many
+-- Metas de una persona cumplidas en el mes (las del bono, al confirmarlas).
+SELECT person_user_id::uuid AS user_id, count(*)::int AS done FROM goals
+WHERE scope = 'person'
+  AND (CASE WHEN bonus_rank IS NOT NULL THEN confirmed_at ELSE completed_at END) >= sqlc.arg('from_at')::timestamptz
+  AND (CASE WHEN bonus_rank IS NOT NULL THEN confirmed_at ELSE completed_at END) < sqlc.arg('to_at')::timestamptz
+GROUP BY person_user_id;

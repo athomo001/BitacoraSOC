@@ -35,6 +35,8 @@ export interface GuardSlot {
   startsAt: string;
   endsAt: string;
   paused: boolean;
+  /** La persona está bloqueada: el turno no cuenta como cubierto. */
+  blocked?: boolean;
 }
 
 export interface GuardOverride {

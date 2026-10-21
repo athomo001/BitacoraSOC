@@ -98,6 +98,7 @@ LEFT JOIN contacts c ON c.id = m.contact_id AND c.active
 LEFT JOIN users u ON u.id = m.user_id AND u.active
 LEFT JOIN organizations co ON co.id = c.organization_id
 WHERE m.active AND m.team_id = ANY(sqlc.arg('team_ids')::uuid[])
+  AND (m.user_id IS NULL OR u.id IS NOT NULL)
   AND (c.id IS NOT NULL OR u.id IS NOT NULL)
 ORDER BY m.team_id, m.priority;
 
@@ -328,7 +329,7 @@ FROM team_members m
 LEFT JOIN users u ON u.id = m.user_id
 LEFT JOIN contacts c ON c.id = m.contact_id
 LEFT JOIN escalation_pools p ON p.id = m.pool_id
-WHERE m.team_id = ANY(sqlc.arg('team_ids')::uuid[]) AND m.active
+WHERE m.team_id = ANY(sqlc.arg('team_ids')::uuid[]) AND m.active AND (m.user_id IS NULL OR u.active)
 ORDER BY m.team_id, m.priority, display_name;
 
 -- name: GetPolicyStep :one

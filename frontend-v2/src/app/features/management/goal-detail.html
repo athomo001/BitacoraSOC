@@ -9,7 +9,8 @@
 
   <dl class="gt__facts">
     @if (g.scope === 'person') {
-      <dt>{{ i18n.t('mg.g.person') }}</dt><dd>{{ g.personName }}@if (g.personAreas?.length) { <span class="adm-hint">({{ g.personAreas!.join(', ') }})</span> }</dd>
+      <dt>{{ i18n.t('mg.g.person') }}</dt><dd>{{ g.personName }}@if (g.personAreas?.length) { <span class="adm-hint">({{ g.personAreas!.join(', ') }})</span> }
+        @if (g.personEmail) { <span class="adm-hint">{{ i18n.tf('mg.g.noAccount', g.personEmail) }}</span> }</dd>
       @if (g.kind) { <dt>{{ i18n.t('mg.g.kind') }}</dt><dd>{{ i18n.t(kindKey(g.kind)) }}</dd> }
       @if (g.bonus) { <dt>{{ i18n.t('mg.g.bonus') }}</dt><dd class="gt__bono">{{ i18n.t(bonusKey(g.bonus)) }}</dd> }
     } @else {
@@ -24,10 +25,12 @@
     <dd class="gt__adv"><span class="meter"><span [style.width.%]="pct()"></span></span>
       <span class="adm-hint">{{ g.milestones ? i18n.tf('mg.g.progress', g.milestonesDone + ' ' + i18n.t('mg.g.of') + ' ' + g.milestones) : i18n.t('mg.g.noStepsHint') }}</span></dd>
   </dl>
-  @if (g.scope === 'person') { <p class="gt__vis"><mat-icon>visibility</mat-icon>{{ i18n.tf('mg.g.vis', g.personName ?? '') }}</p> }
+  @if (g.scope === 'person') { <p class="gt__vis"><mat-icon>visibility</mat-icon>{{ g.personEmail ? i18n.t('mg.g.visExt') : i18n.tf('mg.g.vis', g.personName ?? '') }}</p> }
   @if (g.state === 'risk' && g.autoRisk) { <p class="gt__note gt__note--warn">{{ i18n.t('mg.g.riskNote') }}</p> }
   @if (g.milestones && g.milestonesDone === g.milestones && evidenceMissing()) { <p class="gt__note gt__note--warn">{{ i18n.t('mg.g.evNote') }}</p> }
   @if (g.state === 'confirm') { <p class="gt__note gt__note--info">{{ i18n.t('mg.g.confirmNote') }}</p> }
+  @if (g.state === 'failed') { <p class="gt__note gt__note--warn">{{ i18n.tf('mg.g.failedWhy', g.outcomeReason || i18n.t('mg.g.expired')) }}</p> }
+  @if (g.state === 'not_needed') { <p class="gt__note gt__note--info">{{ i18n.tf('mg.g.notNeededWhy', g.outcomeReason ?? '') }}</p> }
   @if (g.confirmedAt && g.confirmedByName) { <p class="gt__note gt__note--ok">{{ i18n.tf('mg.g.confirmed', g.confirmedByName) }}</p> }
 
   <section class="gt__sec">
@@ -119,7 +122,16 @@
     @if (g.canConfirm) {
       <button type="button" class="adm-btn adm-btn--primary" [disabled]="busy()" (click)="confirm()"><mat-icon>verified</mat-icon>{{ i18n.t('mg.g.confirm') }}</button>
     }
-    @if (closed() && g.canEdit) {
+    @if (g.canOutcome) {
+      @if (failing()) {
+        <input class="adm-input" name="notAchievedReason" maxlength="300" [attr.aria-label]="i18n.t('mg.g.notAchievedReason')" [placeholder]="i18n.t('mg.g.notAchievedPh')" [value]="failReason()" (input)="failReason.set(val($event))" />
+        <button type="button" class="adm-btn adm-btn--danger" [disabled]="busy() || !failReason().trim()" (click)="markNotAchieved()">{{ i18n.t('mg.g.notAchievedSave') }}</button>
+        <button type="button" class="adm-btn" (click)="failing.set(false)">{{ i18n.t('mg.cancel') }}</button>
+      } @else {
+        <button type="button" class="adm-btn" (click)="failing.set(true)"><mat-icon>cancel</mat-icon>{{ i18n.t('mg.g.notAchieved') }}</button>
+      }
+    }
+    @if (closed() && g.canEdit && g.state !== 'not_needed') {
       @if (reopening()) {
         <input class="adm-input mono gt__date" type="date" name="reopenDate" [attr.aria-label]="i18n.t('mg.g.newDate')" [value]="newDate()" (input)="newDate.set(val($event))" />
         <button type="button" class="adm-btn adm-btn--primary" [disabled]="busy() || !newDate()" (click)="reopen()">{{ i18n.t('mg.g.reopen') }}</button>

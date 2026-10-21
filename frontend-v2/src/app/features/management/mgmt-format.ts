@@ -9,8 +9,10 @@ export const HEALTH_ICON: Record<HealthState, string> = { red: 'error', amber: '
 export const HEALTH_TONE: Record<HealthState, string> = { red: 'bad', amber: 'warn', green: 'ok' };
 export const HEALTH_RANK: Record<HealthState, number> = { red: 0, amber: 1, green: 2 };
 
-export const GOAL_TONE: Record<GoalState, string> = { open: 'system', risk: 'warn', confirm: 'info', done: 'ok', failed: 'bad' };
-export const GOAL_ICON: Record<GoalState, string> = { open: 'pending', risk: 'warning', confirm: 'hourglass_top', done: 'check_circle', failed: 'cancel' };
+export const GOAL_TONE: Record<GoalState, string> = { open: 'system', risk: 'warn', confirm: 'info', done: 'ok', failed: 'bad', not_needed: 'neutral' };
+export const GOAL_ICON: Record<GoalState, string> = { open: 'pending', risk: 'warning', confirm: 'hourglass_top', done: 'check_circle', failed: 'cancel', not_needed: 'do_not_disturb_on' };
+/** Orden de los escalones en la fila de una persona (sin escalón, al final). */
+export const RANK_ORDER: Record<string, number> = { primary: 0, secondary: 1, tertiary: 2 };
 
 export const ACTION_KINDS: ActionKind[] = ['meeting', 'committee', 'contact', 'report', 'other'];
 export const PERIODS: MgmtPeriod[] = ['month', 'prev', '90'];

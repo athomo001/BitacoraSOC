@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"net/http"
 	"strings"
 	"time"
@@ -22,7 +23,10 @@ import (
 // UsersHandler cubre /api/users/* (admin) — spec/04-contratos-api.md
 // sección Usuarios.
 type UsersHandler struct {
-	Queries  *db.Queries
+	Queries *db.Queries
+	// Pool: eliminar va en su propia transacción (si la base lo rechaza por
+	// historial, no deja abortada ninguna otra).
+	Pool     txBeginner
 	Crypto   *crypto.Box
 	AuditLog *audit.Logger
 }
@@ -173,9 +177,11 @@ func (h *UsersHandler) Patch(w http.ResponseWriter, r *http.Request) {
 	writeData(w, http.StatusOK, toUserDTO(user))
 }
 
-// Delete es un soft-delete (active=false) — ver comentario de
-// DeactivateUser en sql/queries/users.sql: un DELETE real rompería la FK de
-// audit_log.actor_user_id en cuanto ese usuario haya hecho algo auditado.
+// Delete es DELETE /api/users/:id (decisión del dueño, 2026-10-21): borra de
+// verdad, y de todos lados, a quien no tiene historial (un usuario creado por
+// error). Si tiene historial —entró alguna vez, escribió entradas, tickets…—
+// la base lo rechaza (audit_log y el resto lo referencian sin ON DELETE) y
+// queda bloqueado: su nombre se sigue viendo en lo que hizo.
 func (h *UsersHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	id, err := uuid.Parse(r.PathValue("id"))
@@ -183,12 +189,75 @@ func (h *UsersHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		problemdetails.Write(w, r, http.StatusNotFound, "not-found", "id inválido")
 		return
 	}
+	if me, ok := middleware.UserFromContext(ctx); ok && me.ID == id {
+		problemdetails.Write(w, r, http.StatusConflict, "self-lockout", "no puedes eliminarte a ti mismo")
+		return
+	}
+	user, err := h.Queries.GetUserByID(ctx, id)
+	if err != nil {
+		problemdetails.Write(w, r, http.StatusNotFound, "not-found", "usuario no encontrado")
+		return
+	}
+	n, err := h.deleteForever(ctx, id)
+	if err == nil && n == 1 {
+		h.AuditLog.Log(ctx, "users.delete", audit.LevelWarn, audit.Success(), map[string]any{"userId": id.String(), "username": user.Username})
+		writeData(w, http.StatusOK, map[string]any{"deleted": true})
+		return
+	}
+	if err != nil && !isForeignKeyViolation(err) {
+		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo eliminar el usuario")
+		return
+	}
 	if err := h.Queries.DeactivateUser(ctx, id); err != nil {
 		problemdetails.Write(w, r, http.StatusNotFound, "not-found", "usuario no encontrado")
 		return
 	}
-	h.AuditLog.Log(ctx, "users.deactivate", audit.LevelWarn, audit.Success(), map[string]any{"userId": id.String()})
-	writeNoContent(w)
+	h.AuditLog.Log(ctx, "users.deactivate", audit.LevelWarn, audit.Success(), map[string]any{"userId": id.String(), "reason": "tiene historial"})
+	writeData(w, http.StatusOK, map[string]any{"deleted": false})
+}
+
+func (h *UsersHandler) deleteForever(ctx context.Context, id uuid.UUID) (int64, error) {
+	tx, err := h.Pool.Begin(ctx)
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck // tras Commit no hace nada
+	q := h.Queries.WithTx(tx)
+	if err := q.DeleteBareTeamMemberships(ctx, pgUUIDOf(id)); err != nil {
+		return 0, err
+	}
+	n, err := q.DeleteUserForever(ctx, id)
+	if err != nil {
+		return 0, err
+	}
+	return n, tx.Commit(ctx)
+}
+
+type userLinkDTO struct {
+	Kind   string `json:"kind"` // guard | escalation | pool | shift | client | ticket | task | goal | asset
+	Label  string `json:"label"`
+	Detail string `json:"detail,omitempty"`
+}
+
+// Links es GET /api/users/:id/links: lo que la persona tiene a su nombre y
+// habría que reasignar al bloquearla (al bloquear desaparece de guardias,
+// escalamiento y pools; lo demás queda a su nombre hasta reasignarlo).
+func (h *UsersHandler) Links(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		problemdetails.Write(w, r, http.StatusNotFound, "not-found", "id inválido")
+		return
+	}
+	rows, err := h.Queries.ListUserLinks(r.Context(), pgUUIDOf(id))
+	if err != nil {
+		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo leer lo que tiene a su nombre")
+		return
+	}
+	out := make([]userLinkDTO, 0, len(rows))
+	for _, l := range rows {
+		out = append(out, userLinkDTO{Kind: l.Kind, Label: l.Label, Detail: l.Detail})
+	}
+	writeData(w, http.StatusOK, out)
 }
 
 type forceResetAllRequest struct {

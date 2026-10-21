@@ -52,7 +52,7 @@ const MONTHS_BACK = 12;
               <th class="adm-num">{{ i18n.t('team.mo.tasks') }}</th><th class="adm-num">{{ i18n.t('team.mo.onTimeCol') }}</th>
               <th class="adm-num">{{ i18n.t('team.mo.openLate') }}</th><th class="adm-num">{{ i18n.t('team.mo.skipped') }}</th>
               <th class="adm-num">{{ i18n.t('team.mo.tickets') }}</th><th class="adm-num">{{ i18n.t('team.mo.slaCol') }}</th>
-              <th class="adm-num">{{ i18n.t('team.mo.absent') }}</th>
+              <th class="adm-num">{{ i18n.t('team.mo.goals') }}</th><th class="adm-num">{{ i18n.t('team.mo.absent') }}</th>
             </tr></thead>
             <tbody>
               @for (p of d.summary.people; track p.id) {
@@ -65,6 +65,7 @@ const MONTHS_BACK = 12;
                   <td class="adm-num mono">{{ p.skipped }}</td>
                   <td class="adm-num mono">{{ p.tickets }}</td>
                   <td class="adm-num"><span class="pill {{ tone(sla(p)) }}">{{ pct(sla(p)) }}</span></td>
+                  <td class="adm-num mono">{{ p.goalsDone ?? 0 }}</td>
                   <td class="adm-num mono">{{ p.absentDays }}</td>
                 </tr>
               }
@@ -74,6 +75,7 @@ const MONTHS_BACK = 12;
               <td class="adm-num mono">{{ d.summary.total.tasks }}</td><td class="adm-num mono">{{ pct(d.onTimePct) }}</td>
               <td class="adm-num mono">{{ d.summary.total.openLate }}</td><td class="adm-num mono">{{ d.summary.total.skipped }}</td>
               <td class="adm-num mono">{{ d.summary.total.tickets }}</td><td class="adm-num mono">{{ pct(d.slaPct) }}</td>
+              <td class="adm-num mono">{{ d.summary.total.goalsDone ?? 0 }}</td>
               <td class="adm-num mono">{{ d.summary.total.absentDays }}</td>
             </tr></tfoot>
           </table>

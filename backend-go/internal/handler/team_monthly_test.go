@@ -84,3 +84,14 @@ func TestFreezeAt_PrimerDiaHabil(t *testing.T) {
 		t.Fatalf("congela %v", got.In(loc))
 	}
 }
+
+func TestComputeMonthly_MetasCumplidas(t *testing.T) {
+	ana, otra := uuid.New(), uuid.New()
+	in := monthlyInput{month: time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC), loc: time.UTC, dayEnd: agenda.Clock{Hour: 20}, cal: agenda.DefaultCalendar(),
+		now: time.Date(2026, 10, 5, 9, 0, 0, 0, time.UTC), people: []monthlyPersonDTO{{ID: ana, Name: "Ana"}}, names: map[uuid.UUID]string{},
+		absences: map[uuid.UUID]int{}, goals: map[uuid.UUID]int{ana: 2, otra: 5}, areaName: "SOC"}
+	d := computeMonthly(in)
+	if len(d.People) != 1 || d.People[0].GoalsDone != 2 || d.Total.GoalsDone != 2 {
+		t.Fatalf("las metas de alguien de otra área no suman: %+v %+v", d.People, d.Total)
+	}
+}

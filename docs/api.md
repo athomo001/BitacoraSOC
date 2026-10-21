@@ -197,7 +197,8 @@ Generada desde `backend-go/cmd/server/main.go`, donde se registran las rutas. La
 | `GET` | `/api/users/cargos` | Admin |
 | `POST` | `/api/users` | Admin |
 | `PATCH` | `/api/users/{id}` | Admin |
-| `DELETE` | `/api/users/{id}` | Admin |
+| `DELETE` | `/api/users/{id}` | Admin — `200 {deleted}`: borra de verdad (y de todos lados) a quien no tiene historial; si tiene, queda bloqueado (`deleted: false`). No a uno mismo (`409`) |
+| `GET` | `/api/users/{id}/links` | Admin — lo que tiene a su nombre antes de bloquearlo: `[{kind: guard\|escalation\|pool\|shift\|client\|ticket\|task\|goal\|asset, label, detail}]` (en `guard`, `detail` = turnos por venir) |
 | `POST` | `/api/users/force-reset-all` | Admin |
 | `GET` | `/api/users/{id}/permission-groups` | Admin |
 | `PUT` | `/api/users/{id}/permission-groups` | Admin |
@@ -592,13 +593,18 @@ Spec/16 §4.4 (9.4). Ven Gestión el perfil Gestión, las jefaturas y el admin; 
 | `PUT` | `/api/management/settings` | Admin — `{slaTarget}` (50 a 100) |
 | `GET` | `/api/management/clients` | Gestión — la cartera: semáforo calculado (`health: {state, reasons, tickets, contact, keyTasks}`), CSM, renovación y próxima acción |
 | `GET` | `/api/management/clients/{id}` | Gestión — la ficha: cifras del mes, tickets abiertos con su SLA, acciones, metas, comunicaciones, línea de tiempo y pasos de la renovación |
+| `GET` | `/api/management/clients/{id}/notes` | Solo el perfil Gestión (ni el admin ni las jefaturas) — notas internas del CSM, las fijadas arriba (`spec/16` §4.7.1) |
+| `POST` | `/api/management/clients/{id}/notes` | Perfil Gestión — `{content}` (hasta 5000) |
+| `PUT` | `/api/management/notes/{id}` | El autor — `{content}` |
+| `POST` | `/api/management/notes/{id}/pin` | Perfil Gestión — `{pinned}` |
+| `DELETE` | `/api/management/notes/{id}` | El autor. Auditoría `management.note.create\|update\|pin\|delete`, sin el texto |
 | `PUT` | `/api/management/clients/{id}` | Gestión — `{csmUserId, serviceStart, renewal, slaTarget}` (vacío = sin dato; sin `slaTarget`, el global) |
 | `GET` | `/api/management/clients/{id}/summary` | Gestión — `?period=month\|prev\|90`: SLA, tiempos medios, incidentes resueltos por área y prioridad, y metas |
 | `POST` | `/api/management/clients/{id}/summary/send` | Gestión — `{period, to}`: el mismo resumen por correo, a los dominios válidos de Reportes |
 | `GET` | `/api/management/indicators` | Gestión — `?by=client\|area&period=month\|prev\|90`: tareas a tiempo, tickets en SLA, atrasos abiertos, tiempos medios, tendencia de 6 meses y carga por área (las jefaturas ven sus áreas) |
 | `GET` | `/api/management/tickets/{id}/actions` | Gestión — las acciones de seguimiento de un ticket |
 | `GET` | `/api/goals` | Sesión — `?mine=1` (Agenda → Mis metas), `?person=` (Mi equipo) o `?client=`; sin filtro, solo Gestión |
-| `POST` | `/api/goals` | Gestión — `{name, scope: client\|area\|person, clientId, areaId, personId, ownerId, kind, bonus, dueDate o estimateBizDays, evidenceRequired, steps}`; las de una persona, su jefatura o el admin |
+| `POST` | `/api/goals` | Gestión — `{name, scope: client\|area\|person, clientId, areaId, personId, ownerId, kind, bonus, dueDate o estimateBizDays, evidenceRequired, steps}`; las de una persona, su jefatura o el admin. Alguien sin cuenta: `personName` y `personEmail` en vez de `personId` (admin o una jefatura; 409 si el correo ya es de un usuario) |
 | `GET` | `/api/goals/{id}` | Quien ve la meta — con hitos, historial y certificado |
 | `PUT` | `/api/goals/{id}` | Quien la creó, la jefatura o el admin |
 | `DELETE` | `/api/goals/{id}` | Quien la creó, la jefatura o el admin |
@@ -606,7 +612,8 @@ Spec/16 §4.4 (9.4). Ven Gestión el perfil Gestión, las jefaturas y el admin; 
 | `PUT` | `/api/goals/{id}/milestones/{mid}` | Igual; cambiar el enlace lo deja sin marcar |
 | `DELETE` | `/api/goals/{id}/milestones/{mid}` | Quien edita la meta |
 | `POST` | `/api/goals/{id}/milestones/{mid}/done` | `{done}` — el responsable, a mano (`409 milestone-linked` si está enlazado) |
-| `POST` | `/api/goals/{id}/{action}` | `risk {risk}`, `complete` (`409 evidence-missing` sin el certificado), `confirm` (la jefatura, en las que cuentan para el bono) o `reopen {dueDate}` |
+| `POST` | `/api/goals/{id}/{action}` | `risk {risk}`, `complete` (`409 evidence-missing` sin el certificado), `confirm` (la jefatura, en las metas con escalón), `not-achieved {reason}` (no lograda: la jefatura de la persona o el admin, nunca la persona) o `reopen {dueDate}`. El estado es `open`, `risk`, `confirm`, `done` (lograda), `failed` (no lograda o vencida; `outcomeReason`) o `not_needed` (la cerró la regla de la persona) |
+| `PUT` | `/api/goal-rules/{userId}` | La jefatura de la persona o el admin — `{rule: all\|any\|primary\|secondary}`: la regla de sus metas con escalón (`bonus`: `primary`, `secondary`, `tertiary`); al lograr la que pide, las demás abiertas quedan `not_needed`, y vuelven a abrirse si deja de estar lograda |
 | `POST` | `/api/goals/{id}/evidence` | El certificado: multipart `file` (PDF o imagen, hasta 10 MB) o `{url}` |
 | `GET` | `/api/goals/{id}/evidence/{eid}` | Descarga el archivo |
 | `DELETE` | `/api/goals/{id}/evidence/{eid}` | Mientras la meta no esté cumplida |

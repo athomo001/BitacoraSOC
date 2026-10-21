@@ -418,6 +418,36 @@ func resolveCurrentTeamMembers(ctx context.Context, queries *db.Queries, teamID 
 			}, now))
 		}
 	}
+	return withoutBlocked(ctx, queries, out)
+}
+
+// withoutBlocked saca a los usuarios bloqueados: no están de guardia aunque
+// tengan el turno (queda pendiente hasta poner un reemplazo).
+func withoutBlocked(ctx context.Context, queries *db.Queries, current []rotation.Current) ([]rotation.Current, error) {
+	if len(current) == 0 {
+		return current, nil
+	}
+	ids := make([]uuid.UUID, 0, len(current))
+	for _, c := range current {
+		ids = append(ids, c.TeamMemberID)
+	}
+	blocked, err := queries.ListBlockedTeamMembers(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	if len(blocked) == 0 {
+		return current, nil
+	}
+	skip := map[uuid.UUID]bool{}
+	for _, id := range blocked {
+		skip[id] = true
+	}
+	out := current[:0]
+	for _, c := range current {
+		if !skip[c.TeamMemberID] {
+			out = append(out, c)
+		}
+	}
 	return out, nil
 }
 

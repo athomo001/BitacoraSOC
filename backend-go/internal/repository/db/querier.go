@@ -95,6 +95,7 @@ type Querier interface {
 	CountAssetsForLogSource(ctx context.Context, logSourceID pgtype.UUID) (int64, error)
 	CountAuditLogs(ctx context.Context, arg CountAuditLogsParams) (int64, error)
 	CountBackupRuns(ctx context.Context, kind NullBackupKind) (int64, error)
+	CountClientNotes(ctx context.Context, clientID uuid.UUID) (int32, error)
 	// Un checklist de cierre de un turno ya cerrado no se borra (el cierre lo usa).
 	CountClosuresForCheck(ctx context.Context, closureCheckID uuid.UUID) (int64, error)
 	CountComplementEntries(ctx context.Context, ownerComplementID pgtype.UUID) (int32, error)
@@ -135,6 +136,7 @@ type Querier interface {
 	CreateChecklistEntry(ctx context.Context, arg CreateChecklistEntryParams) (Entry, error)
 	CreateChecklistTemplate(ctx context.Context, arg CreateChecklistTemplateParams) (ChecklistTemplate, error)
 	CreateClientAlertRule(ctx context.Context, arg CreateClientAlertRuleParams) (ClientAlertRule, error)
+	CreateClientNote(ctx context.Context, arg CreateClientNoteParams) (ClientNote, error)
 	CreateComplement(ctx context.Context, arg CreateComplementParams) (Complement, error)
 	// Entrada creada por un complemento (Runtime API o CREATE_ENTRY del iframe).
 	CreateComplementEntry(ctx context.Context, arg CreateComplementEntryParams) (Entry, error)
@@ -239,6 +241,9 @@ type Querier interface {
 	DeleteAssetPolicies(ctx context.Context, assetID pgtype.UUID) error
 	DeleteAssetWithoutHistory(ctx context.Context, arg DeleteAssetWithoutHistoryParams) (int64, error)
 	DeleteBackupRun(ctx context.Context, id uuid.UUID) (BackupRun, error)
+	// Al eliminar: las membresías en equipos sin turnos ni reemplazos no son
+	// historial y se van con la persona (las que tienen turnos sí lo son).
+	DeleteBareTeamMemberships(ctx context.Context, userID pgtype.UUID) error
 	DeleteCalendarFeed(ctx context.Context, userID uuid.UUID) (int64, error)
 	// Un solo DELETE para padres e hijos: la FK de parent_item_id se revisa al
 	// final de la sentencia. El historial conserva el nombre (service_title) y
@@ -246,6 +251,7 @@ type Querier interface {
 	DeleteChecklistItemsExcept(ctx context.Context, arg DeleteChecklistItemsExceptParams) error
 	DeleteChecklistTemplate(ctx context.Context, id uuid.UUID) error
 	DeleteClientAlertRule(ctx context.Context, id uuid.UUID) (int64, error)
+	DeleteClientNote(ctx context.Context, id uuid.UUID) (int64, error)
 	// Archivos y storage caen por CASCADE; las entradas quedan (FK en NULL) con
 	// su owner_complement_name.
 	DeleteComplement(ctx context.Context, id uuid.UUID) (int64, error)
@@ -276,6 +282,7 @@ type Querier interface {
 	DeleteGoal(ctx context.Context, id uuid.UUID) (int64, error)
 	DeleteGoalEvidence(ctx context.Context, arg DeleteGoalEvidenceParams) (int64, error)
 	DeleteGoalMilestone(ctx context.Context, arg DeleteGoalMilestoneParams) (int64, error)
+	DeleteGoalPersonRule(ctx context.Context, userID uuid.UUID) error
 	DeleteGuardSlot(ctx context.Context, id uuid.UUID) (int64, error)
 	DeleteHoliday(ctx context.Context, day pgtype.Date) (int64, error)
 	DeleteIdempotency(ctx context.Context, arg DeleteIdempotencyParams) error
@@ -320,6 +327,9 @@ type Querier interface {
 	// La general no se borra; las áreas que usaban esta pasan a la general.
 	DeleteTicketSeries(ctx context.Context, id uuid.UUID) (int64, error)
 	DeleteUserChannel(ctx context.Context, arg DeleteUserChannelParams) (int64, error)
+	// Solo funciona si no tiene historial: entradas, tickets, Auditoría y el
+	// resto lo referencian sin ON DELETE y la base lo rechaza.
+	DeleteUserForever(ctx context.Context, id uuid.UUID) (int64, error)
 	DeleteWorkShiftMember(ctx context.Context, arg DeleteWorkShiftMemberParams) (int64, error)
 	// POST /api/auth/logout — revoca un JTI puntual sin afectar otras sesiones
 	// del mismo usuario.
@@ -405,6 +415,7 @@ type Querier interface {
 	GetChecklistCooldown(ctx context.Context) (int32, error)
 	GetChecklistTemplate(ctx context.Context, id uuid.UUID) (ChecklistTemplate, error)
 	GetClientAlertRule(ctx context.Context, id uuid.UUID) (ClientAlertRule, error)
+	GetClientNote(ctx context.Context, id uuid.UUID) (ClientNote, error)
 	GetComplementBySlug(ctx context.Context, slug string) (Complement, error)
 	GetComplementFile(ctx context.Context, arg GetComplementFileParams) (GetComplementFileRow, error)
 	GetComplementStorage(ctx context.Context, arg GetComplementStorageParams) (ComplementStorage, error)
@@ -507,6 +518,8 @@ type Querier interface {
 	// Login con nombre de usuario o correo (pedido del dueño). Si un texto
 	// coincidiera con el usuario de uno y el correo de otro, gana el usuario.
 	GetUserForLogin(ctx context.Context, login string) (User, error)
+	// Una meta escrita a mano no puede llevar el correo de alguien que ya es usuario.
+	GetUserNameByEmail(ctx context.Context, email string) (GetUserNameByEmailRow, error)
 	// El aviso de comentarios al cliente que todavía junta (ventana abierta).
 	GetWaitingCommentMail(ctx context.Context, ticketID uuid.UUID) (TicketMailOutbox, error)
 	GetWorkShiftByID(ctx context.Context, id uuid.UUID) (WorkShift, error)
@@ -530,6 +543,7 @@ type Querier interface {
 	InsertFlowOccurrence(ctx context.Context, arg InsertFlowOccurrenceParams) (int64, error)
 	InsertForwardEvent(ctx context.Context, arg InsertForwardEventParams) error
 	InsertGlpiOutbox(ctx context.Context, arg InsertGlpiOutboxParams) (uuid.UUID, error)
+	InsertGoalAlert(ctx context.Context, arg InsertGoalAlertParams) (int64, error)
 	InsertMonthlySummary(ctx context.Context, arg InsertMonthlySummaryParams) error
 	InsertNoticeRecipient(ctx context.Context, arg InsertNoticeRecipientParams) (int64, error)
 	// Notificaciones (spec/16 §4.5, 9.5, 000042).
@@ -635,6 +649,8 @@ type Querier interface {
 	ListBackupRuns(ctx context.Context, arg ListBackupRunsParams) ([]BackupRun, error)
 	// Usuarios activos que cumplen años ese día (mes y día) y tienen correo.
 	ListBirthdayUsers(ctx context.Context, arg ListBirthdayUsersParams) ([]ListBirthdayUsersRow, error)
+	// De estos integrantes, los que son un usuario bloqueado (no están de guardia).
+	ListBlockedTeamMembers(ctx context.Context, ids []uuid.UUID) ([]uuid.UUID, error)
 	// Quién puede quedar a cargo de una cuenta: el perfil Gestión (y el admin).
 	ListCSMUsers(ctx context.Context) ([]ListCSMUsersRow, error)
 	// Cargos en uso y cuántas personas activas los tienen (para elegir a quién avisar).
@@ -650,6 +666,8 @@ type Querier interface {
 	ListClientActions(ctx context.Context, organizationID pgtype.UUID) ([]ListClientActionsRow, error)
 	// ===== Avisos por cliente =====
 	ListClientAlertRules(ctx context.Context, organizationID pgtype.UUID) ([]ListClientAlertRulesRow, error)
+	// Notas internas del CSM de un cliente: las fijadas arriba, después las más nuevas.
+	ListClientNotes(ctx context.Context, clientID uuid.UUID) ([]ClientNote, error)
 	ListClientOpenTickets(ctx context.Context, clientID uuid.UUID) ([]ListClientOpenTicketsRow, error)
 	// Las tareas que dejó cada plantilla aplicada al cliente (la de renovación
 	// se muestra junto a la cuenta regresiva).
@@ -747,10 +765,14 @@ type Querier interface {
 	ListGoalEvents(ctx context.Context, goalID uuid.UUID) ([]ListGoalEventsRow, error)
 	ListGoalEvidence(ctx context.Context, goalID uuid.UUID) ([]ListGoalEvidenceRow, error)
 	ListGoalMilestones(ctx context.Context, goalIds []uuid.UUID) ([]ListGoalMilestonesRow, error)
-	// A quién se le puede poner una meta: las personas de un área, con su nivel.
+	// A quién se le puede poner una meta: los usuarios activos con cada área y
+	// nivel; quien no está en ningún área sale una vez sin área (solo lo ve el admin).
 	ListGoalPeople(ctx context.Context) ([]ListGoalPeopleRow, error)
 	// Las metas con los nombres que muestra la pantalla y su avance.
 	ListGoals(ctx context.Context, arg ListGoalsParams) ([]ListGoalsRow, error)
+	// Metas sin cumplir que vencen pronto o se vencieron hace poco, con a quién
+	// avisar: la persona (o el responsable) y quien la creó.
+	ListGoalsForAlerts(ctx context.Context, arg ListGoalsForAlertsParams) ([]ListGoalsForAlertsRow, error)
 	// Las áreas de varios grupos de una vez (para listarlos sin N consultas).
 	ListGroupAreaCodes(ctx context.Context, groupIds []uuid.UUID) ([]ListGroupAreaCodesRow, error)
 	// Guardias en línea de tiempo (000029, canvas "Turnos: guardias"): los
@@ -805,6 +827,8 @@ type Querier interface {
 	ListMembersForTeams(ctx context.Context, teamIds []uuid.UUID) ([]ListMembersForTeamsRow, error)
 	// Días de vacaciones o licencia de cada persona en el mes (Dotación).
 	ListMonthAbsenceDays(ctx context.Context, arg ListMonthAbsenceDaysParams) ([]ListMonthAbsenceDaysRow, error)
+	// Metas de una persona cumplidas en el mes (las del bono, al confirmarlas).
+	ListMonthGoalsDone(ctx context.Context, arg ListMonthGoalsDoneParams) ([]ListMonthGoalsDoneRow, error)
 	// Las ocurrencias de las tareas del área que vencen en el mes: a quién
 	// cuentan (quien la tiene o quien la cerró), cómo terminaron y cuándo.
 	ListMonthOccurrences(ctx context.Context, arg ListMonthOccurrencesParams) ([]ListMonthOccurrencesRow, error)
@@ -967,6 +991,12 @@ type Querier interface {
 	// Todos los grupos activos de una persona con sus áreas (vacío = grupo sin
 	// área): para saber si la jefatura puede tocarla.
 	ListUserGroupsWithAreas(ctx context.Context, userID uuid.UUID) ([]ListUserGroupsWithAreasRow, error)
+	// Usuarios bloqueados y eliminados (decisión del dueño, 2026-10-21): al
+	// bloquear, la persona desaparece de guardias, escalamiento y pools, y antes
+	// la app avisa lo que tiene a su nombre; eliminar borra de verdad solo a quien
+	// no tiene historial (si no, queda bloqueado).
+	// Lo que una persona tiene a su nombre y habría que reasignar al bloquearla.
+	ListUserLinks(ctx context.Context, userID pgtype.UUID) ([]ListUserLinksRow, error)
 	// Las áreas que abren SOC/NOC (Bitácora, Turnos, Escalamiento, Reportes):
 	// solo las de grupos con perfil Operativo (spec/16 §3.2, 9c). Un Resolutor o
 	// un grupo de Gestión con el área SOC ve sus datos, no la bitácora.
@@ -1068,6 +1098,7 @@ type Querier interface {
 	// HU-5: pausar sin borrar la fila (conserva el historial del rol).
 	PatchRotationSlotPause(ctx context.Context, arg PatchRotationSlotPauseParams) (RotationSlot, error)
 	PendingAssetRequestExists(ctx context.Context, assetID uuid.UUID) (bool, error)
+	PinClientNote(ctx context.Context, arg PinClientNoteParams) (ClientNote, error)
 	// Prueba mínima de conectividad real a Postgres para /api/health/ready
 	// (más que un simple pgxpool.Ping(): confirma que el pool puede ejecutar SQL
 	// de verdad contra la base, no solo abrir el socket TCP).
@@ -1168,6 +1199,9 @@ type Querier interface {
 	SetGoalCompleted(ctx context.Context, arg SetGoalCompletedParams) error
 	// A mano (solo los que no tienen enlace: esos se marcan solos).
 	SetGoalMilestoneDone(ctx context.Context, arg SetGoalMilestoneDoneParams) (int64, error)
+	// No lograda / no hace falta (NULL lo vuelve a abrir).
+	SetGoalOutcome(ctx context.Context, arg SetGoalOutcomeParams) error
+	SetGoalPersonRule(ctx context.Context, arg SetGoalPersonRuleParams) error
 	SetGoalRisk(ctx context.Context, arg SetGoalRiskParams) error
 	SetGuardRemindUncovered(ctx context.Context, arg SetGuardRemindUncoveredParams) error
 	SetLevelRank(ctx context.Context, arg SetLevelRankParams) (int64, error)
@@ -1268,6 +1302,7 @@ type Querier interface {
 	UpdateChecklistTemplate(ctx context.Context, arg UpdateChecklistTemplateParams) (ChecklistTemplate, error)
 	UpdateClientAlertRule(ctx context.Context, arg UpdateClientAlertRuleParams) (ClientAlertRule, error)
 	UpdateClientManagement(ctx context.Context, arg UpdateClientManagementParams) (int64, error)
+	UpdateClientNote(ctx context.Context, arg UpdateClientNoteParams) (ClientNote, error)
 	// Ficha del complemento: todo lo editable de una vez (el handler mezcla lo
 	// que llega con lo guardado).
 	UpdateComplement(ctx context.Context, arg UpdateComplementParams) (Complement, error)

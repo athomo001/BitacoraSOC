@@ -206,9 +206,10 @@ func (q *Queries) ListAssignmentsForRange(ctx context.Context, arg ListAssignmen
 
 const listGuardSlotsForRange = `-- name: ListGuardSlotsForRange :many
 SELECT s.week_start_date, s.week_end_date, t.name AS team_name, c.start_time_utc, c.timezone,
-  COALESCE(NULLIF(u.full_name, ''), ct.name, 'Pendiente')::text AS person_name,
-  COALESCE(u.cargo_label, '')::text AS cargo_label,
-  tm.user_id
+  -- Un usuario bloqueado no cubre la guardia: sale «Pendiente».
+  (CASE WHEN u.active IS FALSE THEN 'Pendiente' ELSE COALESCE(NULLIF(u.full_name, ''), ct.name, 'Pendiente') END)::text AS person_name,
+  (CASE WHEN u.active IS FALSE THEN '' ELSE COALESCE(u.cargo_label, '') END)::text AS cargo_label,
+  tm.user_id, COALESCE(u.active, true)::boolean AS member_active
 FROM rotation_slots s
 JOIN rotation_cycles c ON c.id = s.cycle_id
 JOIN teams t ON t.id = c.team_id
@@ -234,6 +235,7 @@ type ListGuardSlotsForRangeRow struct {
 	PersonName    string      `json:"person_name"`
 	CargoLabel    string      `json:"cargo_label"`
 	UserID        pgtype.UUID `json:"user_id"`
+	MemberActive  bool        `json:"member_active"`
 }
 
 // Guardias semanales (equipos "oncall": Guardia N2, Guardia TI…) que tocan
@@ -257,6 +259,7 @@ func (q *Queries) ListGuardSlotsForRange(ctx context.Context, arg ListGuardSlots
 			&i.PersonName,
 			&i.CargoLabel,
 			&i.UserID,
+			&i.MemberActive,
 		); err != nil {
 			return nil, err
 		}

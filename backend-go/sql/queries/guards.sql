@@ -53,7 +53,9 @@ ORDER BY display_name;
 
 -- name: ListGuardSlotsBetween :many
 SELECT s.id, s.cycle_id, s.team_member_id, s.starts_at, s.ends_at, s.is_paused,
-  COALESCE(NULLIF(u.full_name, ''), u.username, ct.name, '')::text AS display_name, m.user_id
+  COALESCE(NULLIF(u.full_name, ''), u.username, ct.name, '')::text AS display_name, m.user_id,
+  -- Un usuario bloqueado no cubre la guardia: su turno queda pendiente.
+  COALESCE(u.active, true)::boolean AS member_active
 FROM rotation_slots s
 JOIN rotation_cycles c ON c.id = s.cycle_id
 JOIN teams t ON t.id = c.team_id

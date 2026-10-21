@@ -15,7 +15,7 @@ const VIEW: MonthlyView = {
     month: '2026-09', areaCode: 'inf', areaName: 'Infraestructura', bizDays: 20, computedAt: '2026-10-01T11:00:00Z',
     people: [
       person({ id: 'ana', name: 'Ana Rojas', level: 'N1', tasks: 18, onTime: 17, skipped: 1, tickets: 12, ticketsSla: 11 }),
-      person({ id: 'luis', name: 'Luis Fuentes', level: 'N1', tasks: 15, onTime: 12, openLate: 1, doneLate: 2, tickets: 9, ticketsSla: 9, absentDays: 3 }),
+      person({ id: 'luis', name: 'Luis Fuentes', level: 'N1', tasks: 15, onTime: 12, openLate: 1, doneLate: 2, tickets: 9, ticketsSla: 9, absentDays: 3, goalsDone: 2 }),
     ],
     total: person({ name: 'Total Infraestructura', tasks: 33, onTime: 29, openLate: 1, skipped: 1, tickets: 21, ticketsSla: 20, absentDays: 3 }),
   },
@@ -56,6 +56,8 @@ describe('Mi equipo → Resumen mensual (9.7)', () => {
     expect(el.querySelectorAll('tbody tr').length).toBe(2);
     expect(el.textContent).toContain('Total Infraestructura');
     expect(el.textContent).toContain('Mes cerrado');
+    expect(el.querySelector('thead')?.textContent).toContain('Metas cumplidas');
+    expect([...el.querySelectorAll('tbody tr')].some((r) => r.textContent?.includes('Luis Fuentes') && [...r.querySelectorAll('td')].some((td) => td.textContent?.trim() === '2'))).toBe(true);
     // Luis: 12 a tiempo de 15 (2 tarde + 1 abierta) = 80 %.
     expect(el.querySelectorAll('tbody tr')[1].textContent).toContain('80 %');
   });

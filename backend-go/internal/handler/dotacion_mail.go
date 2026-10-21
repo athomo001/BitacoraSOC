@@ -326,7 +326,7 @@ func (h *DotacionHandler) buildScheduleListMail(ctx context.Context, schedule db
 			continue
 		}
 		userID := ""
-		if s.UserID.Valid {
+		if s.UserID.Valid && s.MemberActive {
 			userID = uuid.UUID(s.UserID.Bytes).String()
 		}
 		if userID != "" && absent[userID] && !keepAbsent {

@@ -4,6 +4,49 @@ Registro de cambios relevantes del proyecto.
 
 > Las entradas `[Rewrite]` registran avance de la reescritura Go/Angular especificada en `spec/` (ver `spec/02-alcance-y-roadmap.md`), fase por fase. No llevan número de versión de `package.json` porque documentan spec/decisiones/código de un sistema todavía no desplegado — el sistema en producción sigue siendo el de las entradas versionadas de abajo hasta el corte (Fase 14).
 
+## [Rewrite] Metas por persona: escalones, lograda o no lograda y regla - 2026-10-21
+
+- El dueño pidió agrupar las metas por persona, poder decir que la secundaria no hace falta si se cumple la primaria (o al revés), guardar si una certificación se pasó o no, y que diga «meta» en vez de «bono». Diseño aprobado con sus seis propuestas: <https://claude.ai/artifact/H4hHG2qFqghk9GdgN3y4ir>.
+- **Una fila por persona** en Gestión → Metas (Todas y Personas), con el resumen de sus metas; al abrirla, sus metas ordenadas por escalón: **Meta primaria**, **secundaria** y **terciaria** (nueva).
+- **Lograda o No lograda**: la jefatura (o el admin) marca «No lograda» con el motivo; una vencida sin resultado también es no lograda. El dato queda en el historial.
+- **Regla por persona**: Todas cuentan (por defecto), Basta una, Basta la primaria o Basta la secundaria. Al lograr la que pide, las demás quedan **No hace falta** con el porqué, sin avisos; si se reabre o se borra la lograda, vuelven a abrirse.
+- «Cuenta para el bono» pasa a **Meta: Primaria · Secundaria · Terciaria · Sin escalón**; los textos dicen «lograda» en vez de «cumplida».
+- **Modelo** (migración 000058): `goals.outcome`, `outcome_reason`, `outcome_at`, `outcome_by`, `bonus_rank` con `tertiary` y la tabla `goal_person_rules`.
+- Pruebas: la regla, no lograda y no hace falta, quién puede cambiarlas y que no avisen (integración); la fila por persona, la regla y no lograda en pantalla.
+
+## [Rewrite] Usuarios desactivados y eliminados - 2026-10-21
+
+- El dueño preguntó qué pasa con un usuario enlazado en escalamiento u otros lados al bloquearlo o borrarlo. Revisión: «Eliminar» solo desactivaba, y desactivar no lo sacaba de ningún lado; el legacy, al bloquear, lo quitaba del Directorio y de los flujos de escalamiento.
+- **Desactivar** (decisión del dueño: esconder y avisar): la persona deja de estar de guardia (panel de escalamiento, API, checklist, dotación y Mi equipo), sale de las tarjetas y los llamados de escalamiento, y su turno aparece «Pendiente · … desactivado» en Guardias, sin contar como cubierto (también para el aviso de guardia sin cubrir). Antes de desactivar, Usuarios muestra lo que tiene a su nombre (guardias con turnos por venir, escalamiento, pools, turnos, clientes como CSM, tickets abiertos, tareas, metas, equipos) y, ya desactivada, lo que sigue a su nombre para reasignarlo. No se borra nada: al reactivarla vuelve todo. Los avisos y las listas para elegir gente ya la ignoraban.
+- **Eliminar** (decisión del dueño): borra de verdad, y de todos lados, a quien no tiene historial (sus membresías sin turnos se van con él); si tiene historial (entró alguna vez, escribió entradas o tickets…), queda desactivado. No se puede eliminar a uno mismo.
+- El Directorio de la 2.0 no copia usuarios como contactos (los `user_sync` que trajo el ETL son listas y personas externas), así que no hay nada que limpiar ahí.
+- Pruebas: guardia vigente, llamados, tarjetas y turnos con alguien desactivado, reactivar, y eliminar con y sin historial (integración); el aviso, Eliminar y el turno pendiente (pantalla).
+
+## [Rewrite] Metas para cualquier usuario o para alguien sin cuenta, y «Sin área» en Usuarios - 2026-10-21
+
+- El dueño vio que al poner una meta a una persona solo aparecía un usuario de prueba: la lista pedía estar en un grupo con área, y los usuarios cargados antes de que el ETL asignara grupos no tienen ninguno.
+- **Administración → Usuarios y grupos** marca **Sin área** a quien no está en ningún grupo con área (no aparece en la Agenda, las metas ni Mi equipo); se ubica en «Áreas y nivel». No se cambian datos solos (decisión del dueño).
+- **Nueva meta → Una persona**: el admin elige entre todos los usuarios activos (los que no tienen área salen «sin área»); la jefatura, entre la gente de su área. Con **Alguien sin cuenta…** se escribe nombre y correo, solo como registro: la ven quien la creó y el admin. Si después se crea un usuario con ese correo, la meta pasa a su cuenta con su historial.
+- **Modelo** (migración 000057): `goals.person_name`, `goals.person_email` y el trigger `link_goals_to_user` sobre `users`.
+- Pruebas: quién puede registrar a alguien sin cuenta, el correo repetido y el traspaso a la cuenta (integración); el diálogo y la marca en Usuarios (pantalla).
+
+## [Rewrite] Gestión CSM: notas internas del CSM - 2026-10-21
+
+- Diseño aprobado por el dueño con sus tres decisiones (`spec/16` §4.7.1): <https://claude.ai/artifact/TyqgmuG81PEdVxd39jvXFG>. Con esto queda completa la §4.7 (Comunicaciones).
+- **Pestaña Notas** en la ficha del cliente, con cuántas hay: lo que el equipo de CSM debe saber de la cuenta (acuerdos, contexto, cómo trata el cliente un tema), con autor y fecha.
+- **Solo las ve el perfil Gestión**: ni el admin ni las jefaturas de otras áreas. Tampoco salen en la línea de tiempo, en «Exportar resumen» ni en el reenvío a un SIEM; la Auditoría registra que existe una nota, sin el texto.
+- Editar y borrar (con confirmación), solo el autor; queda «editada» con la fecha. **Fijar** o desfijar, cualquiera de CSM: la fijada va arriba. **Crear acción** abre «Nueva acción» con la primera línea de la nota.
+- **Modelo** (migración 000056): `client_notes`.
+- Pruebas: quién las ve, edita, fija y borra (integración) y la pestaña en la pantalla.
+
+## [Rewrite] Gestión CSM: avisos de las metas y metas en el Resumen mensual - 2026-10-21
+
+- Lo que quedó pendiente de la 9.4 (`spec/16` §4.4.5), ya definido en el diseño aprobado.
+- **Las metas avisan como una tarea**: 5 y 1 días hábiles antes y el día que vencen, en horario hábil; y una vez si se vencen sin cumplirse. Llegan a la persona (o al responsable); la vencida, también a quien la creó. Usan los tipos de aviso de la Agenda, así se apagan o llegan por correo igual que los de una tarea. El enlace abre «Mis metas» (las de una persona) o Gestión → Metas.
+- **Resumen mensual de Mi equipo**: columna **Metas cumplidas** por persona y en el total (las que cuentan para el bono, al confirmarlas; las de alguien de otra área no suman). En el correo van bajo el nombre de cada persona, porque la plantilla de lista del legacy tiene cinco columnas y no se le agrega otra.
+- **Modelo** (migración 000055): `goal_alerts`, para que cada aviso salga una sola vez.
+- Pruebas: la regla de qué aviso toca, a quién llega y las metas del resumen (unitarias), y la columna en la pantalla.
+
 ## [Rewrite] GLPI en la Ticketera, fase 2: de la app a GLPI (10d.2) - 2026-10-21
 
 - Diseño aprobado por el dueño con las cinco propuestas de `spec/18` §4.8: <https://claude.ai/artifact/Pju4VRF871FM2jcSqSocG3>. El dueño pidió construirla sin esperar la prueba de la 10d.1 con su GLPI real («tengo un GLPI de pruebas, construye no más»); se probó contra el GLPI falso de las pruebas.

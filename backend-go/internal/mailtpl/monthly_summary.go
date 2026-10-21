@@ -12,6 +12,9 @@ type MonthlyRow struct {
 	// OnTimePct, SLAPct: -1 = sin datos.
 	Tasks, OnTimePct, OpenLate, Skipped int
 	Tickets, SLAPct, AbsentDays         int
+	// GoalsDone: metas cumplidas en el mes; van bajo el nombre (la plantilla
+	// del legacy tiene cinco columnas y no se le agrega una).
+	GoalsDone int
 }
 
 // MonthlySummaryOptions arma el correo del resumen mensual (spec/16 §6.1, 9.7).
@@ -61,6 +64,13 @@ func RenderMonthlySummary(o MonthlySummaryOptions) (string, error) {
 		name := e(r.Name)
 		if r.Level != "" {
 			name += fmt.Sprintf(`<br><span style="font-size:13px; font-weight:400; color:#5B695D;">%s</span>`, e(r.Level))
+		}
+		if r.GoalsDone > 0 {
+			goals := fmt.Sprintf("%d metas cumplidas", r.GoalsDone)
+			if r.GoalsDone == 1 {
+				goals = "1 meta cumplida"
+			}
+			name += fmt.Sprintf(`<br><span style="font-size:13px; font-weight:400; color:#5B695D;">%s</span>`, goals)
 		}
 		if bold {
 			weight = "800"

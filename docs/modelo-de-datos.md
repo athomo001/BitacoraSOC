@@ -2,7 +2,7 @@
 
 > Generado por `backend-go/cmd/er-docs` desde `backend-go/sql/schema/0001_init_schema.sql`, el esquema que usa sqlc, con todas las migraciones aplicadas. **No se edita a mano**: si cambia el esquema, se regenera con `go run ./cmd/er-docs` desde `backend-go/`.
 
-118 tablas en PostgreSQL, agrupadas en 17 dominios. Notación pata de gallo: `||` uno, `|o` / `o|` cero o uno, `o{` cero o muchos. La etiqueta de cada línea es la columna que hace la referencia.
+121 tablas en PostgreSQL, agrupadas en 17 dominios. Notación pata de gallo: `||` uno, `|o` / `o|` cero o uno, `o{` cero o muchos. La etiqueta de cada línea es la columna que hace la referencia.
 
 - Cada entidad muestra todas sus columnas salvo `created_at` y `updated_at`. `PK` clave primaria, `FK` referencia a otra tabla, `UK` valor único.
 - Las tablas de otros dominios aparecen como cajas sin columnas: son la misma tabla, dibujada donde se une.
@@ -20,7 +20,7 @@ Correspondencia con el legacy (MongoDB): [modelo-er-legacy-2.0.md](modelo-er-leg
 5. [Equipos y escalamiento](#5-equipos-y-escalamiento) — 15 tablas
 6. [Turnos, guardias y dotación](#6-turnos-guardias-y-dotación) — 11 tablas
 7. [Agenda](#7-agenda) — 8 tablas
-8. [Gestión CSM](#8-gestión-csm) — 8 tablas
+8. [Gestión CSM](#8-gestión-csm) — 11 tablas
 9. [Integraciones](#9-integraciones) — 6 tablas
 10. [Notificaciones y avisos con acuse](#10-notificaciones-y-avisos-con-acuse) — 6 tablas
 11. [Checklists](#11-checklists) — 4 tablas
@@ -1113,6 +1113,12 @@ erDiagram
         timestamptz confirmed_at
         uuid confirmed_by FK
         uuid created_by FK
+        text person_name
+        text person_email
+        text outcome
+        text outcome_reason
+        timestamptz outcome_at
+        uuid outcome_by FK
     }
     GOAL_MILESTONES {
         uuid id PK
@@ -1141,6 +1147,27 @@ erDiagram
         bytea file_data
         text url
         uuid uploaded_by FK
+    }
+    GOAL_ALERTS {
+        uuid goal_id PK, FK
+        text alert PK
+        timestamptz sent_at
+    }
+    GOAL_PERSON_RULES {
+        uuid user_id PK, FK
+        text rule
+        uuid updated_by FK
+    }
+    CLIENT_NOTES {
+        uuid id PK
+        uuid client_id FK
+        uuid author_id FK
+        text author_name
+        text content
+        boolean pinned
+        uuid pinned_by FK
+        timestamptz pinned_at
+        timestamptz edited_at
     }
     PLAYBOOKS {
         uuid id PK
@@ -1182,19 +1209,23 @@ erDiagram
     AGENDA_TASKS |o--o{ GOAL_MILESTONES : "agenda_task_id"
     AREAS |o--o{ GOALS : "area_id"
     AREAS |o--o{ PLAYBOOK_ITEMS : "area_id"
+    GOALS ||--o{ GOAL_ALERTS : "goal_id"
     GOALS ||--o{ GOAL_EVENTS : "goal_id"
     GOALS ||--o{ GOAL_EVIDENCE : "goal_id"
     GOALS ||--o{ GOAL_MILESTONES : "goal_id"
     LEVELS |o--o{ PLAYBOOK_ITEMS : "level_id"
     ORGANIZATIONS |o--o{ GOALS : "client_id"
+    ORGANIZATIONS ||--o{ CLIENT_NOTES : "client_id"
     ORGANIZATIONS ||--o{ PLAYBOOK_APPLICATIONS : "client_id"
     PLAYBOOKS ||--o{ PLAYBOOK_APPLICATIONS : "playbook_id"
     PLAYBOOKS ||--o{ PLAYBOOK_ITEMS : "playbook_id"
     TEAMS |o--o{ PLAYBOOK_ITEMS : "team_id"
     TICKETS |o--o{ GOAL_MILESTONES : "ticket_id"
+    USERS |o--o{ CLIENT_NOTES : "author_id"
     USERS |o--o{ GOALS : "owner_user_id"
     USERS |o--o{ GOALS : "person_user_id"
     USERS |o--o{ GOAL_EVENTS : "user_id"
+    USERS ||--o| GOAL_PERSON_RULES : "user_id"
 ```
 
 ---

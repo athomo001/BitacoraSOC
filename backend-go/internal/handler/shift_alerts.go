@@ -391,7 +391,7 @@ func (h *ShiftAlertsHandler) uncoveredGuards(ctx context.Context, monday time.Ti
 		start := time.Date(monday.Year(), monday.Month(), monday.Day()+offset, 0, 0, 0, 0, loc).Add(time.Duration(micro) * time.Microsecond)
 		var spans []span
 		for _, s := range slots {
-			if s.CycleID == cy.ID && !s.IsPaused {
+			if s.CycleID == cy.ID && !s.IsPaused && s.MemberActive {
 				spans = append(spans, span{s.StartsAt.Time, s.EndsAt.Time})
 			}
 		}

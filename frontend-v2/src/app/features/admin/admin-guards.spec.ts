@@ -6,7 +6,7 @@ import { GuardTimeline } from '../../core/shifts/guards.service';
 
 const DAY = 86_400_000;
 
-function timeline(now: number, withSwap = false): GuardTimeline {
+function timeline(now: number, withSwap = false, blocked = false): GuardTimeline {
   const iso = (ms: number) => new Date(ms).toISOString();
   return {
     from: iso(now - 30 * DAY),
@@ -23,7 +23,7 @@ function timeline(now: number, withSwap = false): GuardTimeline {
       },
     ],
     slots: [
-      { id: 's1', cycleId: 'c2', teamMemberId: 'm1', name: 'Ana Rojas', userId: 'u1', startsAt: iso(now - DAY), endsAt: iso(now + 2 * DAY), paused: false },
+      { id: 's1', cycleId: 'c2', teamMemberId: 'm1', name: 'Ana Rojas', userId: 'u1', startsAt: iso(now - DAY), endsAt: iso(now + 2 * DAY), paused: false, blocked },
       { id: 's2', cycleId: 'c2', teamMemberId: 'm2', name: 'Beto Soto', userId: 'u2', startsAt: iso(now + 3 * DAY), endsAt: iso(now + 10 * DAY), paused: false },
     ],
     overrides: withSwap
@@ -44,13 +44,13 @@ describe('AdminGuardsComponent (línea de tiempo de guardias)', () => {
     httpMock = TestBed.inject(HttpTestingController);
   });
 
-  async function render(withSwap = false) {
+  async function render(withSwap = false, blocked = false) {
     const now = Date.now();
     const fixture = TestBed.createComponent(AdminGuardsComponent);
     fixture.detectChanges();
     const reqs = httpMock.match((r) => r.url === '/api/guards');
     expect(reqs.length).toBe(2);
-    reqs.forEach((r: TestRequest) => r.flush({ data: timeline(now, withSwap) }));
+    reqs.forEach((r: TestRequest) => r.flush({ data: timeline(now, withSwap, blocked) }));
     await tick();
     fixture.detectChanges();
     return { fixture, el: fixture.nativeElement as HTMLElement, now };
@@ -64,6 +64,14 @@ describe('AdminGuardsComponent (línea de tiempo de guardias)', () => {
     expect(cards[1].textContent).toContain('Sin guardia ahora');
     expect(el.querySelectorAll('.gd__gap').length).toBeGreaterThan(0);
     expect(el.querySelector('.gd__issue')?.textContent).toContain('N2 sin nadie');
+  });
+
+  it('el turno de alguien desactivado queda pendiente: no está de guardia y la guardia queda sin cubrir', async () => {
+    const { el } = await render(false, true);
+    const cards = el.querySelectorAll('.gd__card');
+    expect(cards[0].textContent).not.toContain('Ana Rojas');
+    expect(el.querySelector('.gd__bar--paused')?.textContent).toContain('Pendiente · Ana Rojas desactivado');
+    expect(el.querySelectorAll('.gd__gap').length).toBeGreaterThan(0);
   });
 
   it('un clic en un reemplazo lo abre para editarlo y borrarlo', async () => {

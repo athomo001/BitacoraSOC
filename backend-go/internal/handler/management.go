@@ -376,6 +376,8 @@ type mgmtClientDetailDTO struct {
 	Renewal  []mgmtRenewalStepDTO `json:"renewal"`
 	// Applied: las plantillas del sistema aplicadas al cliente (clave → fecha).
 	Applied map[string]string `json:"applied"`
+	// NotesCount: las notas internas del CSM (solo para el perfil Gestión; §4.7.1).
+	NotesCount *int32 `json:"notesCount,omitempty"`
 }
 
 // slaTargetFor: el objetivo del cliente si su contrato lo pide; si no, el global.
@@ -505,6 +507,11 @@ func (h *ManagementHandler) Client(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	sort.SliceStable(d.Renewal, func(i, j int) bool { return d.Renewal[i].Due < d.Renewal[j].Due })
+	if u.gestion {
+		if n, err := h.Queries.CountClientNotes(ctx, row.ID); err == nil {
+			d.NotesCount = &n
+		}
+	}
 	writeData(w, http.StatusOK, d)
 }
 
@@ -592,11 +599,11 @@ type mgmtNamedDTO struct {
 }
 
 type mgmtPersonDTO struct {
-	ID       uuid.UUID `json:"id"`
-	Name     string    `json:"name"`
-	AreaID   uuid.UUID `json:"areaId"`
-	AreaName string    `json:"areaName"`
-	Level    string    `json:"level,omitempty"`
+	ID       uuid.UUID  `json:"id"`
+	Name     string     `json:"name"`
+	AreaID   *uuid.UUID `json:"areaId"`
+	AreaName string     `json:"areaName"`
+	Level    string     `json:"level,omitempty"`
 }
 
 // Meta es GET /api/management/meta: lo que necesitan los formularios de Gestión.
@@ -632,11 +639,20 @@ func (h *ManagementHandler) Meta(w http.ResponseWriter, r *http.Request) {
 		cs = append(cs, mgmtNamedDTO{ID: x.ID, Name: x.Name})
 	}
 	out["csms"] = cs
-	// Metas por persona: la jefatura las pone a la gente de su área; el admin, a todos.
+	// Metas por persona: la jefatura las pone a la gente de su área; el admin, a
+	// todos los usuarios (también a quien todavía no está en un área).
 	ps := []mgmtPersonDTO{}
 	for _, p := range people {
-		if u.admin || u.leads[p.AreaID] {
-			ps = append(ps, mgmtPersonDTO{ID: p.ID, Name: p.Name, AreaID: p.AreaID, AreaName: p.AreaName, Level: p.LevelName})
+		area, err := uuid.Parse(p.AreaID)
+		if err != nil && !u.admin {
+			continue
+		}
+		if u.admin || u.leads[area] {
+			d := mgmtPersonDTO{ID: p.ID, Name: p.Name, AreaName: p.AreaName, Level: p.LevelName}
+			if err == nil {
+				d.AreaID = &area
+			}
+			ps = append(ps, d)
 		}
 	}
 	out["people"] = ps

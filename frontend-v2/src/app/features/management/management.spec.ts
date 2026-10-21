@@ -7,6 +7,7 @@ import { SseService } from '../../core/sse/sse.service';
 import { ClientHealth, Goal, Indicators, MgmtClient, MgmtClientDetail, MgmtMeta } from '../../core/management/management.service';
 import { GoalDetailComponent } from './goal-detail';
 import { MgmtIndicatorsComponent } from './mgmt-indicators';
+import { MgmtGoalsComponent } from './mgmt-goals';
 
 const settle = () => new Promise((resolve) => setTimeout(resolve));
 
@@ -136,6 +137,76 @@ describe('Gestión CSM (9.4)', () => {
     req.flush({ data: {} });
     await settle();
   });
+
+  it('las notas internas: pestaña con contador, fijada arriba, solo el autor edita y «Crear acción» lleva el texto', async () => {
+    const { fixture, el } = await render(detail(CASINOS, { notesCount: 2 }));
+    const tab = [...el.querySelectorAll<HTMLButtonElement>('.adm-tab')].find((b) => b.textContent?.includes('Notas'))!;
+    expect(tab.textContent).toContain('2');
+    tab.click();
+    fixture.detectChanges();
+    const notes = [
+      { id: 'n1', authorId: 'u-tomas', authorName: 'Tomás Rivas', content: 'Avisos de ventana: al jefe de TI.\nSiempre por correo.', pinned: true, editedAt: null, createdAt: '2026-10-01T12:00:00Z', mine: false },
+      { id: 'n2', authorId: 'u-lucia', authorName: 'Lucía Vera', content: 'Quieren sumar las sucursales del norte.', pinned: false, editedAt: null, createdAt: '2026-10-15T12:00:00Z', mine: true },
+    ];
+    http.expectOne('/api/management/clients/c1/notes').flush({ data: notes });
+    await settle();
+    fixture.detectChanges();
+    const cards = [...el.querySelectorAll<HTMLElement>('.mn__note')];
+    expect(cards[0].classList).toContain('mn__note--pinned');
+    expect(cards[0].textContent).toContain('Desfijar');
+    expect(cards[0].textContent).not.toContain('Editar');
+    expect(cards[1].textContent).toContain('Editar');
+
+    // Fijar una nota ajena: cualquiera de CSM.
+    ([...cards[0].querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent?.includes('Desfijar')))!.click();
+    const pin = http.expectOne('/api/management/notes/n1/pin');
+    expect(pin.request.body).toEqual({ pinned: false });
+    pin.flush({ data: { ...notes[0], pinned: false } });
+    await settle();
+    http.expectOne('/api/management/clients/c1/notes').flush({ data: notes });
+    await settle();
+
+    // Guardar una nota nueva.
+    const box = el.querySelector('textarea[name="noteNew"]') as HTMLTextAreaElement;
+    box.value = '  Renovación: decide el gerente general.  ';
+    box.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    ([...el.querySelectorAll<HTMLButtonElement>('.mn__composer button')].find((b) => b.textContent?.includes('Guardar nota')))!.click();
+    const create = http.expectOne((r) => r.method === 'POST' && r.url === '/api/management/clients/c1/notes');
+    expect(create.request.body).toEqual({ content: 'Renovación: decide el gerente general.' });
+    create.flush({ data: {} });
+    await settle();
+    http.expectOne('/api/management/clients/c1/notes').flush({ data: [...notes, { ...notes[1], id: 'n3' }] });
+    await settle();
+    fixture.detectChanges();
+    expect(tab.textContent).toContain('3');
+
+    // «Crear acción» abre «Nueva acción» con la primera línea de la nota.
+    ([...el.querySelectorAll<HTMLElement>('.mn__note')][0].querySelectorAll<HTMLButtonElement>('button'))
+      .forEach((b) => b.textContent?.includes('Crear acción') && b.click());
+    await settle();
+    http.expectOne('/api/agenda/meta').flush({ data: { today: '2026-10-21', workDays: [1, 2, 3, 4, 5], dayStart: '08:00', dayEnd: '20:00', holidays: {}, me: 'u-lucia', admin: false, viewAll: true, leadAreas: [], crossArea: true,
+      areas: [{ id: 'a-csm', code: 'csm', name: 'CSM', mine: true, lead: false, myRank: 0, levels: [], people: [], guards: [] }] } });
+    await settle();
+    fixture.detectChanges();
+    expect((document.querySelector('app-mgmt-action-dialog input[name="actName"]') as HTMLInputElement).value).toBe('Avisos de ventana: al jefe de TI.');
+  });
+
+  it('sin el perfil Gestión no hay pestaña de notas', async () => {
+    const fixture = TestBed.createComponent(ManagementComponent);
+    fixture.detectChanges();
+    http.expectOne('/api/management/meta').flush({ data: { ...META, gestion: false, leadAreas: ['soc'] } });
+    http.expectOne('/api/management/clients').flush({ data: [CASINOS] });
+    http.expectOne('/api/tickets/scope').flush({ data: { all: true, myAreas: [], defaultArea: 'soc', areas: [] } });
+    await settle();
+    fixture.detectChanges();
+    http.expectOne('/api/management/clients/c1').flush({ data: detail(CASINOS) });
+    await settle();
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('.mc')).toBeTruthy();
+    expect([...el.querySelectorAll('.adm-tab')].some((b) => b.textContent?.includes('Notas'))).toBe(false);
+  });
 });
 
 describe('Detalle de una meta', () => {
@@ -167,7 +238,7 @@ describe('Detalle de una meta', () => {
     return { fixture, el: fixture.nativeElement as HTMLElement };
   }
 
-  it('un hito enlazado se marca solo y sin certificado no se puede marcar cumplida', async () => {
+  it('un hito enlazado se marca solo y sin certificado no se puede marcar lograda', async () => {
     const { el } = await render(GOAL);
     const steps = el.querySelectorAll<HTMLButtonElement>('.gt__check');
     expect(steps[1].disabled).toBe(true);
@@ -175,7 +246,7 @@ describe('Detalle de una meta', () => {
     expect(steps[1].textContent).toContain('se marca solo');
     expect(el.querySelector('.gt__bono')?.textContent).toContain('primaria');
     expect(el.textContent).toContain('Falta el certificado');
-    const done = [...el.querySelectorAll<HTMLButtonElement>('.gt__actions button')].find((b) => b.textContent?.includes('Marcar cumplida'))!;
+    const done = [...el.querySelectorAll<HTMLButtonElement>('.gt__actions button')].find((b) => b.textContent?.includes('Marcar lograda'))!;
     expect(done.disabled).toBe(true);
     steps[2].click();
     const req = http.expectOne('/api/goals/g5/milestones/s3/done');
@@ -183,12 +254,97 @@ describe('Detalle de una meta', () => {
     req.flush({ data: GOAL });
   });
 
-  it('la jefatura confirma la que cuenta para el bono', async () => {
+  it('la jefatura confirma la meta con escalón', async () => {
     const { el } = await render({ ...GOAL, state: 'confirm', canConfirm: true, evidenceCount: 1, milestonesDone: 3 });
     expect(el.querySelector('.gt__note--info')?.textContent).toContain('espera la confirmación de la jefatura');
-    ([...el.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent?.includes('Confirmar para el bono')))!.click();
+    ([...el.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent?.includes('Confirmar lograda')))!.click();
     http.expectOne('/api/goals/g5/confirm').flush({ data: { ...GOAL, state: 'done', confirmedByName: 'Jefatura SOC', confirmedAt: '2026-10-20T15:00:00Z' } });
     await settle();
+  });
+
+  it('rindió y no pasó: la jefatura la marca no lograda con el motivo, y queda el dato', async () => {
+    const { fixture, el } = await render({ ...GOAL, canOutcome: true });
+    ([...el.querySelectorAll<HTMLButtonElement>('.gt__actions button')].find((b) => b.textContent?.includes('No lograda')))!.click();
+    fixture.detectChanges();
+    const reason = el.querySelector('input[name="notAchievedReason"]') as HTMLInputElement;
+    reason.value = 'Reprobó el examen';
+    reason.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    ([...el.querySelectorAll<HTMLButtonElement>('.gt__actions button')].find((b) => b.textContent?.includes('Marcar no lograda')))!.click();
+    const req = http.expectOne('/api/goals/g5/not-achieved');
+    expect(req.request.body).toEqual({ reason: 'Reprobó el examen' });
+    req.flush({ data: { ...GOAL, state: 'failed', outcomeReason: 'Reprobó el examen', canOutcome: false } });
+    await settle();
+    fixture.detectChanges();
+    expect(el.querySelector('.gt__note--warn')?.textContent).toContain('No lograda: Reprobó el examen.');
+  });
+
+  it('la que dejó de hacer falta dice por qué y no se reabre a mano', async () => {
+    const { el } = await render({ ...GOAL, bonus: 'tertiary', state: 'not_needed', outcomeReason: 'Logró la meta secundaria «ISO 27001»', canEdit: true });
+    expect(el.textContent).toContain('No hace falta: Logró la meta secundaria «ISO 27001».');
+    expect(el.querySelector('.gt__bono')?.textContent).toContain('Meta terciaria');
+    expect([...el.querySelectorAll('button')].some((b) => b.textContent?.includes('Reabrir'))).toBe(false);
+  });
+});
+
+describe('Metas por persona', () => {
+  let http: HttpTestingController;
+  const base = { kind: 'certification' as const, evidenceRequired: false, evidenceCount: 0, manualRisk: false, autoRisk: false, bizDaysLeft: 30, milestones: 2, milestonesDone: 0, canEdit: true, canMark: true, canConfirm: false };
+  const GOALS: Goal[] = [
+    { ...base, id: 'g3', name: 'Fortinet NSE 1', scope: 'person', personId: 'u-mf', personName: 'Matias Fuentes', bonus: 'tertiary', dueDate: '2027-02-28', state: 'not_needed', personRule: 'any', canRule: true },
+    { ...base, id: 'g1', name: 'Btrust BCIE', scope: 'person', personId: 'u-mf', personName: 'Matias Fuentes', bonus: 'primary', dueDate: '2026-12-15', state: 'failed', personRule: 'any', canRule: true },
+    { ...base, id: 'g2', name: 'ISO 27001', scope: 'person', personId: 'u-mf', personName: 'Matias Fuentes', bonus: 'secondary', dueDate: '2027-01-30', state: 'done', personRule: 'any', canRule: true },
+    { ...base, id: 'g9', name: 'Renovar contrato', scope: 'client', clientId: 'c1', clientName: 'Casinos', dueDate: '2026-12-31', state: 'open' },
+  ];
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({ imports: [MgmtGoalsComponent], providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])] });
+    http = TestBed.inject(HttpTestingController);
+  });
+
+  it('una fila por persona, con sus metas por escalón y la regla que se cambia ahí mismo', async () => {
+    const fixture = TestBed.createComponent(MgmtGoalsComponent);
+    fixture.componentRef.setInput('meta', META);
+    fixture.componentRef.setInput('clients', [CASINOS]);
+    fixture.componentRef.setInput('areas', []);
+    fixture.detectChanges();
+    http.expectOne('/api/goals').flush({ data: GOALS });
+    await settle();
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    http.match((r) => r.url.startsWith('/api/goals/')).forEach((r) => r.flush({ data: GOALS[0] }));
+    const tabs = [...el.querySelectorAll<HTMLButtonElement>('.adm-tab')];
+    expect(tabs.find((t) => t.textContent?.includes('Personas'))?.textContent).toContain('1');
+    expect(tabs.find((t) => t.textContent?.includes('Todas'))?.textContent).toContain('2');
+    ([...el.querySelectorAll<HTMLButtonElement>('.seg')].find((b) => b.textContent?.includes('Todas')))!.click();
+    fixture.detectChanges();
+    await settle();
+    http.match((r) => r.url.startsWith('/api/goals/')).forEach((r) => r.flush({ data: GOALS[0] }));
+    fixture.detectChanges();
+
+    const people = el.querySelectorAll('.mgo__person');
+    expect(people.length).toBe(1);
+    expect(people[0].textContent).toContain('Matias Fuentes');
+    expect(people[0].textContent).toContain('1 lograda');
+    expect(people[0].textContent).toContain('1 no lograda');
+    expect(people[0].textContent).toContain('1 no hace falta');
+    const ranks = [...el.querySelectorAll('.mgo__row--in .mgo__bono')].map((b) => b.textContent?.trim());
+    expect(ranks).toEqual(['Meta primaria', 'Meta secundaria', 'Meta terciaria']);
+    expect(el.textContent).not.toContain('Bono');
+
+    const select = el.querySelector('select[name="goalRule"]') as HTMLSelectElement;
+    expect(select.value).toBe('any');
+    select.value = 'primary';
+    select.dispatchEvent(new Event('change'));
+    const req = http.expectOne('/api/goal-rules/u-mf');
+    expect(req.request.body).toEqual({ rule: 'primary' });
+    req.flush({ data: { rule: 'primary' } });
+    await settle();
+    http.expectOne('/api/goals').flush({ data: GOALS.map((g) => (g.personId ? { ...g, personRule: 'primary', state: g.id === 'g3' ? 'open' : g.state } : g)) });
+    await settle();
+    fixture.detectChanges();
+    expect(el.querySelector('.mgo__person')?.textContent).toContain('Basta la primaria');
+    expect(el.querySelector('.mgo__person')?.textContent).toContain('1 en curso');
   });
 });
 

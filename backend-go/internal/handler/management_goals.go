@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/mail"
 	"net/url"
 	"strings"
 	"time"
@@ -15,6 +16,7 @@ import (
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/problemdetails"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/repository/db"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -65,40 +67,50 @@ type goalEvidenceDTO struct {
 }
 
 type goalDTO struct {
-	ID              uuid.UUID          `json:"id"`
-	Name            string             `json:"name"`
-	Scope           string             `json:"scope"`
-	ClientID        *uuid.UUID         `json:"clientId,omitempty"`
-	ClientName      string             `json:"clientName,omitempty"`
-	AreaID          *uuid.UUID         `json:"areaId,omitempty"`
-	AreaName        string             `json:"areaName,omitempty"`
-	PersonID        *uuid.UUID         `json:"personId,omitempty"`
-	PersonName      string             `json:"personName,omitempty"`
-	PersonAreas     []string           `json:"personAreas,omitempty"`
-	OwnerID         *uuid.UUID         `json:"ownerId,omitempty"`
-	OwnerName       string             `json:"ownerName,omitempty"`
-	Kind            *string            `json:"kind,omitempty"`
-	Bonus           *string            `json:"bonus,omitempty"`
-	DueDate         string             `json:"dueDate"`
-	BizDaysLeft     int                `json:"bizDaysLeft"`
-	EstimateBizDays *int32             `json:"estimateBizDays,omitempty"`
-	EvidenceNeeded  bool               `json:"evidenceRequired"`
-	EvidenceCount   int32              `json:"evidenceCount"`
-	ManualRisk      bool               `json:"manualRisk"`
-	AutoRisk        bool               `json:"autoRisk"`
-	State           string             `json:"state"` // open | risk | confirm | done | failed
-	Milestones      int32              `json:"milestones"`
-	MilestonesDone  int32              `json:"milestonesDone"`
-	CompletedAt     *time.Time         `json:"completedAt,omitempty"`
-	ConfirmedAt     *time.Time         `json:"confirmedAt,omitempty"`
-	ConfirmedByName string             `json:"confirmedByName,omitempty"`
-	CreatedByName   string             `json:"createdByName,omitempty"`
-	CanEdit         bool               `json:"canEdit"`
-	CanMark         bool               `json:"canMark"`
-	CanConfirm      bool               `json:"canConfirm"`
-	Steps           []goalMilestoneDTO `json:"steps,omitempty"`
-	Events          []goalEventDTO     `json:"events,omitempty"`
-	Evidence        []goalEvidenceDTO  `json:"evidence,omitempty"`
+	ID         uuid.UUID  `json:"id"`
+	Name       string     `json:"name"`
+	Scope      string     `json:"scope"`
+	ClientID   *uuid.UUID `json:"clientId,omitempty"`
+	ClientName string     `json:"clientName,omitempty"`
+	AreaID     *uuid.UUID `json:"areaId,omitempty"`
+	AreaName   string     `json:"areaName,omitempty"`
+	PersonID   *uuid.UUID `json:"personId,omitempty"`
+	PersonName string     `json:"personName,omitempty"`
+	// Solo alguien sin cuenta (000057): el correo con que pasará a su cuenta.
+	PersonEmail     string     `json:"personEmail,omitempty"`
+	PersonAreas     []string   `json:"personAreas,omitempty"`
+	OwnerID         *uuid.UUID `json:"ownerId,omitempty"`
+	OwnerName       string     `json:"ownerName,omitempty"`
+	Kind            *string    `json:"kind,omitempty"`
+	Bonus           *string    `json:"bonus,omitempty"`
+	DueDate         string     `json:"dueDate"`
+	BizDaysLeft     int        `json:"bizDaysLeft"`
+	EstimateBizDays *int32     `json:"estimateBizDays,omitempty"`
+	EvidenceNeeded  bool       `json:"evidenceRequired"`
+	EvidenceCount   int32      `json:"evidenceCount"`
+	ManualRisk      bool       `json:"manualRisk"`
+	AutoRisk        bool       `json:"autoRisk"`
+	State           string     `json:"state"` // open | risk | confirm | done (lograda) | failed (no lograda) | not_needed
+	// No lograda o no hace falta: el motivo (vacía y vencida: «Venció el plazo»).
+	OutcomeReason string `json:"outcomeReason,omitempty"`
+	// La regla de la persona (all | any | primary | secondary), solo con cuenta.
+	PersonRule      string     `json:"personRule,omitempty"`
+	Milestones      int32      `json:"milestones"`
+	MilestonesDone  int32      `json:"milestonesDone"`
+	CompletedAt     *time.Time `json:"completedAt,omitempty"`
+	ConfirmedAt     *time.Time `json:"confirmedAt,omitempty"`
+	ConfirmedByName string     `json:"confirmedByName,omitempty"`
+	CreatedByName   string     `json:"createdByName,omitempty"`
+	CanEdit         bool       `json:"canEdit"`
+	CanMark         bool       `json:"canMark"`
+	CanConfirm      bool       `json:"canConfirm"`
+	// Marcarla no lograda (la jefatura o el admin, nunca la persona).
+	CanOutcome bool `json:"canOutcome"`
+	// Cambiar la regla de la persona.
+	CanRule  bool               `json:"canRule"`
+	Steps    []goalMilestoneDTO `json:"steps,omitempty"`
+	Events   []goalEventDTO     `json:"events,omitempty"`
+	Evidence []goalEvidenceDTO  `json:"evidence,omitempty"`
 }
 
 // goalState calcula el estado (nadie lo guarda salvo cumplida y confirmada).
@@ -119,21 +131,31 @@ func goalState(done, total int, bonus, completed, confirmed, manualRisk bool, du
 
 // goalPerms: quién ve, edita, marca y confirma una meta.
 type goalPerms struct {
-	see, edit, mark, confirm bool
+	see, edit, mark, confirm, rule bool
 }
 
 func (h *ManagementHandler) goalPermsFor(u agendaUser, g db.ListGoalsRow, personLeads map[uuid.UUID]bool) goalPerms {
 	creator := uuidEq(g.CreatedBy, u.id)
 	owner := uuidEq(g.OwnerUserID, u.id)
 	p := goalPerms{}
+	if g.Scope == "person" && !g.PersonUserID.Valid {
+		// Alguien sin cuenta: es un registro de quien la creó (admin o jefatura).
+		p.see = u.admin || creator || owner
+		p.edit = u.admin || creator
+		p.mark = p.edit || owner
+		p.confirm = p.edit
+		return p
+	}
 	if g.Scope == "person" {
 		person := uuidEq(g.PersonUserID, u.id)
 		lead := personLeads[u.id]
 		p.see = u.admin || person || lead || creator || owner
 		p.edit = u.admin || lead || creator
 		p.mark = p.edit || person || owner
-		// Confirma la jefatura de la persona o el admin; nunca la persona misma.
+		// Confirma (y marca no lograda) la jefatura de la persona o el admin;
+		// nunca la persona misma.
 		p.confirm = (u.admin || lead) && !person
+		p.rule = p.confirm
 		return p
 	}
 	areaLead := g.AreaID.Valid && u.leads[uuid.UUID(g.AreaID.Bytes)]
@@ -182,13 +204,23 @@ func (h *ManagementHandler) goalDTOOf(g db.ListGoalsRow, p goalPerms, c mgmtCloc
 	left := c.ac.cal.BusinessDaysBetween(c.today, due)
 	state, autoRisk := goalState(int(g.MilestonesDone), int(g.Milestones), g.BonusRank.Valid, g.CompletedAt.Valid, g.ConfirmedAt.Valid,
 		g.ManualRisk, due, c.today, left)
+	switch g.Outcome.String {
+	case "not_achieved":
+		state, autoRisk = "failed", false
+	case "not_needed":
+		state, autoRisk = "not_needed", false
+	}
 	d := goalDTO{ID: g.ID, Name: g.Name, Scope: g.Scope, ClientID: uuidPtr(g.ClientID), ClientName: g.ClientName, AreaID: uuidPtr(g.AreaID),
-		AreaName: g.AreaName, PersonID: uuidPtr(g.PersonUserID), PersonName: g.PersonName, OwnerID: uuidPtr(g.OwnerUserID), OwnerName: g.OwnerName,
+		AreaName: g.AreaName, PersonID: uuidPtr(g.PersonUserID), PersonName: g.PersonDisplay, PersonEmail: g.PersonEmail.String, OwnerID: uuidPtr(g.OwnerUserID), OwnerName: g.OwnerName,
 		Kind: textPtr(g.Kind), Bonus: textPtr(g.BonusRank), DueDate: agenda.FormatDate(due), BizDaysLeft: left, EvidenceNeeded: g.EvidenceRequired,
 		EvidenceCount: g.EvidenceCount, ManualRisk: g.ManualRisk, AutoRisk: autoRisk, State: state, Milestones: g.Milestones,
 		MilestonesDone: g.MilestonesDone, CompletedAt: timestamptzPtr(g.CompletedAt), ConfirmedAt: timestamptzPtr(g.ConfirmedAt),
 		ConfirmedByName: g.ConfirmedByName, CreatedByName: g.CreatedByName, CanEdit: p.edit, CanMark: p.mark,
-		CanConfirm: p.confirm && state == "confirm"}
+		CanConfirm: p.confirm && state == "confirm", OutcomeReason: g.OutcomeReason.String,
+		CanOutcome: p.confirm && (state == "open" || state == "risk" || state == "confirm"), CanRule: p.rule && g.PersonUserID.Valid}
+	if g.PersonUserID.Valid {
+		d.PersonRule = g.PersonRule
+	}
 	if g.EstimateBizDays.Valid {
 		d.EstimateBizDays = &g.EstimateBizDays.Int32
 	}
@@ -327,9 +359,12 @@ type goalRequest struct {
 	ClientID *uuid.UUID `json:"clientId"`
 	AreaID   *uuid.UUID `json:"areaId"`
 	PersonID *uuid.UUID `json:"personId"`
-	OwnerID  *uuid.UUID `json:"ownerId"`
-	Kind     string     `json:"kind"`
-	Bonus    string     `json:"bonus"`
+	// Alguien sin cuenta: nombre y correo, en vez de personId.
+	PersonName  string     `json:"personName"`
+	PersonEmail string     `json:"personEmail"`
+	OwnerID     *uuid.UUID `json:"ownerId"`
+	Kind        string     `json:"kind"`
+	Bonus       string     `json:"bonus"`
 	// Plazo: una fecha límite o un tiempo estimado en días hábiles desde hoy.
 	DueDate          string   `json:"dueDate"`
 	EstimateBizDays  int32    `json:"estimateBizDays"`
@@ -359,8 +394,8 @@ func (req *goalRequest) validate() error {
 		return errors.New("el nombre va de 1 a 200 caracteres")
 	case req.Kind != "" && req.Kind != "certification" && req.Kind != "action" && req.Kind != "other":
 		return errors.New("tipo: certification, action u other")
-	case req.Bonus != "" && req.Bonus != "primary" && req.Bonus != "secondary":
-		return errors.New("bono: primary o secondary")
+	case req.Bonus != "" && req.Bonus != "primary" && req.Bonus != "secondary" && req.Bonus != "tertiary":
+		return errors.New("escalón: primary, secondary o tertiary")
 	case len(req.Steps) > 30:
 		return errors.New("hasta 30 hitos")
 	}
@@ -431,6 +466,12 @@ func (h *ManagementHandler) CreateGoal(w http.ResponseWriter, r *http.Request) {
 		}
 		p.AreaID = pgUUIDOf(*req.AreaID)
 	case "person":
+		if req.PersonID == nil && (req.PersonName != "" || req.PersonEmail != "") {
+			if !h.externalPerson(w, r, u, &req, &p) {
+				return
+			}
+			break
+		}
 		if req.PersonID == nil {
 			problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "elige la persona")
 			return
@@ -494,6 +535,37 @@ func (h *ManagementHandler) CreateGoal(w http.ResponseWriter, r *http.Request) {
 	h.writeGoal(w, r, http.StatusCreated)
 }
 
+// externalPerson arma una meta para alguien sin cuenta: solo como registro,
+// la crean el admin o una jefatura, y no puede llevar el correo de un usuario.
+func (h *ManagementHandler) externalPerson(w http.ResponseWriter, r *http.Request, u agendaUser, req *goalRequest, p *db.CreateGoalParams) bool {
+	if !u.admin && len(u.leads) == 0 {
+		problemdetails.Write(w, r, http.StatusForbidden, "forbidden", "las metas de una persona las crea la jefatura de su área o el admin")
+		return false
+	}
+	name, email := strings.TrimSpace(req.PersonName), strings.ToLower(strings.TrimSpace(req.PersonEmail))
+	addr, err := mail.ParseAddress(email)
+	switch {
+	case name == "" || len([]rune(name)) > 120:
+		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "el nombre va de 1 a 120 caracteres")
+		return false
+	case err != nil || addr.Address != email || len(email) > 254:
+		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "el correo no es válido")
+		return false
+	}
+	if other, err := h.Queries.GetUserNameByEmail(r.Context(), email); err == nil {
+		problemdetails.Write(w, r, http.StatusConflict, "conflict", "ese correo ya es de "+other.Name+": elígelo en la lista")
+		return false
+	} else if !errors.Is(err, pgx.ErrNoRows) {
+		mgmtFail(w, r)
+		return false
+	}
+	p.PersonName, p.PersonEmail = pgtype.Text{String: name, Valid: true}, pgtype.Text{String: email, Valid: true}
+	p.OwnerUserID = pgUUIDOf(u.id)
+	p.Kind, p.BonusRank = optText(req.Kind), optText(req.Bonus)
+	p.EvidenceRequired = req.EvidenceRequired && req.Kind == "certification"
+	return true
+}
+
 // UpdateGoal es PUT /api/goals/{id}: nombre, área (de una de cliente),
 // responsable, tipo, bono, plazo y si pide el certificado.
 func (h *ManagementHandler) UpdateGoal(w http.ResponseWriter, r *http.Request) {
@@ -546,7 +618,7 @@ func (h *ManagementHandler) UpdateGoal(w http.ResponseWriter, r *http.Request) {
 // DeleteGoal es DELETE /api/goals/{id}.
 func (h *ManagementHandler) DeleteGoal(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	_, _, g, _, ok := h.goalFor(w, r)
+	_, _, g, row, ok := h.goalFor(w, r)
 	if !ok {
 		return
 	}
@@ -558,6 +630,7 @@ func (h *ManagementHandler) DeleteGoal(w http.ResponseWriter, r *http.Request) {
 		mgmtFail(w, r)
 		return
 	}
+	h.applyPersonRule(ctx, row.PersonUserID)
 	h.AuditLog.Log(ctx, "goal.deleted", audit.LevelWarn, audit.Success(), map[string]any{"goalId": g.ID.String(), "name": g.Name})
 	writeNoContent(w)
 }
@@ -721,6 +794,7 @@ func (h *ManagementHandler) GoalAction(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Risk    bool   `json:"risk"`
 		DueDate string `json:"dueDate"`
+		Reason  string `json:"reason"`
 	}
 	if r.ContentLength != 0 {
 		if err := decodeJSON(w, r, &req); err != nil {
@@ -733,7 +807,7 @@ func (h *ManagementHandler) GoalAction(w http.ResponseWriter, r *http.Request) {
 	var event string
 	switch action {
 	case "risk":
-		if !g.CanMark || g.State == "done" || g.State == "failed" {
+		if !g.CanMark || g.State == "done" || g.State == "failed" || g.State == "not_needed" {
 			problemdetails.Write(w, r, http.StatusConflict, "goal-closed", "la meta ya está cerrada")
 			return
 		}
@@ -743,8 +817,8 @@ func (h *ManagementHandler) GoalAction(w http.ResponseWriter, r *http.Request) {
 		}
 		event = map[bool]string{true: "Marcada en riesgo", false: "Se quitó «en riesgo»"}[req.Risk]
 	case "complete":
-		if !g.CanMark || g.State == "done" || g.State == "confirm" {
-			problemdetails.Write(w, r, http.StatusConflict, "goal-closed", "la meta ya está cumplida")
+		if !g.CanMark || g.State == "done" || g.State == "confirm" || row.Outcome.Valid {
+			problemdetails.Write(w, r, http.StatusConflict, "goal-closed", "la meta ya está cerrada")
 			return
 		}
 		if g.EvidenceNeeded && g.EvidenceCount == 0 {
@@ -752,12 +826,12 @@ func (h *ManagementHandler) GoalAction(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		p := db.SetGoalCompletedParams{ID: g.ID, CompletedAt: now, CompletedBy: pgUUIDOf(u.id)}
-		event = "Marcada cumplida"
+		event = "Marcada lograda"
 		// Quien puede confirmar no necesita pedírselo a nadie.
 		if row.BonusRank.Valid && (g.CanEdit && (u.admin || !uuidEq(row.PersonUserID, u.id))) {
 			p.ConfirmedAt, p.ConfirmedBy = now, pgUUIDOf(u.id)
 		} else if row.BonusRank.Valid {
-			event = "Marcada cumplida: espera la confirmación de la jefatura"
+			event = "Marcada lograda: espera la confirmación de la jefatura"
 		}
 		if err := h.Queries.SetGoalCompleted(ctx, p); err != nil {
 			mgmtFail(w, r)
@@ -773,7 +847,7 @@ func (h *ManagementHandler) GoalAction(w http.ResponseWriter, r *http.Request) {
 			mgmtFail(w, r)
 			return
 		}
-		event = "Confirmada por la jefatura: cuenta para el bono"
+		event = "Confirmada por la jefatura: lograda"
 		h.AuditLog.Log(ctx, "goal.bonus.confirmed", audit.LevelWarn, audit.Success(), map[string]any{"goalId": g.ID.String(), "personId": uuidString(uuidPtr(row.PersonUserID)), "bonus": row.BonusRank.String})
 	case "reopen":
 		if !g.CanEdit || (g.State != "failed" && g.State != "done") {
@@ -790,14 +864,142 @@ func (h *ManagementHandler) GoalAction(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		event = "Reabierta con fecha " + due.Format("02-01-2006")
+	case "not-achieved":
+		// Rindió y no pasó: queda el dato y sigue la regla de la persona.
+		if !g.CanOutcome {
+			problemdetails.Write(w, r, http.StatusForbidden, "forbidden", "la marca no lograda la jefatura de la persona o el admin")
+			return
+		}
+		reason := strings.TrimSpace(req.Reason)
+		if reason == "" || len([]rune(reason)) > 300 {
+			problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "escribe el motivo (hasta 300 caracteres)")
+			return
+		}
+		if row.CompletedAt.Valid {
+			if err := h.Queries.SetGoalCompleted(ctx, db.SetGoalCompletedParams{ID: g.ID}); err != nil {
+				mgmtFail(w, r)
+				return
+			}
+		}
+		if err := h.Queries.SetGoalOutcome(ctx, db.SetGoalOutcomeParams{ID: g.ID, Outcome: optText("not_achieved"), OutcomeReason: optText(reason),
+			OutcomeBy: pgUUIDOf(u.id)}); err != nil {
+			mgmtFail(w, r)
+			return
+		}
+		event = "No lograda: " + reason
 	default:
 		problemdetails.Write(w, r, http.StatusNotFound, "not-found", "acción desconocida")
 		return
 	}
 	h.goalEvent(ctx, g.ID, event, u.id)
+	h.applyPersonRule(ctx, row.PersonUserID)
 	h.AuditLog.Log(ctx, "goal."+action, audit.LevelInfo, audit.Success(), map[string]any{"goalId": g.ID.String()})
 	publishSync(ctx, h.Hub, "management.changed", map[string]string{"goalId": g.ID.String()})
 	h.writeGoal(w, r, http.StatusOK)
+}
+
+// rankName: «la meta primaria» en los textos del historial.
+var rankName = map[string]string{"primary": "la meta primaria", "secondary": "la meta secundaria", "tertiary": "la meta terciaria"}
+
+// achieved: lograda de verdad (las de escalón, ya confirmadas).
+func achieved(g db.ListGoalsRow) bool {
+	return g.CompletedAt.Valid && (!g.BonusRank.Valid || g.ConfirmedAt.Valid) && !g.Outcome.Valid
+}
+
+// applyPersonRule aplica la regla de la persona a sus metas con escalón: si
+// logró la que la regla pide (cualquiera, la primaria o la secundaria), las
+// demás abiertas quedan «No hace falta»; si deja de estar lograda, vuelven a
+// abrirse. Con «Todas cuentan» no cierra ninguna.
+func (h *ManagementHandler) applyPersonRule(ctx context.Context, person pgtype.UUID) {
+	if !person.Valid {
+		return
+	}
+	rows, err := h.Queries.ListGoals(ctx, db.ListGoalsParams{PersonID: person})
+	if err != nil || len(rows) == 0 {
+		return
+	}
+	rule := rows[0].PersonRule
+	var winner *db.ListGoalsRow
+	for i, g := range rows {
+		if g.BonusRank.Valid && achieved(g) && (rule == "any" || rule == g.BonusRank.String) {
+			winner = &rows[i]
+			break
+		}
+	}
+	for _, g := range rows {
+		if !g.BonusRank.Valid || g.CompletedAt.Valid {
+			continue
+		}
+		switch {
+		case winner != nil && g.ID != winner.ID && !g.Outcome.Valid:
+			reason := "Logró " + rankName[winner.BonusRank.String] + " «" + winner.Name + "»"
+			if err := h.Queries.SetGoalOutcome(ctx, db.SetGoalOutcomeParams{ID: g.ID, Outcome: optText("not_needed"), OutcomeReason: optText(reason)}); err == nil {
+				h.goalEvent(ctx, g.ID, "No hace falta: "+reason, uuid.Nil)
+			}
+		case winner == nil && g.Outcome.String == "not_needed":
+			if err := h.Queries.SetGoalOutcome(ctx, db.SetGoalOutcomeParams{ID: g.ID}); err == nil {
+				h.goalEvent(ctx, g.ID, "Vuelve a estar en curso: ya no hay una meta lograda que la reemplace", uuid.Nil)
+			}
+		}
+	}
+}
+
+// PersonRule es PUT /api/goal-rules/{userId} {rule}: la regla de las metas
+// de una persona (all | any | primary | secondary); la cambian su jefatura o
+// el admin.
+func (h *ManagementHandler) PersonRule(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	person, err := uuid.Parse(r.PathValue("userId"))
+	if err != nil {
+		problemdetails.Write(w, r, http.StatusNotFound, "not-found", "persona no encontrada")
+		return
+	}
+	u, err := loadAgendaUser(ctx, h.Queries)
+	if err != nil {
+		mgmtFail(w, r)
+		return
+	}
+	leads, err := h.Queries.ListLeadUserIDsOfPerson(ctx, person)
+	if err != nil {
+		mgmtFail(w, r)
+		return
+	}
+	lead := false
+	for _, id := range leads {
+		lead = lead || id == u.id
+	}
+	if (!u.admin && !lead) || u.id == person {
+		problemdetails.Write(w, r, http.StatusForbidden, "forbidden", "la regla la pone la jefatura de la persona o el admin")
+		return
+	}
+	var req struct {
+		Rule string `json:"rule"`
+	}
+	if err := decodeJSON(w, r, &req); err != nil {
+		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "JSON inválido")
+		return
+	}
+	switch req.Rule {
+	case "all":
+		err = h.Queries.DeleteGoalPersonRule(ctx, person)
+	case "any", "primary", "secondary":
+		err = h.Queries.SetGoalPersonRule(ctx, db.SetGoalPersonRuleParams{UserID: person, Rule: req.Rule, UpdatedBy: pgUUIDOf(u.id)})
+	default:
+		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "regla: all, any, primary o secondary")
+		return
+	}
+	if isForeignKeyViolation(err) {
+		problemdetails.Write(w, r, http.StatusNotFound, "not-found", "persona no encontrada")
+		return
+	}
+	if err != nil {
+		mgmtFail(w, r)
+		return
+	}
+	h.applyPersonRule(ctx, pgUUIDOf(person))
+	h.AuditLog.Log(ctx, "goal.person_rule", audit.LevelInfo, audit.Success(), map[string]any{"personId": person.String(), "rule": req.Rule})
+	publishSync(ctx, h.Hub, "management.changed", map[string]string{})
+	writeData(w, http.StatusOK, map[string]string{"rule": req.Rule})
 }
 
 // ===== Certificado =====
@@ -969,11 +1171,15 @@ func (h *ManagementHandler) reconcileGoal(ctx context.Context, id uuid.UUID) {
 		return
 	}
 	g := rows[0]
+	defer h.applyPersonRule(ctx, g.PersonUserID)
+	if g.Outcome.Valid {
+		return // no lograda o no hace falta: los hitos no la cumplen
+	}
 	ready := g.Milestones > 0 && g.MilestonesDone == g.Milestones && (!g.EvidenceRequired || g.EvidenceCount > 0)
 	switch {
 	case ready && !g.CompletedAt.Valid:
 		_ = h.Queries.SetGoalCompleted(ctx, db.SetGoalCompletedParams{ID: id, CompletedAt: pgtype.Timestamptz{Time: h.now(), Valid: true}})
-		text := "Cumplida: todos los hitos están hechos"
+		text := "Lograda: todos los hitos están hechos"
 		if g.BonusRank.Valid {
 			text = "Hitos completos: espera la confirmación de la jefatura"
 		}

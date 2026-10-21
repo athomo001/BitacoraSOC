@@ -1656,6 +1656,19 @@ type ClientAlertRule struct {
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
 }
 
+type ClientNote struct {
+	ID         uuid.UUID          `json:"id"`
+	ClientID   uuid.UUID          `json:"client_id"`
+	AuthorID   pgtype.UUID        `json:"author_id"`
+	AuthorName string             `json:"author_name"`
+	Content    string             `json:"content"`
+	Pinned     bool               `json:"pinned"`
+	PinnedBy   pgtype.UUID        `json:"pinned_by"`
+	PinnedAt   pgtype.Timestamptz `json:"pinned_at"`
+	EditedAt   pgtype.Timestamptz `json:"edited_at"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+}
+
 type Complement struct {
 	ID                        uuid.UUID          `json:"id"`
 	Slug                      string             `json:"slug"`
@@ -2039,6 +2052,18 @@ type Goal struct {
 	CreatedBy        pgtype.UUID        `json:"created_by"`
 	CreatedAt        pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
+	PersonName       pgtype.Text        `json:"person_name"`
+	PersonEmail      pgtype.Text        `json:"person_email"`
+	Outcome          pgtype.Text        `json:"outcome"`
+	OutcomeReason    pgtype.Text        `json:"outcome_reason"`
+	OutcomeAt        pgtype.Timestamptz `json:"outcome_at"`
+	OutcomeBy        pgtype.UUID        `json:"outcome_by"`
+}
+
+type GoalAlert struct {
+	GoalID uuid.UUID          `json:"goal_id"`
+	Alert  string             `json:"alert"`
+	SentAt pgtype.Timestamptz `json:"sent_at"`
 }
 
 type GoalEvent struct {
@@ -2073,6 +2098,13 @@ type GoalMilestone struct {
 	DoneByName   pgtype.Text        `json:"done_by_name"`
 	DoneSource   pgtype.Text        `json:"done_source"`
 	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+}
+
+type GoalPersonRule struct {
+	UserID    uuid.UUID          `json:"user_id"`
+	Rule      string             `json:"rule"`
+	UpdatedBy pgtype.UUID        `json:"updated_by"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
 }
 
 type Holiday struct {

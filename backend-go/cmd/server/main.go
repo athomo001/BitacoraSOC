@@ -136,7 +136,7 @@ func run(logger *slog.Logger) error {
 		Queries: queries, JWT: jwtIssuer, Crypto: cryptoBox,
 		LoginLimiter: loginLimiter, AuditLog: auditLog, PublicBaseURL: publicBaseURL,
 	}
-	usersHandler := &handler.UsersHandler{Queries: queries, Crypto: cryptoBox, AuditLog: auditLog}
+	usersHandler := &handler.UsersHandler{Queries: queries, Pool: pool, Crypto: cryptoBox, AuditLog: auditLog}
 	permissionGroupsHandler := &handler.PermissionGroupsHandler{Queries: queries, AuditLog: auditLog}
 	auditLogHandler := &handler.AuditLogHandler{Queries: queries, AuditLog: auditLog}
 	// Respaldos (Fase 13): un solo servicio para la API y el planificador, con un
@@ -327,6 +327,7 @@ func run(logger *slog.Logger) error {
 	mux.Handle("POST /api/users", admin(usersHandler.Create))
 	mux.Handle("PATCH /api/users/{id}", admin(usersHandler.Patch))
 	mux.Handle("DELETE /api/users/{id}", admin(usersHandler.Delete))
+	mux.Handle("GET /api/users/{id}/links", admin(usersHandler.Links))
 	mux.Handle("POST /api/users/force-reset-all", admin(usersHandler.ForceResetAll))
 	mux.Handle("GET /api/users/{id}/permission-groups", admin(permissionGroupsHandler.ListUserGroups))
 	mux.Handle("PUT /api/users/{id}/permission-groups", admin(permissionGroupsHandler.ReplaceUserGroups))
@@ -360,6 +361,11 @@ func run(logger *slog.Logger) error {
 	mux.Handle("PUT /api/management/settings", admin(managementHandler.UpdateSettings))
 	mux.Handle("GET /api/management/clients", authed(managementHandler.Clients))
 	mux.Handle("GET /api/management/clients/{id}", authed(managementHandler.Client))
+	mux.Handle("GET /api/management/clients/{id}/notes", authed(managementHandler.ClientNotes))
+	mux.Handle("POST /api/management/clients/{id}/notes", authed(managementHandler.CreateClientNote))
+	mux.Handle("PUT /api/management/notes/{id}", authed(managementHandler.UpdateClientNote))
+	mux.Handle("POST /api/management/notes/{id}/pin", authed(managementHandler.PinClientNote))
+	mux.Handle("DELETE /api/management/notes/{id}", authed(managementHandler.DeleteClientNote))
 	mux.Handle("PUT /api/management/clients/{id}", authed(managementHandler.UpdateClient))
 	mux.Handle("GET /api/management/clients/{id}/summary", authed(managementHandler.Summary))
 	mux.Handle("POST /api/management/clients/{id}/summary/send", authed(managementHandler.SendSummary))
@@ -378,6 +384,7 @@ func run(logger *slog.Logger) error {
 	mux.Handle("GET /api/goals/{id}/evidence/{eid}", authed(managementHandler.Evidence))
 	mux.Handle("DELETE /api/goals/{id}/evidence/{eid}", authed(managementHandler.DeleteEvidence))
 	mux.Handle("POST /api/goals/{id}/{action}", authed(managementHandler.GoalAction))
+	mux.Handle("PUT /api/goal-rules/{userId}", authed(managementHandler.PersonRule))
 	mux.Handle("GET /api/playbooks", authed(managementHandler.Playbooks))
 	mux.Handle("POST /api/playbooks", authed(managementHandler.SavePlaybook))
 	mux.Handle("PUT /api/playbooks/{id}", authed(managementHandler.SavePlaybook))
@@ -912,6 +919,7 @@ func run(logger *slog.Logger) error {
 	go scheduler.Run(ctx, 5*time.Minute, agendaHandler.Alerts)
 	go scheduler.Run(ctx, time.Minute, agendaHandler.Digest)
 	go scheduler.Run(ctx, time.Minute, managementHandler.SyncTick)
+	go scheduler.Run(ctx, 5*time.Minute, managementHandler.GoalAlerts)
 	go scheduler.Run(ctx, time.Minute, notifier.Windows)
 	// Ventanas que se repiten: crea las de los próximos 60 días.
 	go scheduler.Run(ctx, time.Hour, escalationHandler.GenerateSeries)

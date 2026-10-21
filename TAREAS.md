@@ -28,15 +28,19 @@ Lo hecho, lo que está en revisión y lo que falta hasta el corte. Marca con `[x
 - [ ] Probar la 10d.2 con el GLPI de pruebas: `migrate … up` para la 000054; un usuario de GLPI con permiso para crear tickets y seguimientos y su User-Token en Administración → GLPI → Escribir en GLPI («Probar»); comentar un GLPI-…, «Crear en GLPI» desde un ticket y desde una entrada, y escribir en GLPI sobre la copia para ver que vuelve — Dueño
 - [ ] Revisar en la app el seguimiento de la Bitácora (10j): `migrate … up` para la 000053; filtro «En seguimiento», el contador en la lista y «Cerrar seguimiento» en el detalle — Dueño
 - [ ] Probar la 10b (Integraciones): `migrate … up` para la 000052; en Administración → Integraciones crear un destino hacia tu SIEM y «Probar»; crear una llave y probarla con el `curl` que muestra (manual: `docs/api-integraciones.md`) — Dueño
-- [ ] Revisar en la app la Gestión CSM (9.4): antes correr `migrate … up` para la 000051; ponerle a cada cliente su CSM, inicio del servicio y renovación (Gestión → ficha → Datos de la cuenta) — Dueño y CSM
+- [ ] Revisar en la app la Gestión CSM (9.4, con las notas internas): antes correr `migrate … up` hasta la 000057; ponerle a cada cliente su CSM, inicio del servicio y renovación (Gestión → ficha → Datos de la cuenta) — Dueño y CSM
 
 ## Por hacer
 
 ### Áreas
 - [x] Decidir las 7 preguntas de la Gestión CSM (`16` §4.4.10): quedaron las propuestas (2026-10-20) — Dueño
 - [x] Tarea «avisar al cliente» de una ventana de mantenimiento (9.4, 2026-10-20)
-- [ ] Comunicaciones internas del CSM: notas que solo ve CSM (`16` §4.7)
-- [ ] Gestión CSM: aviso antes del vencimiento de una meta y metas cumplidas por persona en el Resumen mensual
+- [x] Comunicaciones internas del CSM: notas por cliente, aprobadas y construidas (2026-10-21; `migrate … up` para la 000056)
+- [x] Metas: el admin elige entre todos los usuarios, «Alguien sin cuenta» con nombre y correo que pasa a la cuenta al crearla, y «Sin área» en Usuarios (2026-10-21; `migrate … up` para la 000057)
+- [x] Desactivar y eliminar usuarios: al desactivar sale de guardias y escalamiento con aviso previo de lo que tiene a su nombre; eliminar borra solo a quien no tiene historial (2026-10-21)
+- [x] Metas por persona: agrupadas por persona, escalones primaria/secundaria/terciaria, regla por persona, lograda o no lograda (diseño aprobado y construido 2026-10-21; `migrate … up` para la 000058)
+- [ ] Ubicar en su área y nivel a los usuarios marcados «Sin área» (Administración → Usuarios y grupos → Áreas y nivel); kmateluna va al área CSM — Dueño
+- [x] Gestión CSM: aviso antes del vencimiento de una meta y metas cumplidas por persona en el Resumen mensual (2026-10-21; `migrate … up` para la 000055)
 
 ### Paridad con el legacy (revisión y decisiones del dueño, 2026-10-16)
 - [x] Correo «no se hizo el checklist de inicio»: igual al legacy (09:30, a la guardia N1 no hábil y a los N2)

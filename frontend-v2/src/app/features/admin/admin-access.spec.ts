@@ -49,6 +49,65 @@ describe('AdminAccessComponent', () => {
     expect(component.userGroups()['u1']).toEqual(['g-noc']);
   });
 
+  it('marca «Sin área» a quien no está en ningún grupo con área', async () => {
+    const fixture = await render();
+    httpMock.expectOne('/api/users/u1/permission-groups').flush({ data: [] });
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const row = () => (fixture.nativeElement as HTMLElement).querySelector('.aa-row') as HTMLElement;
+    expect(row().querySelector('.pill.tone-warn')?.textContent).toContain('Sin área');
+    const component = fixture.componentInstance as unknown as { userGroups: { set(v: Record<string, string[]>): void } };
+    component.userGroups.set({ u1: ['g-soc'] });
+    fixture.detectChanges();
+    expect(row().textContent).not.toContain('Sin área');
+  });
+
+  it('antes de desactivar avisa lo que tiene a su nombre, y «Desactivar igual» lo bloquea', async () => {
+    const fixture = await render();
+    httpMock.expectOne('/api/users/u1/permission-groups').flush({ data: [GROUPS[1]] });
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    const button = (text: string) => [...el.querySelectorAll<HTMLButtonElement>('app-user-retire button')].find((b) => b.textContent?.trim().endsWith(text))!;
+    button('Desactivar').click();
+    httpMock.expectOne('/api/users/u1/links').flush({ data: [{ kind: 'guard', label: 'Guardia N2', detail: '2' }, { kind: 'client', label: 'Casinos' }] });
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const box = el.querySelector('app-user-retire [role="alert"]') as HTMLElement;
+    expect(box.textContent).toContain('Guardia Guardia N2 · 2 turnos por venir');
+    expect(box.textContent).toContain('CSM de Casinos');
+    button('Desactivar igual').click();
+    const req = httpMock.expectOne({ method: 'PATCH', url: '/api/users/u1' });
+    expect(req.request.body).toEqual({ active: false });
+    req.flush({ data: { ...USERS[0], active: false } });
+    await fixture.whenStable();
+    fixture.detectChanges();
+    httpMock.expectOne('/api/users/u1/links').flush({ data: [{ kind: 'client', label: 'Casinos' }] });
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(el.querySelector('app-user-retire')?.textContent).toContain('Sigue a su nombre');
+  });
+
+  it('«Eliminar» a alguien con historial lo deja bloqueado y lo dice', async () => {
+    const fixture = await render();
+    httpMock.expectOne('/api/users/u1/permission-groups').flush({ data: [] });
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    const button = (text: string) => [...el.querySelectorAll<HTMLButtonElement>('app-user-retire button')].filter((b) => b.textContent?.trim().endsWith(text));
+    button('Eliminar')[0].click();
+    fixture.detectChanges();
+    expect(el.querySelector('app-user-retire [role="alert"]')?.textContent).toContain('queda bloqueado');
+    button('Eliminar').at(-1)!.click();
+    httpMock.expectOne({ method: 'DELETE', url: '/api/users/u1' }).flush({ data: { deleted: false } });
+    await fixture.whenStable();
+    fixture.detectChanges();
+    httpMock.match('/api/users/u1/links').forEach((r) => r.flush({ data: [] }));
+    fixture.detectChanges();
+    expect(el.querySelector('.msg--ok')?.textContent).toContain('ana tenía historial: quedó bloqueado.');
+    expect((fixture.componentInstance as unknown as { users(): { active: boolean }[] }).users()[0].active).toBe(false);
+  });
+
   it('la persona se ubica por área y nivel, y Guardar manda todo junto', async () => {
     const fixture = await render();
     httpMock.expectOne('/api/users/u1/permission-groups').flush({ data: [GROUPS[1]] });
@@ -112,7 +171,7 @@ describe('AdminAccessComponent', () => {
     req.flush(null, { status: 409, statusText: 'err' });
     await new Promise((r) => setTimeout(r));
     fixture.detectChanges();
-    expect(el.querySelector('.aa-row .pill')?.textContent?.trim()).toBe('Analista');
+    expect(el.querySelector('.aa-row td:nth-child(2) .pill')?.textContent?.trim()).toBe('Analista');
   });
 
   it('el cumpleaños se edita desde el panel del usuario (como el legacy) y viaja como AAAA-MM-DD', async () => {

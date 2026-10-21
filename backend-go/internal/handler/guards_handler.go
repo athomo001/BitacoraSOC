@@ -78,6 +78,8 @@ type guardSlotDTO struct {
 	StartsAt     time.Time  `json:"startsAt"`
 	EndsAt       time.Time  `json:"endsAt"`
 	Paused       bool       `json:"paused"`
+	// La persona está bloqueada: el turno no cuenta como cubierto.
+	Blocked bool `json:"blocked,omitempty"`
 }
 
 type guardOverrideDTO struct {
@@ -203,7 +205,7 @@ func (h *GuardsHandler) Timeline(w http.ResponseWriter, r *http.Request) {
 		if !visible[s.CycleID] {
 			continue
 		}
-		slots = append(slots, guardSlotDTO{ID: s.ID, CycleID: s.CycleID, TeamMemberID: s.TeamMemberID, Name: s.DisplayName, UserID: uuidPtr(s.UserID), StartsAt: s.StartsAt.Time, EndsAt: s.EndsAt.Time, Paused: s.IsPaused})
+		slots = append(slots, guardSlotDTO{ID: s.ID, CycleID: s.CycleID, TeamMemberID: s.TeamMemberID, Name: s.DisplayName, UserID: uuidPtr(s.UserID), StartsAt: s.StartsAt.Time, EndsAt: s.EndsAt.Time, Paused: s.IsPaused, Blocked: !s.MemberActive})
 	}
 	ovRows, err := h.Queries.ListGuardOverridesBetween(ctx, db.ListGuardOverridesBetweenParams{FromAt: tsFrom, ToAt: tsTo})
 	if err != nil {

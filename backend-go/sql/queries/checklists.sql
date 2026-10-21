@@ -86,7 +86,7 @@ JOIN rotation_slots rs ON rs.cycle_id = rc.id
 JOIN team_members tm ON tm.id = rs.team_member_id AND tm.active = true
 LEFT JOIN users u ON u.id = tm.user_id
 LEFT JOIN contacts c ON c.id = tm.contact_id
-WHERE t.active = true
+WHERE t.active = true AND (tm.user_id IS NULL OR u.active)
   AND (sqlc.narg('team_id')::uuid IS NULL OR t.id = sqlc.narg('team_id'))
 ORDER BY t.id, tm.priority DESC, tm.id;
 -- name: GetShiftClosureByCheck :one

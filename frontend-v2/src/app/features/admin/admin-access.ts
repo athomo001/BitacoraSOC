@@ -11,6 +11,7 @@ import { I18nService } from '../../core/i18n/i18n.service';
 import { MessageKey } from '../../core/i18n/messages';
 import { AdminBirthdaysComponent } from './admin-birthdays';
 import { AdminPasswordPolicyComponent } from './admin-password-policy';
+import { UserRetireComponent } from './user-retire';
 import { Area, AreasService, Level, PROFILES, Placement, Profile } from '../../core/areas/areas.service';
 
 import '../../core/i18n/packs/admin';
@@ -81,7 +82,7 @@ const ROLES: readonly Role[] = ['admin', 'user', 'auditor'];
 @Component({
   selector: 'app-admin-access',
   standalone: true,
-  imports: [FormsModule, DatePipe, MatIconModule, AdminBirthdaysComponent, AdminPasswordPolicyComponent],
+  imports: [FormsModule, DatePipe, MatIconModule, AdminBirthdaysComponent, AdminPasswordPolicyComponent, UserRetireComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './admin-access.html',
   styleUrl: './admin-access.css',
@@ -149,6 +150,7 @@ export class AdminAccessComponent implements OnInit {
   protected readonly userGroups = signal<Record<string, string[]>>({});
   protected readonly groupsLoaded = signal(false);
   protected readonly error = signal<string | null>(null);
+  protected readonly notice = signal<string | null>(null);
   protected readonly busy = signal(false);
 
   protected readonly query = signal('');
@@ -167,6 +169,16 @@ export class AdminAccessComponent implements OnInit {
     );
   });
   protected readonly selected = computed(() => this.users().find((user) => user.id === this.selectedId()) ?? null);
+  /** Usuarios activos sin ningún grupo con área: no aparecen en la Agenda, las metas ni Mi equipo. */
+  protected readonly noArea = computed(() => {
+    const out = new Set<string>();
+    if (!this.groupsLoaded()) return out;
+    const withArea = new Set(this.groups().filter((g) => g.active && g.areas.length).map((g) => g.id));
+    for (const user of this.users()) {
+      if (user.active && !(this.userGroups()[user.id] ?? []).some((id) => withArea.has(id))) out.add(user.id);
+    }
+    return out;
+  });
   protected readonly isMe = computed(() => this.selected()?.id === this.perms.user()?.id);
   protected readonly members = computed(() => {
     const counts: Record<string, number> = {};
@@ -333,7 +345,19 @@ export class AdminAccessComponent implements OnInit {
   protected readonly today = new Date().toISOString().slice(0, 10);
 
   protected setActive(user: AdminUser, active: boolean): Promise<void> {
+    this.notice.set(null);
     return this.patchUser(user, { active });
+  }
+
+  /** Eliminado de verdad (sin historial) o, si tenía historial, bloqueado. */
+  protected onRemoved(user: AdminUser, deleted: boolean): void {
+    if (deleted) {
+      this.users.update((list) => list.filter((u) => u.id !== user.id));
+      this.selectedId.set(this.users()[0]?.id ?? null);
+    } else {
+      this.users.update((list) => list.map((u) => (u.id === user.id ? { ...u, active: false } : u)));
+    }
+    this.notice.set(this.i18n.tf(deleted ? 'access.retire.deleted' : 'access.retire.kept', user.fullName || user.username));
   }
 
   private async loadPlacement(id: string | null): Promise<void> {

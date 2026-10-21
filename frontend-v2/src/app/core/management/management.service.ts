@@ -97,9 +97,24 @@ export interface MgmtClientDetail {
   renewal: MgmtRenewalStep[];
   /** Plantillas del sistema ya aplicadas (onboarding, qbr, renewal → fecha). */
   applied: Record<string, string>;
+  /** Notas internas del CSM (solo llega al perfil Gestión). */
+  notesCount?: number;
 }
 
-export interface MgmtPerson { id: string; name: string; areaId: string; areaName: string; level?: string; }
+/** Una nota interna del CSM sobre un cliente (spec/16 §4.7.1). */
+export interface ClientNote {
+  id: string;
+  authorId: string | null;
+  authorName: string;
+  content: string;
+  pinned: boolean;
+  editedAt: string | null;
+  createdAt: string;
+  mine: boolean;
+}
+
+/** areaId null: todavía no está en un área (solo le llega al admin). */
+export interface MgmtPerson { id: string; name: string; areaId: string | null; areaName: string; level?: string; }
 
 export interface MgmtMeta {
   slaTarget: number;
@@ -113,9 +128,13 @@ export interface MgmtMeta {
 }
 
 export type GoalScope = 'client' | 'area' | 'person';
-export type GoalState = 'open' | 'risk' | 'confirm' | 'done' | 'failed';
+/** done = lograda; failed = no lograda (marcada o vencida); not_needed = la cerró la regla de la persona. */
+export type GoalState = 'open' | 'risk' | 'confirm' | 'done' | 'failed' | 'not_needed';
 export type GoalKind = 'certification' | 'action' | 'other';
-export type GoalBonus = 'primary' | 'secondary';
+/** Escalón de la meta de una persona. */
+export type GoalBonus = 'primary' | 'secondary' | 'tertiary';
+/** Regla de las metas de una persona: todas cuentan, basta una, basta la primaria o la secundaria. */
+export type GoalRule = 'all' | 'any' | 'primary' | 'secondary';
 
 export interface GoalStep {
   id: string;
@@ -143,6 +162,8 @@ export interface Goal {
   areaName?: string;
   personId?: string;
   personName?: string;
+  /** Solo alguien sin cuenta: el correo con que pasará a su cuenta. */
+  personEmail?: string;
   personAreas?: string[];
   ownerId?: string;
   ownerName?: string;
@@ -156,6 +177,12 @@ export interface Goal {
   manualRisk: boolean;
   autoRisk: boolean;
   state: GoalState;
+  /** No lograda o no hace falta: el motivo (vacío en una vencida). */
+  outcomeReason?: string;
+  /** La regla de la persona (solo con cuenta). */
+  personRule?: GoalRule;
+  canOutcome?: boolean;
+  canRule?: boolean;
   milestones: number;
   milestonesDone: number;
   completedAt?: string;
@@ -176,6 +203,9 @@ export interface GoalInput {
   clientId?: string;
   areaId?: string;
   personId?: string;
+  /** Alguien sin cuenta: nombre y correo en vez de personId. */
+  personName?: string;
+  personEmail?: string;
   ownerId?: string;
   kind?: GoalKind | '';
   bonus?: GoalBonus | '';
@@ -269,6 +299,26 @@ export interface Playbook {
 /** Gestión CSM (spec/16 §4.4, 9.4): Clientes, Metas, Indicadores y Plantillas. */
 @Injectable({ providedIn: 'root' })
 export class ManagementService {
+  async clientNotes(clientId: string): Promise<ClientNote[]> {
+    return (await firstValueFrom(this.http.get<ApiEnvelope<ClientNote[]>>(`/api/management/clients/${clientId}/notes`))).data;
+  }
+
+  async createClientNote(clientId: string, content: string): Promise<ClientNote> {
+    return (await firstValueFrom(this.http.post<ApiEnvelope<ClientNote>>(`/api/management/clients/${clientId}/notes`, { content }))).data;
+  }
+
+  async updateClientNote(id: string, content: string): Promise<ClientNote> {
+    return (await firstValueFrom(this.http.put<ApiEnvelope<ClientNote>>(`/api/management/notes/${id}`, { content }))).data;
+  }
+
+  async pinClientNote(id: string, pinned: boolean): Promise<ClientNote> {
+    return (await firstValueFrom(this.http.post<ApiEnvelope<ClientNote>>(`/api/management/notes/${id}/pin`, { pinned }))).data;
+  }
+
+  async deleteClientNote(id: string): Promise<void> {
+    await firstValueFrom(this.http.delete(`/api/management/notes/${id}`));
+  }
+
   private readonly http = inject(HttpClient);
 
   private async get<T>(url: string, params: Record<string, string> = {}): Promise<T> {
@@ -324,6 +374,8 @@ export class ManagementService {
   complete(goalId: string): Promise<Goal> { return this.send('POST', `/api/goals/${goalId}/complete`); }
   confirm(goalId: string): Promise<Goal> { return this.send('POST', `/api/goals/${goalId}/confirm`); }
   reopen(goalId: string, dueDate: string): Promise<Goal> { return this.send('POST', `/api/goals/${goalId}/reopen`, { dueDate }); }
+  notAchieved(goalId: string, reason: string): Promise<Goal> { return this.send('POST', `/api/goals/${goalId}/not-achieved`, { reason }); }
+  async setPersonRule(userId: string, rule: GoalRule): Promise<void> { await this.send('PUT', `/api/goal-rules/${userId}`, { rule }); }
 
   async addEvidenceFile(goalId: string, file: File): Promise<Goal> {
     const form = new FormData();

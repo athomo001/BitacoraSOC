@@ -40,6 +40,8 @@ type monthlyPersonDTO struct {
 	Tickets    int       `json:"tickets"`
 	TicketsSLA int       `json:"ticketsSla"`
 	AbsentDays int       `json:"absentDays"`
+	// GoalsDone: metas propias cumplidas en el mes (las del bono, confirmadas; 9.4).
+	GoalsDone int `json:"goalsDone"`
 }
 
 // onTimePct: como en Gestión, hechas a tiempo sobre hechas más atrasadas
@@ -80,6 +82,7 @@ type monthlyInput struct {
 	occs       []db.ListMonthOccurrencesRow
 	tickets    []db.ListMonthResolvedTicketsRow
 	absences   map[uuid.UUID]int
+	goals      map[uuid.UUID]int
 	areaCode   string
 	areaName   string
 	computedAt time.Time
@@ -159,6 +162,13 @@ func computeMonthly(in monthlyInput) monthlyDataDTO {
 			total.AbsentDays += days
 		}
 	}
+	// Las metas cuentan para la gente del área (no suman a alguien de otra).
+	for id, n := range in.goals {
+		if p, ok := byID[id]; ok {
+			p.GoalsDone = n
+			total.GoalsDone += n
+		}
+	}
 	out := monthlyDataDTO{Month: in.month.Format("2006-01"), AreaCode: in.areaCode, AreaName: in.areaName, Total: total,
 		People: make([]monthlyPersonDTO, 0, len(order)), ComputedAt: in.computedAt}
 	for _, id := range order {
@@ -222,10 +232,17 @@ func (h *TeamHandler) monthly(ctx context.Context, area db.ListLeadAreasRow, mon
 	if err != nil {
 		return monthlyDataDTO{}, false, err
 	}
+	goals, err := h.Queries.ListMonthGoalsDone(ctx, db.ListMonthGoalsDoneParams{FromAt: pgTime(monthStart), ToAt: pgTime(monthStart.AddDate(0, 1, 0))})
+	if err != nil {
+		return monthlyDataDTO{}, false, err
+	}
 	in := monthlyInput{month: month, loc: ac.loc, dayEnd: ac.end, cal: ac.cal, now: now, names: map[uuid.UUID]string{},
-		occs: occs, tickets: tickets, absences: map[uuid.UUID]int{}, areaCode: area.Code, areaName: area.Name, computedAt: now}
+		occs: occs, tickets: tickets, absences: map[uuid.UUID]int{}, goals: map[uuid.UUID]int{}, areaCode: area.Code, areaName: area.Name, computedAt: now}
 	for _, a := range abs {
 		in.absences[a.UserID] = int(a.Days)
+	}
+	for _, g := range goals {
+		in.goals[g.UserID] = int(g.Done)
 	}
 	people, err := h.Queries.ListAreaPeopleLevels(ctx)
 	if err != nil {
@@ -401,7 +418,7 @@ func (h *TeamHandler) monthlyMail(ctx context.Context, d monthlyDataDTO, frozen 
 	name, logo := h.Notify.brand(ctx)
 	row := func(p monthlyPersonDTO) mailtpl.MonthlyRow {
 		return mailtpl.MonthlyRow{Name: p.Name, Level: p.Level, Tasks: p.Tasks, OnTimePct: p.onTimePct(), OpenLate: p.OpenLate,
-			Skipped: p.Skipped, Tickets: p.Tickets, SLAPct: p.slaPct(), AbsentDays: p.AbsentDays}
+			Skipped: p.Skipped, Tickets: p.Tickets, SLAPct: p.slaPct(), AbsentDays: p.AbsentDays, GoalsDone: p.GoalsDone}
 	}
 	rows := make([]mailtpl.MonthlyRow, 0, len(d.People))
 	for _, p := range d.People {

@@ -19,6 +19,8 @@ export interface ActionDialogData {
   ticket?: { id: string; number: string };
   /** Arranca como «Reunión de seguimiento» (Agendar reunión). */
   meeting?: boolean;
+  /** Arranca con este texto (Crear acción desde una nota del CSM). */
+  name?: string;
 }
 
 interface Suggestion { key: MessageKey; kind: ActionKind; }
@@ -166,6 +168,7 @@ export class ActionDialogComponent implements OnInit {
 
   async ngOnInit(): Promise<void> {
     if (this.data.meeting) this.suggest(SUGGESTIONS[0]);
+    if (this.data.name) this.name.set(this.data.name.trim().split('\n')[0].slice(0, 200));
     try {
       const m = await this.agenda.meta();
       this.meta.set(m);

@@ -2431,7 +2431,8 @@ CREATE TABLE goals (
   -- Solo las de una persona: tipo y si cuenta para el bono (la app solo lo
   -- registra; no guarda montos ni calcula el bono).
   kind TEXT CHECK (kind IN ('certification', 'action', 'other')),
-  bonus_rank TEXT CHECK (bonus_rank IN ('primary', 'secondary')),
+  -- Escalón (000058: también terciaria).
+  bonus_rank TEXT CHECK (bonus_rank IN ('primary', 'secondary', 'tertiary')),
   due_date DATE NOT NULL,
   -- Plazo en días hábiles desde que se creó (si se dio así).
   estimate_biz_days INT CHECK (estimate_biz_days BETWEEN 1 AND 500),
@@ -2445,14 +2446,36 @@ CREATE TABLE goals (
   created_by UUID REFERENCES users(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  -- Alguien sin cuenta (000057): nombre y correo, solo como registro. Un
+  -- trigger sobre users (link_goals_to_user) pasa la meta a la cuenta que se
+  -- cree con ese correo.
+  person_name TEXT CHECK (length(trim(person_name)) BETWEEN 1 AND 120),
+  person_email TEXT CHECK (length(person_email) BETWEEN 3 AND 254),
+  -- 000058: no lograda (la jefatura, con el motivo) o no hace falta (la
+  -- regla de la persona); lograda sigue siendo completed_at/confirmed_at.
+  outcome TEXT CHECK (outcome IN ('not_achieved', 'not_needed')),
+  outcome_reason TEXT CHECK (length(outcome_reason) <= 300),
+  outcome_at TIMESTAMPTZ,
+  outcome_by UUID REFERENCES users(id) ON DELETE SET NULL,
   CONSTRAINT chk_goal_scope CHECK (
-    (scope = 'client' AND client_id IS NOT NULL AND person_user_id IS NULL) OR
-    (scope = 'area' AND area_id IS NOT NULL AND client_id IS NULL AND person_user_id IS NULL) OR
-    (scope = 'person' AND person_user_id IS NOT NULL AND client_id IS NULL AND area_id IS NULL)),
+    (scope = 'client' AND client_id IS NOT NULL AND person_user_id IS NULL AND person_email IS NULL) OR
+    (scope = 'area' AND area_id IS NOT NULL AND client_id IS NULL AND person_user_id IS NULL AND person_email IS NULL) OR
+    (scope = 'person' AND client_id IS NULL AND area_id IS NULL AND
+      ((person_user_id IS NOT NULL AND person_name IS NULL AND person_email IS NULL) OR
+       (person_user_id IS NULL AND person_name IS NOT NULL AND person_email IS NOT NULL)))),
   CONSTRAINT chk_goal_person_fields CHECK (scope = 'person' OR (kind IS NULL AND bonus_rank IS NULL))
 );
 CREATE INDEX idx_goals_client ON goals(client_id) WHERE client_id IS NOT NULL;
 CREATE INDEX idx_goals_person ON goals(person_user_id) WHERE person_user_id IS NOT NULL;
+CREATE INDEX idx_goals_person_email ON goals (lower(person_email)) WHERE person_email IS NOT NULL;
+
+-- La regla de las metas de cada persona (000058); sin fila = «Todas cuentan».
+CREATE TABLE goal_person_rules (
+  user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  rule TEXT NOT NULL CHECK (rule IN ('any', 'primary', 'secondary')),
+  updated_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 
 -- Hitos: se marcan a mano o, enlazados a un ticket o a una tarea de la
 -- Agenda, solos cuando el ticket se resuelve o la tarea se hace (y se
@@ -2712,3 +2735,26 @@ CREATE TABLE glpi_outbox (
 );
 CREATE INDEX idx_glpi_outbox_due ON glpi_outbox(next_attempt_at) WHERE state = 'queued';
 CREATE INDEX idx_glpi_outbox_created ON glpi_outbox(created_at DESC);
+
+-- 000055: avisos de vencimiento de las metas (9.4).
+CREATE TABLE goal_alerts (
+  goal_id UUID NOT NULL REFERENCES goals(id) ON DELETE CASCADE,
+  alert TEXT NOT NULL,
+  sent_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (goal_id, alert)
+);
+
+-- 000056: notas internas del CSM (spec/16 §4.7.1).
+CREATE TABLE client_notes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  client_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  author_id UUID REFERENCES users(id) ON DELETE SET NULL,
+  author_name TEXT NOT NULL,
+  content TEXT NOT NULL CHECK (length(trim(content)) BETWEEN 1 AND 5000),
+  pinned BOOLEAN NOT NULL DEFAULT false,
+  pinned_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  pinned_at TIMESTAMPTZ,
+  edited_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_client_notes_client ON client_notes(client_id, pinned DESC, created_at DESC);
