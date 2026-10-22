@@ -33,6 +33,13 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/tickets/public-ticket').then((module) => module.PublicTicketComponent),
   },
+  // Enlaces públicos (10h): guardias, Ticketera y Mapa en TV y el estado de un
+  // cliente. Sin login ni shell; el token decide qué se ve.
+  {
+    path: 'p/v/:token',
+    loadComponent: () =>
+      import('./features/public-view/public-view').then((module) => module.PublicViewComponent),
+  },
   {
     path: '',
     component: ShellComponent,

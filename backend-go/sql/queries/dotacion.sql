@@ -21,22 +21,12 @@ RETURNING *;
 -- name: MarkNotificationScheduleSent :exec
 UPDATE work_shift_notification_schedules SET last_sent_at = now(), updated_at = now() WHERE id = $1;
 
--- ===== Enlace público TV (slug fijo 'telework', sin UNIQUE en slug: se
--- resuelve la fila existente en el handler antes de decidir INSERT/UPDATE) =====
-
--- name: GetPublicShareBySlug :one
-SELECT * FROM public_share_links WHERE slug = $1;
-
--- name: CreatePublicShareLink :one
-INSERT INTO public_share_links (slug, token_hash, is_active, created_by)
-VALUES ($1, $2, true, $3) RETURNING *;
+-- ===== Enlaces públicos: el de teletrabajo (/p/telework) y los de la 10h, que se
+-- administran en Administración → Enlaces públicos (public_links.sql) =====
 
 -- name: RotatePublicShareLink :one
 UPDATE public_share_links SET token_hash = $2, is_active = true, created_by = $3, created_at = now()
 WHERE id = $1 RETURNING *;
-
--- name: SetPublicShareLinkActive :one
-UPDATE public_share_links SET is_active = $2 WHERE id = $1 RETURNING *;
 
 -- name: GetActivePublicShareByTokenHash :one
 SELECT * FROM public_share_links WHERE token_hash = $1 AND is_active;

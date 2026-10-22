@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, effect, inject, output, signal, untracked } from '@angular/core';
+import { ChangeDetectionStrategy, Component, Injector, OnInit, computed, effect, inject, output, signal, untracked } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
@@ -13,8 +13,10 @@ import { AdminBirthdaysComponent } from './admin-birthdays';
 import { AdminPasswordPolicyComponent } from './admin-password-policy';
 import { UserRetireComponent } from './user-retire';
 import { Area, AreasService, Level, PROFILES, Placement, Profile } from '../../core/areas/areas.service';
+import { openCsvImport } from '../../shared/csv-import/open-csv-import';
 
 import '../../core/i18n/packs/admin';
+import '../../core/i18n/packs/imports';
 type Role = 'admin' | 'user' | 'auditor';
 
 interface AdminUser {
@@ -95,6 +97,7 @@ export class AdminAccessComponent implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly perms = inject(PermissionsService);
   private readonly areasApi = inject(AreasService);
+  private readonly injector = inject(Injector);
 
   protected readonly roles = ROLES;
   protected readonly profiles = PROFILES;
@@ -189,6 +192,11 @@ export class AdminAccessComponent implements OnInit {
   async ngOnInit(): Promise<void> {
     void this.perms.load();
     await Promise.all([this.loadUsers(), this.loadGroups()]);
+  }
+
+  /** Carga masiva de usuarios (10g); las contraseñas temporales se ven en el diálogo. */
+  protected async importCsv(): Promise<void> {
+    if (await openCsvImport(this.injector, 'users')) await this.loadUsers();
   }
 
   private async loadUsers(): Promise<void> {

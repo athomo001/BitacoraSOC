@@ -573,12 +573,13 @@ func (q *Queries) UpdateMyProfile(ctx context.Context, arg UpdateMyProfileParams
 const updateUserAdmin = `-- name: UpdateUserAdmin :one
 UPDATE users SET
   email = COALESCE($2, email),
-  role = COALESCE($3, role),
-  cargo_label = COALESCE($4, cargo_label),
-  active = COALESCE($5, active),
-  must_change_password = COALESCE($6, must_change_password),
+  full_name = COALESCE($3, full_name),
+  role = COALESCE($4, role),
+  cargo_label = COALESCE($5, cargo_label),
+  active = COALESCE($6, active),
+  must_change_password = COALESCE($7, must_change_password),
   -- Cumpleaños: set_birthday dice si viene (y birthday NULL lo borra).
-  birthday = CASE WHEN $7::boolean THEN $8::date ELSE birthday END,
+  birthday = CASE WHEN $8::boolean THEN $9::date ELSE birthday END,
   updated_at = now()
 WHERE id = $1
 RETURNING id, username, email, full_name, phone, birthday, avatar_url, password_hash, role, cargo_label, mfa_enabled, mfa_secret_encrypted, is_guest, guest_expires_at, must_change_password, failed_login_attempts, locked_until, reset_password_token_hash, reset_password_expires_at, active, created_at, updated_at, last_login_at
@@ -587,6 +588,7 @@ RETURNING id, username, email, full_name, phone, birthday, avatar_url, password_
 type UpdateUserAdminParams struct {
 	ID                 uuid.UUID    `json:"id"`
 	Email              pgtype.Text  `json:"email"`
+	FullName           pgtype.Text  `json:"full_name"`
 	Role               NullUserRole `json:"role"`
 	CargoLabel         pgtype.Text  `json:"cargo_label"`
 	Active             pgtype.Bool  `json:"active"`
@@ -601,6 +603,7 @@ func (q *Queries) UpdateUserAdmin(ctx context.Context, arg UpdateUserAdminParams
 	row := q.db.QueryRow(ctx, updateUserAdmin,
 		arg.ID,
 		arg.Email,
+		arg.FullName,
 		arg.Role,
 		arg.CargoLabel,
 		arg.Active,

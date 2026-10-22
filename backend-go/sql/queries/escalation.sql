@@ -371,3 +371,9 @@ FROM (
   FROM escalation_steps e WHERE e.policy_id = sqlc.arg('policy_id')
 ) x
 WHERE s.id = x.id;
+
+-- name: ListWindowsAt :many
+-- Carga masiva por CSV (10g): ventanas activas con ese título y horario, para
+-- no duplicar la que ya se cargó.
+SELECT * FROM maintenance_windows
+WHERE active AND lower(title) = lower(sqlc.arg('title')) AND starts_at = sqlc.arg('starts_at') AND ends_at = sqlc.arg('ends_at');

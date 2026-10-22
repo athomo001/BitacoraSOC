@@ -6,8 +6,10 @@ import { I18nService } from '../../core/i18n/i18n.service';
 import { MessageKey } from '../../core/i18n/messages';
 import { problemDetail } from '../../core/http-error';
 import { ModuleAccessService } from '../../core/auth/module-access.service';
+import { openCsvImport } from '../../shared/csv-import/open-csv-import';
 
 import '../../core/i18n/packs/admin';
+import '../../core/i18n/packs/imports';
 /** Tipos que solo tienen sentido con NOC (contratas de terreno y carriers). */
 const NOC_TYPES: ReadonlySet<string> = new Set(['contractor', 'carrier']);
 const TYPE_TONE: Record<string, string> = { client: 'tone-info', mandante: 'tone-ok', contractor: 'tone-warn', carrier: 'tone-system', internal: 'tone-neutral' };
@@ -32,6 +34,7 @@ const DEFAULT_NAMES: Record<string, string> = { client: 'Cliente', mandante: 'Ma
         <h2 class="adm-title">{{ i18n.t('admin.nav.organizations') }}</h2>
         <p class="adm-muted">{{ i18n.t('orgs.subtitle') }}</p>
       </div>
+      <button type="button" class="adm-btn adm-push" (click)="importCsv()"><mat-icon>upload_file</mat-icon>{{ i18n.t('csvImport.open') }}</button>
     </header>
 
     @if (error(); as e) { <p class="adm-error" role="alert">{{ e }}</p> }
@@ -379,6 +382,11 @@ export class AdminOrganizationsComponent implements OnInit {
     ref.closed.subscribe((deleted) => {
       if (deleted) void this.reload();
     });
+  }
+
+  /** Carga masiva de organizaciones y sus servicios (10g). */
+  protected async importCsv(): Promise<void> {
+    if (await openCsvImport(this.injector, 'organizations')) await this.reload();
   }
 
   protected async remove(org: Organization): Promise<void> {

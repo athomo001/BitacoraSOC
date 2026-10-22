@@ -187,7 +187,7 @@ type Querier interface {
 	CreatePlaybookApplication(ctx context.Context, arg CreatePlaybookApplicationParams) (uuid.UUID, error)
 	CreatePlaybookItem(ctx context.Context, arg CreatePlaybookItemParams) error
 	CreatePolicy(ctx context.Context, arg CreatePolicyParams) (EscalationPolicy, error)
-	CreatePublicShareLink(ctx context.Context, arg CreatePublicShareLinkParams) (PublicShareLink, error)
+	CreatePublicLink(ctx context.Context, arg CreatePublicLinkParams) (PublicShareLink, error)
 	CreateRaciActivity(ctx context.Context, arg CreateRaciActivityParams) (uuid.UUID, error)
 	CreateReportEvent(ctx context.Context, arg CreateReportEventParams) (ReportEvent, error)
 	CreateReportOperationType(ctx context.Context, arg CreateReportOperationTypeParams) (ReportOperationType, error)
@@ -294,6 +294,7 @@ type Querier interface {
 	DeletePlaybookItems(ctx context.Context, playbookID uuid.UUID) error
 	DeletePolicy(ctx context.Context, id uuid.UUID) (int64, error)
 	DeletePolicyStep(ctx context.Context, arg DeletePolicyStepParams) (int64, error)
+	DeletePublicLink(ctx context.Context, id uuid.UUID) (int64, error)
 	DeleteRaciActivity(ctx context.Context, id uuid.UUID) (int64, error)
 	DeleteRaciOfTeams(ctx context.Context, ids []uuid.UUID) (int64, error)
 	DeleteReportEvent(ctx context.Context, id uuid.UUID) (int64, error)
@@ -343,6 +344,8 @@ type Querier interface {
 	// necesita una fila para leer, así que se asegura antes de leer si todavía
 	// no existe, con los defaults de la propia tabla.
 	EnsureAppConfigRow(ctx context.Context) error
+	// La misma entrada (autor, minuto y texto) ya está: volver a subir el archivo no la duplica.
+	EntryImported(ctx context.Context, arg EntryImportedParams) (bool, error)
 	// Lo que lleva más de 7 días esperando se da por perdido: cuántos y hasta
 	// dónde avanza el cursor.
 	ExpiredForwardEvents(ctx context.Context, arg ExpiredForwardEventsParams) (ExpiredForwardEventsRow, error)
@@ -460,9 +463,7 @@ type Querier interface {
 	GetPolicy(ctx context.Context, id uuid.UUID) (EscalationPolicy, error)
 	GetPolicyStep(ctx context.Context, arg GetPolicyStepParams) (GetPolicyStepRow, error)
 	GetPolicyStepByOrder(ctx context.Context, arg GetPolicyStepByOrderParams) (GetPolicyStepByOrderRow, error)
-	// ===== Enlace público TV (slug fijo 'telework', sin UNIQUE en slug: se
-	// resuelve la fila existente en el handler antes de decidir INSERT/UPDATE) =====
-	GetPublicShareBySlug(ctx context.Context, slug string) (PublicShareLink, error)
+	GetPublicLink(ctx context.Context, id uuid.UUID) (PublicShareLink, error)
 	GetPublicTicket(ctx context.Context, publicTrackingToken pgtype.Text) (Ticket, error)
 	GetReportHistory(ctx context.Context, id uuid.UUID) (GetReportHistoryRow, error)
 	GetRotationCycle(ctx context.Context, id uuid.UUID) (RotationCycle, error)
@@ -487,6 +488,8 @@ type Querier interface {
 	GetTeam(ctx context.Context, id uuid.UUID) (Team, error)
 	GetTeamMemberDisplay(ctx context.Context, id uuid.UUID) (GetTeamMemberDisplayRow, error)
 	GetTeamMemberForTeam(ctx context.Context, arg GetTeamMemberForTeamParams) (uuid.UUID, error)
+	// En las TV, el nombre completo de quien está de guardia (sin él, su usuario).
+	GetTeamMemberPublicName(ctx context.Context, id uuid.UUID) (string, error)
 	GetTerritorialUnit(ctx context.Context, id uuid.UUID) (TerritorialUnit, error)
 	// Lock de la fila antes del upsert del import: si el code ya existía con
 	// otro path (el dataset lo movió de padre), hay que reubicar sus
@@ -528,6 +531,8 @@ type Querier interface {
 	GroupCodeTaken(ctx context.Context, code string) (bool, error)
 	GuardSlugTaken(ctx context.Context, slug string) (bool, error)
 	HasClientAlertAck(ctx context.Context, arg HasClientAlertAckParams) (bool, error)
+	// Carga masiva por CSV (10g): entradas históricas con su fecha y autor reales.
+	ImportEntry(ctx context.Context, arg ImportEntryParams) error
 	// Importar no pisa lo que el admin ya cargó a mano.
 	ImportHoliday(ctx context.Context, arg ImportHolidayParams) (int64, error)
 	InsertAPIKeyRequest(ctx context.Context, arg InsertAPIKeyRequestParams) error
@@ -881,6 +886,25 @@ type Querier interface {
 	// Integrantes que son un pool (TI-Mundo…): se expanden a sus personas en el
 	// orden del pool, con el rol y la prioridad del integrante del nivel.
 	ListPoolMembersForTeams(ctx context.Context, teamIds []uuid.UUID) ([]ListPoolMembersForTeamsRow, error)
+	// Tablero de la Ticketera: los abiertos de esas áreas (de la que resuelve o
+	// de la que lo pidió), primero el SLA de resolución que vence antes; los
+	// que esperan al proveedor tienen el SLA en pausa.
+	ListPublicBoardTickets(ctx context.Context, areaIds []uuid.UUID) ([]ListPublicBoardTicketsRow, error)
+	// Incidentes resueltos de los servicios del cliente en los últimos 7 días.
+	ListPublicClientRecent(ctx context.Context, organizationID uuid.UUID) ([]ListPublicClientRecentRow, error)
+	// Estado de un cliente: sus servicios activos con el incidente abierto más
+	// antiguo y la ventana en curso (del servicio o de todo el cliente).
+	ListPublicClientServices(ctx context.Context, organizationID uuid.UUID) ([]ListPublicClientServicesRow, error)
+	// Mantenimientos programados de un cliente en los próximos 30 días. Sin
+	// servicio = todos sus servicios.
+	ListPublicClientWindows(ctx context.Context, organizationID pgtype.UUID) ([]ListPublicClientWindowsRow, error)
+	// Enlaces públicos (10h): Administración → Enlaces públicos y lo que muestra
+	// cada vista sin iniciar sesión. El token nunca se guarda: solo su SHA-256.
+	ListPublicLinks(ctx context.Context) ([]ListPublicLinksRow, error)
+	// Mapa en TV: los incidentes abiertos con lugar, con su localidad.
+	ListPublicMapIncidents(ctx context.Context) ([]ListPublicMapIncidentsRow, error)
+	// Mapa en TV: los mantenimientos en curso con lugar.
+	ListPublicMapWindows(ctx context.Context) ([]ListPublicMapWindowsRow, error)
 	ListPublicTicketComments(ctx context.Context, ticketID uuid.UUID) ([]TicketComment, error)
 	// ===== RACI por cliente (paridad con el legacy: Escalamiento → Matriz RACI) =====
 	// Actividades de un cliente (o de todos), con el nombre del cliente.
@@ -1014,6 +1038,9 @@ type Querier interface {
 	ListVisibleComplementCandidates(ctx context.Context) ([]Complement, error)
 	// Las series activas con el nombre de a qué aplican.
 	ListWindowSeries(ctx context.Context) ([]ListWindowSeriesRow, error)
+	// Carga masiva por CSV (10g): ventanas activas con ese título y horario, para
+	// no duplicar la que ya se cargó.
+	ListWindowsAt(ctx context.Context, arg ListWindowsAtParams) ([]MaintenanceWindow, error)
 	// Para el calendario de la Agenda: las ventanas activas que tocan el rango.
 	ListWindowsBetween(ctx context.Context, arg ListWindowsBetweenParams) ([]ListWindowsBetweenRow, error)
 	// Candidatas para notify: ventanas activas del servicio, del activo, o de
@@ -1164,6 +1191,8 @@ type Querier interface {
 	RetryGlpiOutbox(ctx context.Context, id pgtype.UUID) (int64, error)
 	RetryTicketMail(ctx context.Context, arg RetryTicketMailParams) (int64, error)
 	RevokeAPIKey(ctx context.Context, arg RevokeAPIKeyParams) (ApiKey, error)
+	// ===== Enlaces públicos: el de teletrabajo (/p/telework) y los de la 10h, que se
+	// administran en Administración → Enlaces públicos (public_links.sql) =====
 	RotatePublicShareLink(ctx context.Context, arg RotatePublicShareLinkParams) (PublicShareLink, error)
 	SetAgendaFlowActive(ctx context.Context, arg SetAgendaFlowActiveParams) (int64, error)
 	SetAgendaTaskActive(ctx context.Context, arg SetAgendaTaskActiveParams) (int64, error)
@@ -1215,7 +1244,6 @@ type Querier interface {
 	SetPasswordResetToken(ctx context.Context, arg SetPasswordResetTokenParams) error
 	// El área dueña de la política (9e): esa área la ve y su jefatura la edita.
 	SetPolicyArea(ctx context.Context, arg SetPolicyAreaParams) (EscalationPolicy, error)
-	SetPublicShareLinkActive(ctx context.Context, arg SetPublicShareLinkActiveParams) (PublicShareLink, error)
 	// Saltar o volver a aplicar una vez; aplicar igual en feriado (queda quién) o quitarlo.
 	SetSeriesWindowState(ctx context.Context, arg SetSeriesWindowStateParams) (MaintenanceWindow, error)
 	// Activar o desactivar a mano anula lo que hizo la organización.
@@ -1336,6 +1364,7 @@ type Querier interface {
 	UpdatePlaybook(ctx context.Context, arg UpdatePlaybookParams) (int64, error)
 	UpdatePolicyReminder(ctx context.Context, arg UpdatePolicyReminderParams) (EscalationPolicy, error)
 	UpdatePolicyStep(ctx context.Context, arg UpdatePolicyStepParams) (EscalationStep, error)
+	UpdatePublicLink(ctx context.Context, arg UpdatePublicLinkParams) (PublicShareLink, error)
 	UpdateRaciActivity(ctx context.Context, arg UpdateRaciActivityParams) (int64, error)
 	UpdateReportEvent(ctx context.Context, arg UpdateReportEventParams) (ReportEvent, error)
 	UpdateReportOperationType(ctx context.Context, arg UpdateReportOperationTypeParams) (ReportOperationType, error)

@@ -128,3 +128,17 @@ UPDATE entries SET
   follow_up_close_note = CASE WHEN sqlc.arg('open')::boolean THEN NULL ELSE sqlc.narg('note')::text END
 WHERE id = sqlc.arg('id')
 RETURNING id, follow_up_open, follow_up_closed_at;
+
+-- name: ImportEntry :exec
+-- Carga masiva por CSV (10g): entradas históricas con su fecha y autor reales.
+INSERT INTO entries (user_id, entry_type, scope, content, tags, service_id, created_at, updated_at)
+VALUES (sqlc.arg('user_id'), sqlc.arg('entry_type'), sqlc.arg('scope'), sqlc.arg('content'), sqlc.arg('tags'),
+  sqlc.narg('service_id'), sqlc.arg('created_at'), sqlc.arg('created_at'));
+
+-- name: EntryImported :one
+-- La misma entrada (autor, minuto y texto) ya está: volver a subir el archivo no la duplica.
+SELECT EXISTS (
+  SELECT 1 FROM entries
+  WHERE user_id = sqlc.arg('user_id') AND date_trunc('minute', created_at) = date_trunc('minute', sqlc.arg('created_at')::timestamptz)
+    AND content = sqlc.arg('content')
+)::boolean;

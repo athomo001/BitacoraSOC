@@ -7,6 +7,9 @@
     <button type="button" role="tab" class="seg" [attr.aria-pressed]="tab() === 'users'" [attr.aria-selected]="tab() === 'users'" (click)="tab.set('users')">{{ i18n.t('access.tab.users') }} <span class="mono">{{ users().length }}</span></button>
     <button type="button" role="tab" class="seg" [attr.aria-pressed]="tab() === 'groups'" [attr.aria-selected]="tab() === 'groups'" (click)="tab.set('groups')">{{ i18n.t('access.tab.groups') }} <span class="mono">{{ groups().length }}</span></button>
   </span>
+  @if (tab() === 'users') {
+    <button type="button" class="aa-btn" (click)="importCsv()"><mat-icon>upload_file</mat-icon>{{ i18n.t('csvImport.open') }}</button>
+  }
   <button type="button" class="aa-btn aa-btn--primary" (click)="startCreate(tab() === 'users' ? 'user' : 'group')">
     <mat-icon>{{ tab() === 'users' ? 'person_add' : 'group_add' }}</mat-icon>{{ i18n.t(tab() === 'users' ? 'access.newUser' : 'access.newGroup') }}
   </button>

@@ -1755,6 +1755,65 @@ func (q *Queries) ListUnitAncestors(ctx context.Context, id uuid.UUID) ([]ListUn
 	return items, nil
 }
 
+const listWindowsAt = `-- name: ListWindowsAt :many
+SELECT id, service_id, asset_id, territorial_unit_id, title, notes, starts_at, ends_at, suppress_notifications, priority, created_by, active, organization_id, area_id, team_id, agenda_task_id, closed_at, closed_by, notified_start, notified_end, series_id, series_day, holiday_name, approved_by, approved_at FROM maintenance_windows
+WHERE active AND lower(title) = lower($1) AND starts_at = $2 AND ends_at = $3
+`
+
+type ListWindowsAtParams struct {
+	Title    string             `json:"title"`
+	StartsAt pgtype.Timestamptz `json:"starts_at"`
+	EndsAt   pgtype.Timestamptz `json:"ends_at"`
+}
+
+// Carga masiva por CSV (10g): ventanas activas con ese título y horario, para
+// no duplicar la que ya se cargó.
+func (q *Queries) ListWindowsAt(ctx context.Context, arg ListWindowsAtParams) ([]MaintenanceWindow, error) {
+	rows, err := q.db.Query(ctx, listWindowsAt, arg.Title, arg.StartsAt, arg.EndsAt)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []MaintenanceWindow
+	for rows.Next() {
+		var i MaintenanceWindow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ServiceID,
+			&i.AssetID,
+			&i.TerritorialUnitID,
+			&i.Title,
+			&i.Notes,
+			&i.StartsAt,
+			&i.EndsAt,
+			&i.SuppressNotifications,
+			&i.Priority,
+			&i.CreatedBy,
+			&i.Active,
+			&i.OrganizationID,
+			&i.AreaID,
+			&i.TeamID,
+			&i.AgendaTaskID,
+			&i.ClosedAt,
+			&i.ClosedBy,
+			&i.NotifiedStart,
+			&i.NotifiedEnd,
+			&i.SeriesID,
+			&i.SeriesDay,
+			&i.HolidayName,
+			&i.ApprovedBy,
+			&i.ApprovedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listWindowsForScope = `-- name: ListWindowsForScope :many
 SELECT mw.id, mw.service_id, mw.asset_id, mw.territorial_unit_id, mw.title, mw.notes, mw.starts_at, mw.ends_at, mw.suppress_notifications, mw.priority, mw.created_by, mw.active, mw.organization_id, mw.area_id, mw.team_id, mw.agenda_task_id, mw.closed_at, mw.closed_by, mw.notified_start, mw.notified_end, mw.series_id, mw.series_day, mw.holiday_name, mw.approved_by, mw.approved_at FROM maintenance_windows mw
 WHERE mw.active AND mw.ends_at > now()

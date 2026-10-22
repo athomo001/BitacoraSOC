@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, input, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, Injector, OnInit, computed, inject, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DatePipe } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
@@ -14,8 +14,10 @@ import { I18nService } from '../../core/i18n/i18n.service';
 import { PreferencesService } from '../../core/preferences/preferences.service';
 import { MessageKey } from '../../core/i18n/messages';
 import { problemDetail } from '../../core/http-error';
+import { openCsvImport } from '../../shared/csv-import/open-csv-import';
 
 import '../../core/i18n/packs/escalation';
+import '../../core/i18n/packs/imports';
 type ScopeKind = 'asset' | 'unit' | 'service' | 'client' | 'area' | 'team';
 type Repeat = 'once' | 'weekly' | 'monthly';
 
@@ -43,6 +45,7 @@ const WEEKDAYS = [0, 1, 2, 3, 4, 5, 6] as const;
     <section class="adm-card">
       <div class="adm-card__head">
         <h3 class="adm-card__title"><mat-icon>engineering</mat-icon>{{ i18n.t('escAdmin.windows') }}</h3>
+        <button type="button" class="adm-btn adm-push" (click)="importCsv()"><mat-icon>upload_file</mat-icon>{{ i18n.t('csvImport.open') }}</button>
       </div>
       <p class="adm-card__note mw__lead">{{ i18n.t('escAdmin.windowsHint') }}</p>
       @if (error(); as e) { <p class="adm-error mw__msg" role="alert">{{ e }}</p> }
@@ -255,6 +258,7 @@ export class MaintenanceWindowsComponent implements OnInit {
   private readonly modules = inject(ModuleAccessService);
   private readonly orgs = inject(OrganizationsService);
   private readonly agenda = inject(AgendaService);
+  private readonly injector = inject(Injector);
 
   protected readonly weekdays = WEEKDAYS;
   protected readonly repeats: readonly Repeat[] = ['once', 'weekly', 'monthly'];
@@ -515,6 +519,11 @@ export class MaintenanceWindowsComponent implements OnInit {
       await this.api.deleteSeries(s.id);
       await this.refresh();
     });
+  }
+
+  /** Carga masiva de ventanas sueltas (10g). */
+  protected async importCsv(): Promise<void> {
+    if (await openCsvImport(this.injector, 'windows')) await this.run(() => this.refresh());
   }
 
   private async refresh(): Promise<void> {

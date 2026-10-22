@@ -47,6 +47,9 @@ type csvRowResult struct {
 	Action string `json:"action"` // create | update | unchanged | error
 	Detail string `json:"detail,omitempty"`
 	Error  string `json:"error,omitempty"`
+	// Secret: la contraseña temporal de un usuario recién creado (10g); se
+	// muestra una sola vez, como en el alta de a uno.
+	Secret string `json:"secret,omitempty"`
 }
 
 type csvImportResult struct {

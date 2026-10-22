@@ -954,10 +954,14 @@ erDiagram
         boolean is_active
         uuid created_by FK
         timestamptz last_accessed_at
+        text name
+        uuid[] area_ids
+        uuid organization_id FK
     }
 
     CHECKLIST_TEMPLATES |o--o{ WORK_SHIFTS : "checklist_template_end_id"
     CHECKLIST_TEMPLATES |o--o{ WORK_SHIFTS : "checklist_template_start_id"
+    ORGANIZATIONS |o--o{ PUBLIC_SHARE_LINKS : "organization_id"
     ROTATION_CYCLES |o--o{ WORK_SHIFTS : "rotation_cycle_id"
     ROTATION_CYCLES ||--o{ ROTATION_OVERRIDES : "cycle_id"
     ROTATION_CYCLES ||--o{ ROTATION_SLOTS : "cycle_id"

@@ -183,11 +183,16 @@ func planPlacement(current []groupShape, want placementDTO, active map[string]bo
 }
 
 func (h *PlacementHandler) catalog(ctx context.Context) (map[string]db.Area, map[string]db.Level, error) {
-	areas, err := h.Queries.ListAreas(ctx)
+	return placementCatalog(ctx, h.Queries)
+}
+
+// placementCatalog: las áreas encendidas por código y los niveles por id.
+func placementCatalog(ctx context.Context, q *db.Queries) (map[string]db.Area, map[string]db.Level, error) {
+	areas, err := q.ListAreas(ctx)
 	if err != nil {
 		return nil, nil, err
 	}
-	levels, err := h.Queries.ListLevels(ctx)
+	levels, err := q.ListLevels(ctx)
 	if err != nil {
 		return nil, nil, err
 	}

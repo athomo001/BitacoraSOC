@@ -33,6 +33,9 @@
       <button type="button" class="adm-btn" [attr.aria-expanded]="moreFilters()" (click)="moreFilters.set(!moreFilters())"><mat-icon>tune</mat-icon>{{ i18n.t('entries.moreFilters') }}</button>
       <span class="en__count mono en__push">{{ i18n.tf('entries.count', total()) }}</span>
       <button type="button" class="adm-btn" [attr.aria-pressed]="panel() === 'notes'" (click)="toggleNotes()"><mat-icon>sticky_note_2</mat-icon>{{ i18n.t('entries.notes') }}</button>
+      @if (perms.isAdmin()) {
+        <button type="button" class="adm-icon-btn" [title]="i18n.t('csvImport.open')" [attr.aria-label]="i18n.t('csvImport.open')" (click)="importCsv()"><mat-icon>upload_file</mat-icon></button>
+      }
       <button type="button" class="adm-icon-btn" [title]="i18n.t('entries.exportCsv')" [attr.aria-label]="i18n.t('entries.exportCsv')" (click)="exportCsv()"><mat-icon>download</mat-icon></button>
     </div>
 

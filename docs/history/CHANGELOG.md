@@ -4,6 +4,29 @@ Registro de cambios relevantes del proyecto.
 
 > Las entradas `[Rewrite]` registran avance de la reescritura Go/Angular especificada en `spec/` (ver `spec/02-alcance-y-roadmap.md`), fase por fase. No llevan número de versión de `package.json` porque documentan spec/decisiones/código de un sistema todavía no desplegado — el sistema en producción sigue siendo el de las entradas versionadas de abajo hasta el corte (Fase 14).
 
+## [Rewrite] Enlaces públicos: guardias, Ticketera y Mapa en TV y estado para un cliente (10h) - 2026-10-22
+
+- El dueño eligió cuatro vistas nuevas sin sesión y aprobó el diseño (<https://claude.ai/artifact/5DbgXPNMtdtocb1bhgBEoi>) con las propuestas: el enlace se ve una sola vez, el cliente no ve el título interno de los incidentes, la TV de la Ticketera muestra asunto y cliente, y el teletrabajo pasa a la pantalla nueva.
+- **Administración → Enlaces públicos**: crear (qué muestra, un nombre y su alcance: áreas o cliente), **Cambiar enlace** (el anterior deja de abrir), apagar y borrar, con cuándo se abrió por última vez. La URL se muestra una vez al crearla o cambiarla: solo se guarda su SHA-256. Los tipos de un módulo apagado no se ofrecen. El enlace de teletrabajo sale de Turnos → Dotación y se maneja aquí (puede haber varios).
+- **Guardias en TV** (`/p/v/…`, tema oscuro): por área, quién está de guardia ahora (nombre completo), hasta cuándo y quién sigue; la que debe estar cubierta y no lo está sale en ámbar. Sin teléfonos ni correos.
+- **Ticketera en TV**: los abiertos de las áreas elegidas, primero el SLA que vence antes, con la cuenta regresiva (vencido en rojo, menos de 2 horas en ámbar, en pausa si espera al proveedor), y arriba cuántos hay abiertos, sin asignar, vencidos y por vencer.
+- **Mapa NOC en TV**: el mapa con el fondo configurado, las localidades con incidente o mantenimiento y al costado la lista con el lugar y desde o hasta cuándo. Sin tickets.
+- **Estado para un cliente** (tema claro): una frase con su estado, sus servicios uno por uno, los mantenimientos de los próximos 30 días y los incidentes resueltos de los últimos 7, sin títulos internos ni nada de otros clientes.
+- Todas se actualizan solas cada minuto; si el servidor no responde, la pantalla sigue con lo último y lo dice. Un enlace apagado, borrado o de un módulo apagado muestra «Este enlace no está disponible».
+- **Modelo** (migración 000059): `public_share_links.name`, `area_ids` y `organization_id`, con los tipos permitidos. Se quitó `POST /api/public-shares/telework`; las rutas nuevas están en `docs/api.md`.
+- Pruebas: las cuatro vistas, cambiar, apagar y borrar, y que al cliente no le llegue nada interno ni de otro (integración); la pantalla de administración y las vistas (pantalla).
+
+## [Rewrite] Cargas por CSV de usuarios, organizaciones, ventanas y entradas históricas (10g) - 2026-10-22
+
+- El dueño eligió qué más se carga por CSV: usuarios, organizaciones con sus servicios, ventanas de mantenimiento y entradas históricas de la Bitácora. El legacy no tenía nada de esto más allá de lo que la 2.0 ya cargaba (directorio, guardias y dotación, catálogo de eventos, inventario, territorio y feriados).
+- **«Cargar CSV»** en Administración → Usuarios y grupos, Administración → Organizaciones, Ventanas de mantenimiento y la Bitácora (solo el admin). Mismo flujo que el Inventario: plantilla, revisión fila por fila (nuevo, actualiza, sin cambios o no se carga, con el motivo) y «Cargar». El archivo no se guarda; las filas con error no entran y el resto sí. Lo que se deja vacío se mantiene.
+- **Usuarios**: por usuario. Los nuevos entran con contraseña temporal, que se muestra una sola vez (y se puede descargar) y se cambia al entrar, como el alta de a uno. `areas` («SOC=N1; NOC») deja a la persona en esas áreas y niveles, con su jefatura y permisos extra. Nadie se quita a sí mismo el rol de admin. «Exportar lo que hay» baja los activos en el mismo formato.
+- **Organizaciones**: por código, con tipo y mandante (otra organización ya existente o más arriba en el archivo). Con SOC, `servicios` («FW-MUNDO=Firewall») agrega o renombra servicios, nunca borra; sin SOC la columna no aparece.
+- **Ventanas de mantenimiento**: ventanas sueltas; `aplica_a` usa los nombres de la pantalla (`cliente:`, `area:`, `equipo:` y, según los módulos, `servicio:`, `activo:` o `zona:`). La ya cargada no se repite y la que ya terminó no entra. Las de un cliente le dejan al CSM la tarea «Avisar al cliente», como al programarlas a mano.
+- **Entradas históricas**: las columnas del «Exportar CSV» de la Bitácora (un export vuelve a entrar), con su fecha y autor reales. Solo se agregan; la misma entrada (autor, minuto y texto) no se repite.
+- Rutas en `docs/api.md` (`/api/users/import`, `/api/organizations/import`, `/api/maintenance-windows/import`, `/api/entries/import`, sus plantillas y los exports). Sin migraciones.
+- Pruebas: los cuatro contra la base (crear, actualizar, sin cambios, errores, contraseña temporal, áreas y niveles, mandante, servicios, ventanas repetidas y vencidas, entradas repetidas) y el diálogo (revisión, carga, contraseñas y lo que muestra según los módulos).
+
 ## [Rewrite] Metas por persona: escalones, lograda o no lograda y regla - 2026-10-21
 
 - El dueño pidió agrupar las metas por persona, poder decir que la secundaria no hace falta si se cumple la primaria (o al revés), guardar si una certificación se pasó o no, y que diga «meta» en vez de «bono». Diseño aprobado con sus seis propuestas: <https://claude.ai/artifact/H4hHG2qFqghk9GdgN3y4ir>.

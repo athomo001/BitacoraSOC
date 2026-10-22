@@ -65,34 +65,8 @@ func (q *Queries) CreateNotificationSchedule(ctx context.Context, arg CreateNoti
 	return i, err
 }
 
-const createPublicShareLink = `-- name: CreatePublicShareLink :one
-INSERT INTO public_share_links (slug, token_hash, is_active, created_by)
-VALUES ($1, $2, true, $3) RETURNING id, slug, token_hash, is_active, created_by, created_at, last_accessed_at
-`
-
-type CreatePublicShareLinkParams struct {
-	Slug      string    `json:"slug"`
-	TokenHash string    `json:"token_hash"`
-	CreatedBy uuid.UUID `json:"created_by"`
-}
-
-func (q *Queries) CreatePublicShareLink(ctx context.Context, arg CreatePublicShareLinkParams) (PublicShareLink, error) {
-	row := q.db.QueryRow(ctx, createPublicShareLink, arg.Slug, arg.TokenHash, arg.CreatedBy)
-	var i PublicShareLink
-	err := row.Scan(
-		&i.ID,
-		&i.Slug,
-		&i.TokenHash,
-		&i.IsActive,
-		&i.CreatedBy,
-		&i.CreatedAt,
-		&i.LastAccessedAt,
-	)
-	return i, err
-}
-
 const getActivePublicShareByTokenHash = `-- name: GetActivePublicShareByTokenHash :one
-SELECT id, slug, token_hash, is_active, created_by, created_at, last_accessed_at FROM public_share_links WHERE token_hash = $1 AND is_active
+SELECT id, slug, token_hash, is_active, created_by, created_at, last_accessed_at, name, area_ids, organization_id FROM public_share_links WHERE token_hash = $1 AND is_active
 `
 
 func (q *Queries) GetActivePublicShareByTokenHash(ctx context.Context, tokenHash string) (PublicShareLink, error) {
@@ -106,6 +80,9 @@ func (q *Queries) GetActivePublicShareByTokenHash(ctx context.Context, tokenHash
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.LastAccessedAt,
+		&i.Name,
+		&i.AreaIds,
+		&i.OrganizationID,
 	)
 	return i, err
 }
@@ -134,28 +111,6 @@ func (q *Queries) GetNotificationSchedule(ctx context.Context, id uuid.UUID) (Wo
 		&i.UpdatedAt,
 		&i.TargetPeriod,
 		&i.EmailFormat,
-	)
-	return i, err
-}
-
-const getPublicShareBySlug = `-- name: GetPublicShareBySlug :one
-
-SELECT id, slug, token_hash, is_active, created_by, created_at, last_accessed_at FROM public_share_links WHERE slug = $1
-`
-
-// ===== Enlace público TV (slug fijo 'telework', sin UNIQUE en slug: se
-// resuelve la fila existente en el handler antes de decidir INSERT/UPDATE) =====
-func (q *Queries) GetPublicShareBySlug(ctx context.Context, slug string) (PublicShareLink, error) {
-	row := q.db.QueryRow(ctx, getPublicShareBySlug, slug)
-	var i PublicShareLink
-	err := row.Scan(
-		&i.ID,
-		&i.Slug,
-		&i.TokenHash,
-		&i.IsActive,
-		&i.CreatedBy,
-		&i.CreatedAt,
-		&i.LastAccessedAt,
 	)
 	return i, err
 }
@@ -391,8 +346,9 @@ func (q *Queries) PatchNotificationSchedule(ctx context.Context, arg PatchNotifi
 }
 
 const rotatePublicShareLink = `-- name: RotatePublicShareLink :one
+
 UPDATE public_share_links SET token_hash = $2, is_active = true, created_by = $3, created_at = now()
-WHERE id = $1 RETURNING id, slug, token_hash, is_active, created_by, created_at, last_accessed_at
+WHERE id = $1 RETURNING id, slug, token_hash, is_active, created_by, created_at, last_accessed_at, name, area_ids, organization_id
 `
 
 type RotatePublicShareLinkParams struct {
@@ -401,6 +357,8 @@ type RotatePublicShareLinkParams struct {
 	CreatedBy uuid.UUID `json:"created_by"`
 }
 
+// ===== Enlaces públicos: el de teletrabajo (/p/telework) y los de la 10h, que se
+// administran en Administración → Enlaces públicos (public_links.sql) =====
 func (q *Queries) RotatePublicShareLink(ctx context.Context, arg RotatePublicShareLinkParams) (PublicShareLink, error) {
 	row := q.db.QueryRow(ctx, rotatePublicShareLink, arg.ID, arg.TokenHash, arg.CreatedBy)
 	var i PublicShareLink
@@ -412,30 +370,9 @@ func (q *Queries) RotatePublicShareLink(ctx context.Context, arg RotatePublicSha
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.LastAccessedAt,
-	)
-	return i, err
-}
-
-const setPublicShareLinkActive = `-- name: SetPublicShareLinkActive :one
-UPDATE public_share_links SET is_active = $2 WHERE id = $1 RETURNING id, slug, token_hash, is_active, created_by, created_at, last_accessed_at
-`
-
-type SetPublicShareLinkActiveParams struct {
-	ID       uuid.UUID `json:"id"`
-	IsActive bool      `json:"is_active"`
-}
-
-func (q *Queries) SetPublicShareLinkActive(ctx context.Context, arg SetPublicShareLinkActiveParams) (PublicShareLink, error) {
-	row := q.db.QueryRow(ctx, setPublicShareLinkActive, arg.ID, arg.IsActive)
-	var i PublicShareLink
-	err := row.Scan(
-		&i.ID,
-		&i.Slug,
-		&i.TokenHash,
-		&i.IsActive,
-		&i.CreatedBy,
-		&i.CreatedAt,
-		&i.LastAccessedAt,
+		&i.Name,
+		&i.AreaIds,
+		&i.OrganizationID,
 	)
 	return i, err
 }

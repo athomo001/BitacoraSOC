@@ -868,7 +868,14 @@ CREATE TABLE public_share_links (
   is_active BOOLEAN NOT NULL DEFAULT true,
   created_by UUID NOT NULL REFERENCES users(id),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  last_accessed_at TIMESTAMPTZ
+  last_accessed_at TIMESTAMPTZ,
+  -- 000059 (10h): nombre y alcance: las áreas (guardias, Ticketera) o el
+  -- cliente (estado). Slugs: telework, guards, tickets, map, client.
+  name TEXT NOT NULL DEFAULT '',
+  area_ids UUID[] NOT NULL DEFAULT '{}',
+  organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
+  CONSTRAINT chk_public_share_links_slug CHECK (slug IN ('telework', 'guards', 'tickets', 'map', 'client')),
+  CONSTRAINT chk_public_share_links_client CHECK ((slug = 'client') = (organization_id IS NOT NULL))
 );
 CREATE INDEX idx_public_share_links_lookup ON public_share_links(token_hash) WHERE is_active;
 

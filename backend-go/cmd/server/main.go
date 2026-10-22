@@ -329,6 +329,18 @@ func run(logger *slog.Logger) error {
 	mux.Handle("DELETE /api/users/{id}", admin(usersHandler.Delete))
 	mux.Handle("GET /api/users/{id}/links", admin(usersHandler.Links))
 	mux.Handle("POST /api/users/force-reset-all", admin(usersHandler.ForceResetAll))
+	// Cargas masivas por CSV (10g): plantilla, revisión (?dryRun=true) y carga.
+	bulkImport := &handler.BulkImportHandler{Queries: queries, Pool: pool, AuditLog: auditLog}
+	mux.Handle("GET /api/users/import/template", admin(bulkImport.UsersTemplate))
+	mux.Handle("GET /api/users/export", admin(bulkImport.UsersExport))
+	mux.Handle("POST /api/users/import", admin(bulkImport.Users))
+	mux.Handle("GET /api/organizations/import/template", admin(bulkImport.OrganizationsTemplate))
+	mux.Handle("GET /api/organizations/export", admin(bulkImport.OrganizationsExport))
+	mux.Handle("POST /api/organizations/import", admin(bulkImport.Organizations))
+	mux.Handle("GET /api/maintenance-windows/import/template", operator(bulkImport.WindowsTemplate))
+	mux.Handle("POST /api/maintenance-windows/import", operator(bulkImport.Windows))
+	mux.Handle("GET /api/entries/import/template", admin(bulkImport.EntriesTemplate))
+	mux.Handle("POST /api/entries/import", admin(bulkImport.Entries))
 	mux.Handle("GET /api/users/{id}/permission-groups", admin(permissionGroupsHandler.ListUserGroups))
 	mux.Handle("PUT /api/users/{id}/permission-groups", admin(permissionGroupsHandler.ReplaceUserGroups))
 	// Usuarios por área y nivel: los grupos se arman solos (2026-10-13).
@@ -689,7 +701,6 @@ func run(logger *slog.Logger) error {
 	// siempre activo.
 	mux.Handle("GET /api/work-shifts/matrix", authed(dotacionHandler.Matrix))
 	mux.Handle("POST /api/work-shifts/assignments", admin(dotacionHandler.CreateAssignment))
-	mux.Handle("POST /api/public-shares/telework", admin(dotacionHandler.PublicShareAction))
 	mux.Handle("GET /api/work-shifts/notification-schedules", admin(dotacionHandler.ListNotificationSchedules))
 	mux.Handle("POST /api/work-shifts/notification-schedules", admin(dotacionHandler.CreateNotificationSchedule))
 	mux.Handle("PATCH /api/work-shifts/notification-schedules/{id}", admin(dotacionHandler.PatchNotificationSchedule))
@@ -732,6 +743,16 @@ func run(logger *slog.Logger) error {
 	// Página pública sin login para la TV de sala (HU-4b) — primer endpoint
 	// HTML del backend, fuera del envoltorio {data} y sin auth a propósito.
 	mux.HandleFunc("GET /p/telework/{token}", dotacionHandler.PublicTeleworkPage)
+	// Enlaces públicos (10h): Administración → Enlaces públicos y las vistas sin sesión
+	// (guardias, Ticketera y Mapa en TV, estado de un cliente) en /p/v/{token}.
+	publicLinksHandler := &handler.PublicLinksHandler{Queries: queries, AuditLog: auditLog, PublicBaseURL: publicBaseURL}
+	mux.Handle("GET /api/public-links", admin(publicLinksHandler.List))
+	mux.Handle("GET /api/public-links/meta", admin(publicLinksHandler.Meta))
+	mux.Handle("POST /api/public-links", admin(publicLinksHandler.Create))
+	mux.Handle("POST /api/public-links/{id}/rotate", admin(publicLinksHandler.Rotate))
+	mux.Handle("PATCH /api/public-links/{id}", admin(publicLinksHandler.Patch))
+	mux.Handle("DELETE /api/public-links/{id}", admin(publicLinksHandler.Delete))
+	mux.Handle("GET /api/public/views/{token}", public(publicLinksHandler.View))
 	// Calendario en Outlook (spec/16 §6.1, 9.7): el enlace propio de cada
 	// persona (Perfil) y la suscripción ICS pública (el token es la llave).
 	calendarFeedHandler := &handler.CalendarFeedHandler{Queries: queries, Crypto: cryptoBox, AuditLog: auditLog, PublicBaseURL: publicBaseURL}
@@ -854,6 +875,7 @@ func run(logger *slog.Logger) error {
 	teamHandler.Reports = reportsHandler                            // el resumen mensual usa sus destinatarios válidos
 	managementHandler.Reports = reportsHandler                      // «Exportar resumen» por correo, mismos destinatarios válidos
 	escalationHandler.ClientNotice = managementHandler.WindowNotice // ventana de un cliente → «Avisar al cliente» al CSM
+	bulkImport.ClientNotice = managementHandler.WindowNotice        // lo mismo con las ventanas cargadas por CSV
 	// Administración → Integraciones y API de integraciones (spec/19, 10b).
 	integrationsHandler := &handler.IntegrationsHandler{Queries: queries, AuditLog: auditLog, Crypto: cryptoBox, Forward: forwardEmitter, Hostname: hostname}
 	mux.Handle("GET /api/integrations/meta", admin(integrationsHandler.Meta))

@@ -188,6 +188,28 @@ func (q *Queries) DeleteEntry(ctx context.Context, id uuid.UUID) (Entry, error) 
 	return i, err
 }
 
+const entryImported = `-- name: EntryImported :one
+SELECT EXISTS (
+  SELECT 1 FROM entries
+  WHERE user_id = $1 AND date_trunc('minute', created_at) = date_trunc('minute', $2::timestamptz)
+    AND content = $3
+)::boolean
+`
+
+type EntryImportedParams struct {
+	UserID    uuid.UUID          `json:"user_id"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	Content   string             `json:"content"`
+}
+
+// La misma entrada (autor, minuto y texto) ya está: volver a subir el archivo no la duplica.
+func (q *Queries) EntryImported(ctx context.Context, arg EntryImportedParams) (bool, error) {
+	row := q.db.QueryRow(ctx, entryImported, arg.UserID, arg.CreatedAt, arg.Content)
+	var column_1 bool
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const getEntry = `-- name: GetEntry :one
 SELECT e.id, e.user_id, e.entry_type, e.scope, e.content, e.tags, e.service_id, e.asset_id, e.work_shift_id, e.glpi_ticket_id, e.glpi_linked_at, e.ticket_id, e.image_url, e.image_hash, e.image_size_bytes, e.created_at, e.updated_at, e.owner_complement_id, e.owner_complement_name, e.api_key_id, e.api_key_name, e.follow_up_open, e.follow_up_closed_at, e.follow_up_closed_by, e.follow_up_close_note, u.username AS author_username, COALESCE(fu.username, '')::text AS follow_up_closed_by_name
 FROM entries e JOIN users u ON u.id = e.user_id
@@ -269,6 +291,36 @@ func (q *Queries) GetServiceOrganizationID(ctx context.Context, id uuid.UUID) (u
 	var organization_id uuid.UUID
 	err := row.Scan(&organization_id)
 	return organization_id, err
+}
+
+const importEntry = `-- name: ImportEntry :exec
+INSERT INTO entries (user_id, entry_type, scope, content, tags, service_id, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5,
+  $6, $7, $7)
+`
+
+type ImportEntryParams struct {
+	UserID    uuid.UUID          `json:"user_id"`
+	EntryType EntryType          `json:"entry_type"`
+	Scope     EntryScope         `json:"scope"`
+	Content   string             `json:"content"`
+	Tags      []string           `json:"tags"`
+	ServiceID pgtype.UUID        `json:"service_id"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
+// Carga masiva por CSV (10g): entradas históricas con su fecha y autor reales.
+func (q *Queries) ImportEntry(ctx context.Context, arg ImportEntryParams) error {
+	_, err := q.db.Exec(ctx, importEntry,
+		arg.UserID,
+		arg.EntryType,
+		arg.Scope,
+		arg.Content,
+		arg.Tags,
+		arg.ServiceID,
+		arg.CreatedAt,
+	)
+	return err
 }
 
 const listEntries = `-- name: ListEntries :many

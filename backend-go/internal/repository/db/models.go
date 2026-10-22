@@ -2348,6 +2348,9 @@ type PublicShareLink struct {
 	CreatedBy      uuid.UUID          `json:"created_by"`
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 	LastAccessedAt pgtype.Timestamptz `json:"last_accessed_at"`
+	Name           string             `json:"name"`
+	AreaIds        []uuid.UUID        `json:"area_ids"`
+	OrganizationID pgtype.UUID        `json:"organization_id"`
 }
 
 type RaciActivity struct {

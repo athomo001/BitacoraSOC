@@ -200,6 +200,9 @@ Generada desde `backend-go/cmd/server/main.go`, donde se registran las rutas. La
 | `DELETE` | `/api/users/{id}` | Admin — `200 {deleted}`: borra de verdad (y de todos lados) a quien no tiene historial; si tiene, queda bloqueado (`deleted: false`). No a uno mismo (`409`) |
 | `GET` | `/api/users/{id}/links` | Admin — lo que tiene a su nombre antes de bloquearlo: `[{kind: guard\|escalation\|pool\|shift\|client\|ticket\|task\|goal\|asset, label, detail}]` (en `guard`, `detail` = turnos por venir) |
 | `POST` | `/api/users/force-reset-all` | Admin |
+| `POST` | `/api/users/import` | Admin — `?dryRun=true` revisa sin guardar; cuerpo CSV (hasta 5 MB; no se guarda). Por usuario: crea (con `secret`, la contraseña temporal, que se muestra una vez) o actualiza; `areas` deja a la persona en esas áreas y niveles. `200 {rows, created, updated, unchanged, errors, applied}` |
+| `GET` | `/api/users/import/template` | Admin |
+| `GET` | `/api/users/export` | Admin — los usuarios activos en el formato de la carga |
 | `GET` | `/api/users/{id}/permission-groups` | Admin |
 | `PUT` | `/api/users/{id}/permission-groups` | Admin |
 | `GET` | `/api/users/{id}/placement` | Admin |
@@ -312,6 +315,8 @@ Generada desde `backend-go/cmd/server/main.go`, donde se registran las rutas. La
 | `GET` | `/api/entries` | Sesión — `q` busca también en los seguimientos; `followUp=open`: solo las que están en seguimiento, primero la de seguimiento más reciente. Cada entrada trae `followUpOpen`, `followUpCount` y `lastFollowUpAt` |
 | `POST` | `/api/entries` | Sesión |
 | `GET` | `/api/entries/export` | Sesión |
+| `POST` | `/api/entries/import` | Admin — `?dryRun=true`, cuerpo CSV con las columnas del export (hasta 20 MB; no se guarda). Entradas históricas con su fecha y autor; la misma (autor, minuto y texto) no se repite |
+| `GET` | `/api/entries/import/template` | Admin |
 | `GET` | `/api/entries/authors` | Sesión — quienes escribieron en la Bitácora (filtro por autor) |
 | `GET` | `/api/entries/tags` | Sesión — `?q=`: hasta 10 etiquetas que empiezan con lo escrito, las más usadas primero |
 | `GET` | `/api/admin/entry-tags` | Admin — todas las etiquetas con cuántas entradas las usan y el último uso |
@@ -490,6 +495,9 @@ Generada desde `backend-go/cmd/server/main.go`, donde se registran las rutas. La
 | `PATCH` | `/api/organizations/{id}` | Admin |
 | `DELETE` | `/api/organizations/{id}` | Admin |
 | `GET` | `/api/organizations/{id}/dependents` | Admin |
+| `POST` | `/api/organizations/import` | Admin — `?dryRun=true`, cuerpo CSV (hasta 5 MB; no se guarda). Por código; con SOC, la columna `servicios` agrega o renombra servicios (nunca borra) |
+| `GET` | `/api/organizations/import/template` | Admin |
+| `GET` | `/api/organizations/export` | Admin — en el formato de la carga |
 | `GET` | `/api/organization-types` | Sesión |
 | `POST` | `/api/organization-types` | Admin |
 | `PATCH` | `/api/organization-types/{code}` | Admin |
@@ -715,6 +723,8 @@ Tipos de notificación: `agenda.assigned`, `agenda.warn`, `agenda.due`, `agenda.
 | `GET` | `/api/maintenance-windows/overview` | Sesión — `?from=&to=` (RFC3339): ventanas activas con el nombre de a qué aplican |
 | `POST` | `/api/maintenance-windows/{id}/close` | Admin o analista — cierra antes de tiempo una ventana en curso |
 | `POST` | `/api/maintenance-windows` | Admin o analista |
+| `POST` | `/api/maintenance-windows/import` | Admin o analista — `?dryRun=true`, cuerpo CSV (hasta 5 MB; no se guarda). Ventanas sueltas; `aplica_a` = `cliente:`, `area:`, `equipo:` y, según los módulos, `servicio:`, `activo:` o `zona:`. La ya cargada no se repite y la que ya terminó no entra |
+| `GET` | `/api/maintenance-windows/import/template` | Admin o analista |
 | `DELETE` | `/api/maintenance-windows/{id}` | Admin o analista |
 | `GET` | `/api/maintenance-windows/series` | Sesión — ventanas que se repiten con sus próximas (también las saltadas y las de feriado) y `canApproveHoliday` |
 | `POST` | `/api/maintenance-windows/series/preview` | Sesión — `{rule, validFrom}` → las próximas 6, con el feriado si cae en uno |
@@ -761,8 +771,14 @@ Los tickets traídos de GLPI (spec/18) llevan `source: "glpi"` y `glpi: {id, url
 
 | Método | Ruta | Acceso |
 | --- | --- | --- |
-| `POST` | `/api/public-shares/telework` | Admin |
-| `GET` | `/p/telework/{token}` | Pública |
+| `GET` | `/api/public-links` | Admin — los enlaces (10h): `[{id, kind: telework\|guards\|tickets\|map\|client, name, active, areaIds, organizationId?, organizationName?, createdAt, createdBy, lastAccessedAt?}]`. La URL no está: solo se ve al crear o cambiar |
+| `GET` | `/api/public-links/meta` | Admin — `{kinds}`: los tipos que se pueden crear (sin NOC no hay `map`; sin Ticketera, no hay `tickets`) |
+| `POST` | `/api/public-links` | Admin — `{kind, name, areaIds?, organizationId?}`: `guards` y `tickets` llevan al menos un área; `client`, el cliente. `201` con `url`, que no se vuelve a mostrar |
+| `POST` | `/api/public-links/{id}/rotate` | Admin — `{url}` nueva; la anterior deja de abrir |
+| `PATCH` | `/api/public-links/{id}` | Admin — `{name?, active?}` |
+| `DELETE` | `/api/public-links/{id}` | Admin |
+| `GET` | `/api/public/views/{token}` | Pública — lo que muestra el enlace (`/p/v/{token}` en el navegador): `{kind, name, generatedAt, areaNames?, guards? \| tickets? \| map? \| client?}`. Solo nombres en guardias (sin contactos); al cliente, sin el título interno de los incidentes. `404` igual si el token no existe, está apagado o su módulo está apagado |
+| `GET` | `/p/telework/{token}` | Pública — la grilla de teletrabajo (HTML); su enlace se crea en Enlaces públicos |
 | `GET` | `/api/public/tickets/{token}` | Pública |
 | `GET` | `/api/public/tickets/{token}/images/{imageId}` | Pública |
 

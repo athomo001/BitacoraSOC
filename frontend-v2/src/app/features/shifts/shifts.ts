@@ -11,7 +11,6 @@ import { AdminGuardsComponent } from '../admin/admin-guards';
 import {
   CONDITION_COLOR_VAR,
   Matrix,
-  PublicShare,
   ShiftsService,
   TeleworkCondition,
 } from '../../core/shifts/shifts.service';
@@ -76,8 +75,6 @@ export class ShiftsComponent implements OnInit {
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
 
-  protected readonly share = signal<PublicShare | null>(null);
-  protected readonly shareBusy = signal(false);
 
   protected readonly editing = signal<{ userId: string; date: string } | null>(null);
   protected readonly editCondition = signal<TeleworkCondition>('office');
@@ -177,16 +174,4 @@ export class ShiftsComponent implements OnInit {
     }
   }
 
-  protected async shareLinkAction(action: 'generate' | 'regenerate' | 'deactivate'): Promise<void> {
-    if (this.shareBusy()) return;
-    this.shareBusy.set(true);
-    this.error.set(null);
-    try {
-      this.share.set(await this.api.publicShareAction(action));
-    } catch (error) {
-      this.error.set(problemDetail(error, this.i18n.t('staff.tvError')));
-    } finally {
-      this.shareBusy.set(false);
-    }
-  }
 }

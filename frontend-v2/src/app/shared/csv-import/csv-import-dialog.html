@@ -1,0 +1,68 @@
+<div class="ci" role="document" (keydown.escape)="close()">
+  <header class="ci__head">
+    <mat-icon class="ci__icon">upload_file</mat-icon>
+    <h2 class="ci__title">{{ title() }}</h2>
+    <span class="ci__btns">
+      <button type="button" class="adm-btn" (click)="api.downloadTemplate(data.kind)"><mat-icon>download</mat-icon>{{ i18n.t('csvImport.template') }}</button>
+      @if (api.exportable(data.kind)) {
+        <button type="button" class="adm-btn" (click)="api.downloadExport(data.kind)"><mat-icon>download</mat-icon>{{ i18n.t('csvImport.export') }}</button>
+      }
+      <button type="button" class="ci__icon-btn" [attr.aria-label]="i18n.t('csvImport.close')" (click)="close()"><mat-icon>close</mat-icon></button>
+    </span>
+  </header>
+
+  <div class="ci__body">
+    <div class="adm-field">
+      <span class="adm-label">{{ i18n.t('csvImport.file') }}</span>
+      <label class="adm-btn ci__file">
+        <mat-icon>description</mat-icon>{{ fileName() || i18n.t('csvImport.pickFile') }}
+        <input type="file" name="csvFile" accept=".csv,text/csv" [disabled]="busy()" (change)="pick($event)" />
+      </label>
+      @for (hint of hints(); track hint) { <span class="adm-hint">{{ hint }}</span> }
+      <span class="adm-hint">{{ i18n.t('csvImport.noFile') }}</span>
+    </div>
+
+    @if (error(); as e) { <p class="adm-error" role="alert">{{ e }}</p> }
+
+    @if (result(); as r) {
+      <div class="adm-field">
+        <span class="adm-label">{{ i18n.t('csvImport.review') }}</span>
+        <div class="ci__table">
+          <div class="ci__row ci__row--head">
+            <span>{{ i18n.t('csvImport.col.line') }}</span><span>{{ i18n.t('csvImport.col.item') }}</span><span>{{ i18n.t('csvImport.col.what') }}</span><span>{{ i18n.t('csvImport.col.detail') }}</span>
+          </div>
+          @for (row of r.rows; track row.line) {
+            <div class="ci__row">
+              <span class="mono">{{ row.line }}</span>
+              <span class="ci__item"><span class="mono">{{ row.code }}</span>@if (row.name) { <span class="ci__name">{{ row.name }}</span> }</span>
+              <span><span class="pill" [class]="'tone-' + tone[row.action]">{{ i18n.t(actionKey(row.action)) }}</span></span>
+              <span [class.ci__err]="!!row.error">
+                {{ row.error || row.detail }}
+                @if (row.secret) { <span class="mono ci__secret">{{ row.secret }}</span> }
+              </span>
+            </div>
+          }
+        </div>
+        <span class="adm-hint">{{ reviewHint() }}</span>
+      </div>
+      @if (secrets().length) {
+        <div class="ci__secrets" role="status">
+          <mat-icon>key</mat-icon>
+          <span class="ci__secrets-text">{{ i18n.t('csvImport.secrets') }}</span>
+          <button type="button" class="adm-btn" (click)="downloadSecrets()"><mat-icon>download</mat-icon>{{ i18n.t('csvImport.secretsDownload') }}</button>
+        </div>
+      }
+    }
+  </div>
+
+  @if (result(); as r) {
+    <footer class="ci__foot">
+      <span class="ci__status">{{ r.applied ? i18n.t('csvImport.done') : counts(r) }}</span>
+      @if (r.applied) {
+        <button type="button" class="adm-btn" (click)="close()">{{ i18n.t('csvImport.close') }}</button>
+      } @else {
+        <button type="button" class="adm-btn adm-btn--primary" [disabled]="busy() || r.created + r.updated === 0" (click)="load()"><mat-icon>done_all</mat-icon>{{ i18n.t('csvImport.go') }}</button>
+      }
+    </footer>
+  }
+</div>

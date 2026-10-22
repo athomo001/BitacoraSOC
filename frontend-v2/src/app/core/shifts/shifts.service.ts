@@ -114,12 +114,6 @@ export interface Assignment {
   notes?: string;
 }
 
-export interface PublicShare {
-  token?: string;
-  publicUrl?: string;
-  isActive: boolean;
-}
-
 export type NotificationFrequency = 'weekly' | 'monthly';
 
 export interface NotificationSchedule {
@@ -238,12 +232,6 @@ export class ShiftsService {
 
   async setAssignment(assignment: { userId: string; assignedDate: string; condition: TeleworkCondition; notes?: string; untilDate?: string }): Promise<Assignment> {
     return (await firstValueFrom(this.http.post<ApiEnvelope<Assignment>>('/api/work-shifts/assignments', assignment))).data;
-  }
-
-  // ===== Enlace público TV =====
-
-  async publicShareAction(action: 'generate' | 'regenerate' | 'deactivate'): Promise<PublicShare> {
-    return (await firstValueFrom(this.http.post<ApiEnvelope<PublicShare>>('/api/public-shares/telework', { action }))).data;
   }
 
   // ===== Notificación periódica a RRHH (HU-5b) =====

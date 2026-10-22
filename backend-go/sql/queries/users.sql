@@ -46,6 +46,7 @@ ORDER BY username;
 -- valor actual (COALESCE), no lo borra.
 UPDATE users SET
   email = COALESCE(sqlc.narg('email'), email),
+  full_name = COALESCE(sqlc.narg('full_name'), full_name),
   role = COALESCE(sqlc.narg('role'), role),
   cargo_label = COALESCE(sqlc.narg('cargo_label'), cargo_label),
   active = COALESCE(sqlc.narg('active'), active),

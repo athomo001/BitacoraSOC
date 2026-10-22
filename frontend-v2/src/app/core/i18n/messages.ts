@@ -17,6 +17,8 @@ import type { GlpiKey } from './packs/glpi';
 import type { ManagementKey } from './packs/management';
 import type { RaciKey } from './packs/raci';
 import type { IntegrationsKey } from './packs/integrations';
+import type { ImportsKey } from './packs/imports';
+import type { PublicLinksKey } from './packs/public-links';
 
 const ES = {
   'nav.entries': 'Bitácora',
@@ -248,7 +250,9 @@ export type MessageKey =
   | GlpiKey
   | ManagementKey
   | RaciKey
-  | IntegrationsKey;
+  | IntegrationsKey
+  | ImportsKey
+  | PublicLinksKey;
 
 /**
  * El inglés va en messages-en.ts y se descarga solo al cambiar a EN: así no

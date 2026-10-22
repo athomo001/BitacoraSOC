@@ -30,21 +30,6 @@
           <app-button variant="text" (pressed)="goToCurrentWeek()">{{ i18n.t('staff.thisWeek') }}</app-button>
         </div>
 
-        @if (perms.isAdmin()) {
-          <div class="shifts__tv">
-            <app-button variant="secondary" [disabled]="shareBusy()" (pressed)="shareLinkAction('generate')">{{ i18n.t('staff.tvGenerate') }}</app-button>
-            <app-button variant="secondary" [disabled]="shareBusy()" (pressed)="shareLinkAction('regenerate')">{{ i18n.t('staff.tvRegenerate') }}</app-button>
-            <app-button variant="critical" [disabled]="shareBusy()" (pressed)="shareLinkAction('deactivate')">{{ i18n.t('staff.tvDeactivate') }}</app-button>
-            @if (share(); as s) {
-              @if (s.publicUrl) {
-                <code class="shifts__tv-url">{{ s.publicUrl }}</code>
-              } @else {
-                <span class="shifts__muted">{{ i18n.t('staff.tvOff') }}</span>
-              }
-            }
-          </div>
-        }
-
         @if (loading()) {
           <p class="shifts__muted">{{ i18n.t('staff.loading') }}</p>
         }

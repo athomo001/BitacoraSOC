@@ -28,6 +28,8 @@ Lo hecho, lo que está en revisión y lo que falta hasta el corte. Marca con `[x
 - [ ] Probar la 10d.2 con el GLPI de pruebas: `migrate … up` para la 000054; un usuario de GLPI con permiso para crear tickets y seguimientos y su User-Token en Administración → GLPI → Escribir en GLPI («Probar»); comentar un GLPI-…, «Crear en GLPI» desde un ticket y desde una entrada, y escribir en GLPI sobre la copia para ver que vuelve — Dueño
 - [ ] Revisar en la app el seguimiento de la Bitácora (10j): `migrate … up` para la 000053; filtro «En seguimiento», el contador en la lista y «Cerrar seguimiento» en el detalle — Dueño
 - [ ] Probar la 10b (Integraciones): `migrate … up` para la 000052; en Administración → Integraciones crear un destino hacia tu SIEM y «Probar»; crear una llave y probarla con el `curl` que muestra (manual: `docs/api-integraciones.md`) — Dueño
+- [ ] Probar los enlaces públicos (10h): `migrate … up` para la 000059; en Administración → Enlaces públicos crear uno de cada tipo y abrirlo en otra pestaña o en la TV. El de teletrabajo ya no está en Turnos: créalo de nuevo aquí y cambia el de la TV — Dueño
+- [ ] Probar las cargas por CSV (10g): «Cargar CSV» en Usuarios y grupos, Organizaciones, Ventanas de mantenimiento y la Bitácora (solo admin). Bajar la plantilla, subirla y revisar antes de «Cargar»; los usuarios nuevos muestran su contraseña temporal una sola vez — Dueño
 - [ ] Revisar en la app la Gestión CSM (9.4, con las notas internas): antes correr `migrate … up` hasta la 000057; ponerle a cada cliente su CSM, inicio del servicio y renovación (Gestión → ficha → Datos de la cuenta) — Dueño y CSM
 
 ## Por hacer
@@ -67,8 +69,8 @@ Lo hecho, lo que está en revisión y lo que falta hasta el corte. Marca con `[x
 - [x] 10d.2 De la app a GLPI: comentar los GLPI-… y «Crear en GLPI» (2026-10-21; ver «En curso»)
 - [ ] 10e Pedidos especiales — validar el concepto con el dueño
 - [ ] 10f Reportes avanzados — elegir qué parte primero
-- [ ] 10g Carga CSV masiva — definir de qué más
-- [ ] 10h Enlaces públicos avanzados — definir qué falta
+- [x] 10g Carga CSV masiva: usuarios, organizaciones con servicios, ventanas de mantenimiento y entradas históricas (2026-10-22; ver «En curso»)
+- [x] 10h Enlaces públicos: guardias, Ticketera y Mapa en TV y estado para un cliente (2026-10-22; ver «En curso»)
 - [ ] 10i Complementos con build — solo si hay un complemento real que lo necesite
 - [x] 10j Seguimiento de entradas de la Bitácora (2026-10-21; ver «En curso»). «Seguir» con aviso en la campana queda para después
 
@@ -108,3 +110,5 @@ Lo hecho, lo que está en revisión y lo que falta hasta el corte. Marca con `[x
 - [x] Reenvío de eventos a un SIEM y API de integraciones (10b, 2026-10-21)
 - [x] Seguimiento de entradas de la Bitácora (10j, 2026-10-21)
 - [x] De la app a GLPI: comentar y crear en GLPI (10d.2, 2026-10-21)
+- [x] Cargas por CSV de usuarios, organizaciones, ventanas y entradas históricas (10g, 2026-10-22)
+- [x] Enlaces públicos: guardias, Ticketera y Mapa en TV y estado para un cliente (10h, 2026-10-22)

@@ -1,0 +1,194 @@
+@switch (state()) {
+  @case ('loading') { <div class="pv__empty" aria-busy="true"></div> }
+  @case ('unavailable') {
+    <main class="pv__empty">
+      <h1 class="pv__empty-title">{{ i18n.t('pv.unavailable') }}</h1>
+      <p>{{ i18n.t('pv.unavailableHint') }}</p>
+    </main>
+  }
+  @default {
+    @if (view(); as v) {
+      @switch (v.kind) {
+        @case ('guards') {
+          <main class="tv">
+            <header class="tv__head">
+              <h1 class="tv__title">{{ i18n.t('pv.guards') }}</h1>
+              <span class="tv__date">{{ today() }}</span>
+              <span class="tv__clock">{{ clock() }}</span>
+            </header>
+            <div class="gd">
+              @for (a of v.guards ?? []; track a.area) {
+                <section class="gd__area">
+                  <h2 class="gd__area-name">{{ a.area }}</h2>
+                  <div class="gd__list">
+                    @for (g of a.guards; track g.label) {
+                      <div class="gd__row">
+                        <span class="gd__label">{{ g.label }}</span>
+                        @if (g.people.length) {
+                          <span class="gd__person">{{ g.people.join(', ') }}</span>
+                        } @else if (g.mustBeCovered) {
+                          <span class="gd__uncovered">
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2 21h20L12 3z" /><path d="M12 10v5M12 18v.5" /></svg>
+                            {{ i18n.t('pv.uncovered') }}
+                          </span>
+                        } @else {
+                          <span class="gd__nobody">{{ i18n.t('pv.nobody') }}</span>
+                        }
+                        <span class="gd__when">
+                          @if (g.until) { <span>{{ i18n.tf('pv.until', when(g.until)) }}</span> }
+                          @if (g.next.length) {
+                            <span>{{ i18n.t('pv.next') }} <span class="gd__next">{{ g.next.join(', ') }}</span>@if (!g.until && g.nextFrom) { {{ i18n.tf('pv.nextFrom', when(g.nextFrom)) }} }</span>
+                          }
+                        </span>
+                      </div>
+                    }
+                  </div>
+                </section>
+              } @empty {
+                <p class="tv__none">{{ i18n.t('pv.noGuards') }}</p>
+              }
+            </div>
+            <footer class="tv__foot">
+              <span class="tv__foot-note">{{ i18n.t('pv.guardsFoot') }}</span>
+              <span [class.tv__stale]="stale()">{{ stale() ? i18n.t('pv.loadError') : i18n.tf('pv.updated', updated()) }}</span>
+            </footer>
+          </main>
+        }
+
+        @case ('tickets') {
+          <main class="tv">
+            <header class="tv__head">
+              <h1 class="tv__title">{{ i18n.tf('pv.tickets', (v.areaNames ?? []).join(', ')) }}</h1>
+              <span class="tv__clock">{{ clock() }}</span>
+            </header>
+            <div class="tk__counts">
+              <span><strong>{{ ticketCounts().open }}</strong> {{ i18n.t('pv.open') }}</span>
+              <span><strong>{{ ticketCounts().unassigned }}</strong> {{ i18n.t('pv.unassigned') }}</span>
+              <span><strong class="tk--late">{{ ticketCounts().late }}</strong> {{ i18n.t('pv.late') }}</span>
+              <span><strong class="tk--soon">{{ ticketCounts().soon }}</strong> {{ i18n.t('pv.soon') }}</span>
+            </div>
+            @if (ticketsShown().length) {
+              <table class="tk__table">
+                <thead><tr><th class="tk__sla-col">{{ i18n.t('pv.col.sla') }}</th><th class="tk__num-col">{{ i18n.t('pv.col.ticket') }}</th><th>{{ i18n.t('pv.col.title') }}</th><th class="tk__client-col">{{ i18n.t('pv.col.client') }}</th><th class="tk__who-col">{{ i18n.t('pv.col.assignee') }}</th></tr></thead>
+                <tbody>
+                  @for (t of ticketsShown(); track t.number) {
+                    <tr>
+                      <td><span class="tk__sla" [class]="'tk__sla tk--' + t.tone">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>{{ t.sla }}
+                      </span></td>
+                      <td class="tk__num">{{ t.number }}</td>
+                      <td class="tk__title">{{ t.title }}</td>
+                      <td class="tk__muted">{{ t.client }}</td>
+                      <td [class.tk--soon]="!t.assignee" [class.tk__muted]="!!t.assignee">{{ t.assignee || i18n.t('pv.nobodyAssigned') }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            } @else {
+              <p class="tv__none">{{ i18n.t('pv.noTickets') }}</p>
+            }
+            <footer class="tv__foot">
+              <span class="tv__foot-note">@if (tickets().length > ticketsShown().length) { {{ i18n.tf('pv.more', tickets().length - ticketsShown().length) }} }</span>
+              <span [class.tv__stale]="stale()">{{ stale() ? i18n.t('pv.loadError') : i18n.tf('pv.updated', updated()) }}</span>
+            </footer>
+          </main>
+        }
+
+        @case ('map') {
+          <main class="mp">
+            <div class="mp__map-wrap">
+              <app-map-canvas class="mp__map" [tiles]="v.map?.tiles ?? null" [label]="v.name" (ready)="onMapReady($event)" />
+              <div class="mp__legend">
+                <span><span class="mp__dot mp__dot--bad"></span>{{ i18n.t('pv.legend.incident') }}</span>
+                <span><span class="mp__dot mp__dot--warn"></span>{{ i18n.t('pv.legend.window') }}</span>
+              </div>
+            </div>
+            <aside class="mp__side">
+              <div class="mp__head">
+                <h1 class="mp__title">{{ i18n.t('pv.network') }}</h1>
+                <span class="tv__clock">{{ clock() }}</span>
+              </div>
+              @if (v.map?.incidents?.length) {
+                <section class="mp__group">
+                  <h2 class="mp__group-title tk--late">{{ i18n.tf('pv.incidents', v.map!.incidents.length) }}</h2>
+                  @for (i of v.map!.incidents; track $index) {
+                    <div class="mp__item">
+                      <span class="mp__place">{{ i.place }}</span>
+                      <span class="mp__what">{{ i.title }}</span>
+                      <span class="mp__when">{{ i18n.tf('pv.since', when(i.at)) }}</span>
+                    </div>
+                  }
+                </section>
+              }
+              @if (v.map?.windows?.length) {
+                <section class="mp__group">
+                  <h2 class="mp__group-title tk--soon">{{ i18n.tf('pv.windows', v.map!.windows.length) }}</h2>
+                  @for (w of v.map!.windows; track $index) {
+                    <div class="mp__item">
+                      <span class="mp__place">{{ w.place }}</span>
+                      <span class="mp__what">{{ w.title }}</span>
+                      <span class="mp__when">{{ i18n.tf('pv.untilTime', when(w.at)) }}</span>
+                    </div>
+                  }
+                </section>
+              }
+              @if (!v.map?.incidents?.length && !v.map?.windows?.length) { <p class="mp__quiet">{{ i18n.t('pv.allQuiet') }}</p> }
+              <footer class="mp__foot" [class.tv__stale]="stale()">{{ stale() ? i18n.t('pv.loadError') : i18n.tf('pv.updated', updated()) }}</footer>
+            </aside>
+          </main>
+        }
+
+        @case ('client') {
+          @if (client(); as c) {
+            <main class="cl">
+              <header class="cl__head">
+                <span class="cl__product">{{ brandTitle() }}</span>
+                <span>{{ c.name }}</span>
+              </header>
+              <section class="cl__status">
+                <span class="cl__state" [class]="'cl__state cl--' + c.tone">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    @if (c.tone === 'ok') { <circle cx="12" cy="12" r="9" /><path d="m8 12 3 3 5-6" /> } @else { <path d="M12 3 2 21h20L12 3z" /><path d="M12 10v5M12 18v.5" /> }
+                  </svg>
+                  {{ c.title }}
+                </span>
+                <h1 class="cl__lead">{{ c.lead }}</h1>
+                <span class="cl__muted" [class.tv__stale]="stale()">{{ stale() ? i18n.t('pv.loadError') : i18n.tf('pv.client.updated', updated()) }}</span>
+              </section>
+
+              <section class="cl__block">
+                <h2 class="cl__h2">{{ i18n.t('pv.client.services') }}</h2>
+                @for (s of c.services; track s.name) {
+                  <div class="cl__row cl__row--service">
+                    <span class="cl__name">{{ s.name }}</span>
+                    <span class="cl__svc" [class]="'cl__svc cl--' + s.tone"><span class="cl__dot"></span>{{ s.state }}</span>
+                  </div>
+                } @empty { <p class="cl__muted cl__row">{{ i18n.t('pv.client.noServices') }}</p> }
+              </section>
+
+              <section class="cl__block">
+                <h2 class="cl__h2">{{ i18n.t('pv.client.windows') }}</h2>
+                @for (w of c.windows; track $index) {
+                  <div class="cl__row cl__row--grid">
+                    <span class="cl__muted">{{ w.when }}</span>
+                    <span class="cl__stack"><span class="cl__name">{{ w.title }}</span><span class="cl__muted">{{ w.affects }}</span></span>
+                  </div>
+                } @empty { <p class="cl__muted cl__row">{{ i18n.t('pv.client.noWindows') }}</p> }
+              </section>
+
+              <section class="cl__block">
+                <h2 class="cl__h2">{{ i18n.t('pv.client.recent') }}</h2>
+                @for (r of c.recent; track $index) {
+                  <div class="cl__row cl__row--grid">
+                    <span class="cl__muted">{{ r.when }}</span>
+                    <span class="cl__stack"><span class="cl__name">{{ r.title }}</span><span class="cl__muted">{{ r.lasted }}</span></span>
+                  </div>
+                } @empty { <p class="cl__muted cl__row">{{ i18n.t('pv.client.noRecent') }}</p> }
+              </section>
+            </main>
+          }
+        }
+      }
+    }
+  }
+}

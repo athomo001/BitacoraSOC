@@ -22,9 +22,11 @@ import { Asset, EscalationService, SocService } from '../../core/escalation/esca
 import { Organization, OrganizationsService, TeamSummary } from '../../core/organizations/organizations.service';
 import { defangWithCount } from '../../core/entries/defang';
 import { Entry, EntryAuthor, EntryComment, EntryDetail, EntryFilters, EntryScope, EntryType, EntriesService, TagSuggestion } from '../../core/entries/entries.service';
+import { openCsvImport } from '../../shared/csv-import/open-csv-import';
 
 import '../../core/i18n/packs/glpi';
 import '../../core/i18n/packs/entries';
+import '../../core/i18n/packs/imports';
 interface ComposeDraft {
   entryType: EntryType;
   scope: EntryScope;
@@ -658,6 +660,11 @@ export class EntriesComponent implements OnInit {
     } catch (error) {
       this.error.set(problemDetail(error, this.i18n.t('entries.notebookError')));
     }
+  }
+
+  /** Carga de entradas históricas por CSV (10g), solo el admin. */
+  protected async importCsv(): Promise<void> {
+    if (await openCsvImport(this.injector, 'entries')) await this.load();
   }
 
   protected async exportCsv(): Promise<void> {
