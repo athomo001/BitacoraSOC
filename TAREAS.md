@@ -32,8 +32,8 @@ Lo hecho, lo que está en revisión y lo que falta hasta el corte. Marca con `[x
 - [ ] Probar las cargas por CSV (10g): «Cargar CSV» en Usuarios y grupos, Organizaciones, Ventanas de mantenimiento y la Bitácora (solo admin). Bajar la plantilla, subirla y revisar antes de «Cargar»; los usuarios nuevos muestran su contraseña temporal una sola vez — Dueño
 - [ ] Revisar en la app los Departamentos: `migrate … up` para la 000060; en Administración → Departamentos y áreas crear CDC, agregarle SOC y NOC (arrastrándolas), ponerle jefe y marcar que comparten equipo; marcar a alguien como CSM en Usuarios y grupos y asignarla en la pestaña CSM del departamento; en Mi equipo elegir «Departamento CDC» — Dueño
 - [ ] Revisar en la app guardias del departamento, ubicación y grupos de equipos (2026-10-23): `migrate … up` para la 000061; en Mi equipo → «Departamento CDC» → Guardias, elegir SOC o NOC; en el Inventario crear un grupo en Grupos (pegar coordenadas de Google Maps), elegirlo en dos equipos, editar el grupo y ver que se mueven; en el Mapa, la capa Equipos y «Ver en el mapa» desde la ficha; ponerle cliente a un grupo, elegir ese cliente en el Mapa y abrir un ticket o una entrada de incidente sobre uno de sus equipos para verlo en rojo con su tarjetita — Dueño
-- [ ] Revisar en la app la Calidad (10f): Mi equipo → Calidad en SOC o NOC; elegir a una persona y abrir «Cómo se calcula el puntaje». Con un usuario auditor, Mi equipo muestra solo esa pestaña — Dueño
 - [ ] Revisar en la app la Gestión CSM (9.4, con las notas internas): antes correr `migrate … up` hasta la 000057; ponerle a cada cliente su CSM, inicio del servicio y renovación (Gestión → ficha → Datos de la cuenta) — Dueño y CSM
+- [ ] Revisar en la app las certificaciones validadas por la CSM: `migrate … up` para la 000062; crear una meta de certificación para una persona («Pedir la validación de la CSM»), marcar sus hitos y ver el aviso en la campana de la CSM; con la CSM, «Validar certificación» — Dueño y CSM
 - [ ] Revisar en la app la Gestión sin la Ticketera: apagarla en Administración → Módulos, abrir Gestión (Clientes, ficha, Indicadores y Exportar resumen) y ver que carga sin columnas ni cifras de tickets; encenderla de nuevo y ver que vuelven — Dueño
 
 ## Por hacer
@@ -64,7 +64,7 @@ Lo hecho, lo que está en revisión y lo que falta hasta el corte. Marca con `[x
 ### Integraciones
 - [ ] Wiki: nada por ahora; se retoma cuando exista Kudawiki (decisión del dueño 2026-10-16)
 - [ ] Documentación externa (wiki) en la app: buscador, ayuda en pantalla y sugerencias por contexto
-- [ ] Orquestador: barra para saltar entre sistemas, como complemento fuera del núcleo
+- [ ] Orquestador: barra para saltar entre sistemas, como complemento sobre la 10i (proyecto aparte)
 
 ### Áreas y departamentos
 - [x] Departamentos (agrupar áreas, jefatura del departamento, áreas que comparten equipo, qué ve cada CSM): construido el 2026-10-22
@@ -78,11 +78,11 @@ Lo hecho, lo que está en revisión y lo que falta hasta el corte. Marca con `[x
 - [ ] 10c SSO con Microsoft 365 — un admin del tenant registra la app en Entra ID
 - [x] 10d.1 Tickets de GLPI en la Ticketera, solo para mirar (2026-10-20; ver «En curso»)
 - [x] 10d.2 De la app a GLPI: comentar los GLPI-… y «Crear en GLPI» (2026-10-21; ver «En curso»)
-- [ ] 10e Pedidos especiales — validar el concepto con el dueño
-- [ ] 10f Reportes avanzados — el puntaje de calidad por analista está hecho (2026-10-22; ver «En curso»); faltan estadísticas, boletines avanzados y PDF real
+- Decidido: 10e Pedidos especiales no se hace; ya lo cubren la Solicitud de la Ticketera y las acciones de Gestión (dueño, 2026-10-23)
+- [ ] 10f Reportes avanzados — el puntaje de calidad por analista está hecho y revisado (2026-10-23); faltan estadísticas, boletines avanzados y PDF real
 - [x] 10g Carga CSV masiva: usuarios, organizaciones con servicios, ventanas de mantenimiento y entradas históricas (2026-10-22; ver «En curso»)
 - [x] 10h Enlaces públicos: guardias, Ticketera y Mapa en TV y estado para un cliente (2026-10-22; ver «En curso»)
-- [ ] 10i Complementos con build — solo si hay un complemento real que lo necesite
+- [ ] 10i Complementos que agregan funciones (como los plugins de GLPI: informes, integraciones, barra del orquestador) sin tocar el núcleo — propuesta en `spec/11` §12; decidir las 5 preguntas de §12.7 — Dueño
 - [x] 10j Seguimiento de entradas de la Bitácora (2026-10-21; ver «En curso»). «Seguir» con aviso en la campana queda para después
 
 ### Corte
@@ -123,3 +123,4 @@ Lo hecho, lo que está en revisión y lo que falta hasta el corte. Marca con `[x
 - [x] De la app a GLPI: comentar y crear en GLPI (10d.2, 2026-10-21)
 - [x] Cargas por CSV de usuarios, organizaciones, ventanas y entradas históricas (10g, 2026-10-22)
 - [x] Enlaces públicos: guardias, Ticketera y Mapa en TV y estado para un cliente (10h, 2026-10-22)
+- [x] Puntaje de calidad por analista en Mi equipo, revisado por el dueño (10f, 2026-10-23)

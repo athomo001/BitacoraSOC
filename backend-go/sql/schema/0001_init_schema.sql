@@ -2443,7 +2443,8 @@ CREATE TABLE goals (
   due_date DATE NOT NULL,
   -- Plazo en días hábiles desde que se creó (si se dio así).
   estimate_biz_days INT CHECK (estimate_biz_days BETWEEN 1 AND 500),
-  evidence_required BOOLEAN NOT NULL DEFAULT false,
+  -- 000062: la CSM valida la certificación (antes se adjuntaba el certificado).
+  validation_required BOOLEAN NOT NULL DEFAULT false,
   manual_risk BOOLEAN NOT NULL DEFAULT false,
   completed_at TIMESTAMPTZ,
   completed_by UUID REFERENCES users(id) ON DELETE SET NULL,
@@ -2464,6 +2465,8 @@ CREATE TABLE goals (
   outcome_reason TEXT CHECK (length(outcome_reason) <= 300),
   outcome_at TIMESTAMPTZ,
   outcome_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  validated_at TIMESTAMPTZ,
+  validated_by UUID REFERENCES users(id) ON DELETE SET NULL,
   CONSTRAINT chk_goal_scope CHECK (
     (scope = 'client' AND client_id IS NOT NULL AND person_user_id IS NULL AND person_email IS NULL) OR
     (scope = 'area' AND area_id IS NOT NULL AND client_id IS NULL AND person_user_id IS NULL AND person_email IS NULL) OR
@@ -2516,21 +2519,7 @@ CREATE TABLE goal_events (
 );
 CREATE INDEX idx_goal_events_goal ON goal_events(goal_id, created_at DESC);
 
--- Certificado de una meta: un archivo (en la base, como las imágenes de los
--- tickets) o un enlace de verificación.
-CREATE TABLE goal_evidence (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  goal_id UUID NOT NULL REFERENCES goals(id) ON DELETE CASCADE,
-  file_name TEXT,
-  mime_type TEXT,
-  size_bytes INT CHECK (size_bytes <= 10485760),
-  file_data BYTEA,
-  url TEXT CHECK (url IS NULL OR length(url) <= 500),
-  uploaded_by UUID REFERENCES users(id) ON DELETE SET NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  CONSTRAINT chk_goal_evidence_kind CHECK ((file_data IS NULL) <> (url IS NULL))
-);
-CREATE INDEX idx_goal_evidence_goal ON goal_evidence(goal_id, created_at DESC);
+-- goal_evidence (el certificado adjunto) se quitó en la 000062.
 
 -- Plantillas (playbooks): acciones con quién y cuándo, relativas a una
 -- fecha: el día que se aplica, una fecha que se elige (la reunión) o la

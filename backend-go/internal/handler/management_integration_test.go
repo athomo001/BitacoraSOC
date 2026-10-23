@@ -243,21 +243,21 @@ func TestManagement_SaludMetasYPlantillas(t *testing.T) {
 		t.Fatalf("el ticket se reabrió: %s", w.Body)
 	}
 
-	// Meta de una persona para el bono: la crea su jefatura (no la CSM), pide el certificado y la confirma la jefatura.
+	// Meta de una persona para el bono: la crea su jefatura (no la CSM), la CSM valida la certificación y la confirma la jefatura.
 	if w := call(h.CreateGoal, lucia, "POST", "/api/goals", map[string]any{"name": "Security+", "scope": "person", "personId": camila, "kind": "certification",
 		"bonus": "primary", "dueDate": due}); w.Code != http.StatusForbidden {
 		t.Fatalf("la CSM no le pone metas a una persona de otra área: %d", w.Code)
 	}
 	w = call(h.CreateGoal, jefa, "POST", "/api/goals", map[string]any{"name": "Certificación CompTIA Security+", "scope": "person", "personId": camila,
-		"kind": "certification", "bonus": "primary", "estimateBizDays": 40, "evidenceRequired": true, "steps": []string{"Inscripción", "Examen aprobado"}})
+		"kind": "certification", "bonus": "primary", "estimateBizDays": 40, "validationRequired": true, "steps": []string{"Inscripción", "Examen aprobado"}})
 	if w.Code != 201 {
 		t.Fatalf("meta de una persona: %d %s", w.Code, w.Body)
 	}
 	var cert goalDTO
 	decode(w, &cert)
 	cid := cert.ID.String()
-	// La ven la persona y su jefatura; la CSM y otra persona del área, no.
-	for who, want := range map[uuid.UUID]int{camila: 200, jefa: 200, lucia: 404, diego: 404} {
+	// La ven la persona, su jefatura y la CSM que la valida; otra persona del área, no.
+	for who, want := range map[uuid.UUID]int{camila: 200, jefa: 200, lucia: 200, diego: 404} {
 		if w := call(h.Goal, who, "GET", "/", nil, "id", cid); w.Code != want {
 			t.Fatalf("ver la meta de Camila (%s): %d, quiero %d", who, w.Code, want)
 		}
@@ -269,13 +269,23 @@ func TestManagement_SaludMetasYPlantillas(t *testing.T) {
 	for _, s := range cert.Steps {
 		call(h.MarkMilestone, camila, "POST", "/", map[string]bool{"done": true}, "id", cid, "mid", s.ID.String())
 	}
-	if w := call(h.GoalAction, camila, "POST", "/", nil, "id", cid, "action", "complete"); w.Code != http.StatusConflict || !strings.Contains(w.Body.String(), "evidence-missing") {
-		t.Fatalf("sin certificado no se cumple: %d %s", w.Code, w.Body)
+	if w := call(h.GoalAction, camila, "POST", "/", nil, "id", cid, "action", "complete"); w.Code != http.StatusConflict || !strings.Contains(w.Body.String(), "validation-missing") {
+		t.Fatalf("sin la validación de la CSM no se cumple: %d %s", w.Code, w.Body)
 	}
-	w = call(h.AddEvidence, camila, "POST", "/", map[string]string{"url": "https://verify.comptia.org/abc"}, "id", cid)
+	w = call(h.Goal, lucia, "GET", "/", nil, "id", cid)
 	decode(w, &cert)
-	if cert.State != "confirm" || cert.CanConfirm {
-		t.Fatalf("con hitos y certificado espera a la jefatura: %+v", cert)
+	if cert.State != "open" || !cert.CanValidate || !strings.Contains(w.Body.String(), "falta la validación de la CSM") {
+		t.Fatalf("con los hitos hechos espera a la CSM: %s", w.Body)
+	}
+	for _, who := range []uuid.UUID{camila, jefa} {
+		if w := call(h.GoalAction, who, "POST", "/", nil, "id", cid, "action", "validate"); w.Code != http.StatusForbidden {
+			t.Fatalf("valida la CSM, no la persona ni su jefatura (%s): %d", who, w.Code)
+		}
+	}
+	w = call(h.GoalAction, lucia, "POST", "/", nil, "id", cid, "action", "validate")
+	decode(w, &cert)
+	if cert.State != "confirm" || cert.CanConfirm || cert.ValidatedByName != "Lucia" {
+		t.Fatalf("validada por la CSM, espera a la jefatura: %+v", cert)
 	}
 	if w := call(h.GoalAction, camila, "POST", "/", nil, "id", cid, "action", "confirm"); w.Code != http.StatusForbidden {
 		t.Fatalf("la persona no se confirma a sí misma: %d", w.Code)

@@ -208,18 +208,18 @@ WHERE oc.status IN ('pending', 'done', 'skipped')
 
 -- name: CreateGoal :one
 INSERT INTO goals (name, scope, client_id, area_id, person_user_id, person_name, person_email, owner_user_id, kind, bonus_rank, due_date,
-  estimate_biz_days, evidence_required, created_by)
+  estimate_biz_days, validation_required, created_by)
 VALUES (sqlc.arg('name'), sqlc.arg('scope'), sqlc.narg('client_id'), sqlc.narg('area_id'), sqlc.narg('person_user_id'),
   sqlc.narg('person_name'), sqlc.narg('person_email'),
   sqlc.narg('owner_user_id'), sqlc.narg('kind'), sqlc.narg('bonus_rank'), sqlc.arg('due_date'), sqlc.narg('estimate_biz_days'),
-  sqlc.arg('evidence_required'), sqlc.narg('created_by'))
+  sqlc.arg('validation_required'), sqlc.narg('created_by'))
 RETURNING id;
 
 -- name: UpdateGoal :exec
 UPDATE goals SET name = sqlc.arg('name'), area_id = CASE WHEN scope = 'client' THEN sqlc.narg('area_id') ELSE area_id END,
   owner_user_id = sqlc.narg('owner_user_id'), kind = sqlc.narg('kind'), bonus_rank = sqlc.narg('bonus_rank'),
   due_date = sqlc.arg('due_date'), estimate_biz_days = sqlc.narg('estimate_biz_days'),
-  evidence_required = sqlc.arg('evidence_required'), updated_at = now()
+  validation_required = sqlc.arg('validation_required'), updated_at = now()
 WHERE id = sqlc.arg('id');
 
 -- name: DeleteGoal :execrows
@@ -232,9 +232,9 @@ SELECT g.*, COALESCE(o.name, '')::text AS client_name, COALESCE(a.name, '')::tex
   COALESCE(NULLIF(ou.full_name, ''), ou.username, '')::text AS owner_name,
   COALESCE(NULLIF(cu.full_name, ''), cu.username, '')::text AS created_by_name,
   COALESCE(NULLIF(fu.full_name, ''), fu.username, '')::text AS confirmed_by_name,
+  COALESCE(NULLIF(vu.full_name, ''), vu.username, '')::text AS validated_by_name,
   (SELECT count(*) FROM goal_milestones m WHERE m.goal_id = g.id)::int AS milestones,
   (SELECT count(*) FROM goal_milestones m WHERE m.goal_id = g.id AND m.done_at IS NOT NULL)::int AS milestones_done,
-  (SELECT count(*) FROM goal_evidence e WHERE e.goal_id = g.id)::int AS evidence_count,
   COALESCE(rl.rule, 'all')::text AS person_rule
 FROM goals g
 LEFT JOIN organizations o ON o.id = g.client_id
@@ -243,6 +243,7 @@ LEFT JOIN users pu ON pu.id = g.person_user_id
 LEFT JOIN users ou ON ou.id = g.owner_user_id
 LEFT JOIN users cu ON cu.id = g.created_by
 LEFT JOIN users fu ON fu.id = g.confirmed_by
+LEFT JOIN users vu ON vu.id = g.validated_by
 LEFT JOIN goal_person_rules rl ON rl.user_id = g.person_user_id
 WHERE (sqlc.narg('goal_id')::uuid IS NULL OR g.id = sqlc.narg('goal_id')::uuid)
   AND (sqlc.narg('client_id')::uuid IS NULL OR g.client_id = sqlc.narg('client_id')::uuid)
@@ -332,7 +333,8 @@ WHERE id = sqlc.arg('id');
 
 -- name: ReopenGoal :exec
 UPDATE goals SET due_date = sqlc.arg('due_date'), completed_at = NULL, completed_by = NULL, confirmed_at = NULL, confirmed_by = NULL,
-  manual_risk = false, outcome = NULL, outcome_reason = NULL, outcome_at = NULL, outcome_by = NULL, updated_at = now()
+  manual_risk = false, outcome = NULL, outcome_reason = NULL, outcome_at = NULL, outcome_by = NULL,
+  validated_at = NULL, validated_by = NULL, updated_at = now()
 WHERE id = sqlc.arg('id');
 
 -- name: SetGoalOutcome :exec
@@ -357,22 +359,27 @@ SELECT e.id, e.text, e.created_at, COALESCE(NULLIF(u.full_name, ''), u.username,
 FROM goal_events e LEFT JOIN users u ON u.id = e.user_id
 WHERE e.goal_id = $1 ORDER BY e.created_at DESC LIMIT 50;
 
--- name: AddGoalEvidence :one
-INSERT INTO goal_evidence (goal_id, file_name, mime_type, size_bytes, file_data, url, uploaded_by)
-VALUES (sqlc.arg('goal_id'), sqlc.narg('file_name'), sqlc.narg('mime_type'), sqlc.narg('size_bytes'), sqlc.narg('file_data'), sqlc.narg('url'), sqlc.narg('uploaded_by'))
-RETURNING id;
+-- name: SetGoalValidated :exec
+-- La CSM valida la certificación de una persona (000062).
+UPDATE goals SET validated_at = now(), validated_by = sqlc.arg('validated_by'), updated_at = now() WHERE id = sqlc.arg('id');
 
--- name: ListGoalEvidence :many
-SELECT e.id, e.file_name, e.mime_type, e.size_bytes, e.url, e.created_at,
-  COALESCE(NULLIF(u.full_name, ''), u.username, '')::text AS uploaded_by_name
-FROM goal_evidence e LEFT JOIN users u ON u.id = e.uploaded_by
-WHERE e.goal_id = $1 ORDER BY e.created_at DESC;
-
--- name: GetGoalEvidenceFile :one
-SELECT id, file_name, mime_type, file_data FROM goal_evidence WHERE id = $1 AND goal_id = $2 AND file_data IS NOT NULL;
-
--- name: DeleteGoalEvidence :execrows
-DELETE FROM goal_evidence WHERE id = $1 AND goal_id = $2;
+-- name: ListGoalValidators :many
+-- Quién valida la certificación de una persona: el perfil Gestión (la CSM)
+-- sin alcance, o con alguna de las áreas de la persona en su alcance. Nunca
+-- la persona misma. Sin cuenta (NULL), solo las CSM sin alcance.
+SELECT DISTINCT u.id
+FROM users u
+JOIN user_permission_groups upg ON upg.user_id = u.id
+JOIN permission_groups pg ON pg.id = upg.permission_group_id AND pg.active AND pg.profile = 'gestion'
+WHERE u.active AND u.id IS DISTINCT FROM sqlc.narg('person_id')::uuid
+  AND (NOT EXISTS (SELECT 1 FROM management_scopes s WHERE s.user_id = u.id)
+    OR EXISTS (
+      SELECT 1 FROM management_scopes s
+      JOIN areas a ON a.id = s.area_id OR a.department_id = s.department_id
+      JOIN permission_group_areas pa ON pa.area_id = a.id
+      JOIN permission_groups ppg ON ppg.id = pa.permission_group_id AND ppg.active
+      JOIN user_permission_groups pu ON pu.permission_group_id = ppg.id
+      WHERE s.user_id = u.id AND pu.user_id = sqlc.narg('person_id')::uuid));
 
 -- name: ListLeadUserIDsOfPerson :many
 -- Las jefaturas de las áreas de una persona (ven y confirman sus metas).

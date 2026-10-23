@@ -2056,32 +2056,34 @@ type GlpiTicketRun struct {
 }
 
 type Goal struct {
-	ID               uuid.UUID          `json:"id"`
-	Name             string             `json:"name"`
-	Scope            string             `json:"scope"`
-	ClientID         pgtype.UUID        `json:"client_id"`
-	AreaID           pgtype.UUID        `json:"area_id"`
-	PersonUserID     pgtype.UUID        `json:"person_user_id"`
-	OwnerUserID      pgtype.UUID        `json:"owner_user_id"`
-	Kind             pgtype.Text        `json:"kind"`
-	BonusRank        pgtype.Text        `json:"bonus_rank"`
-	DueDate          pgtype.Date        `json:"due_date"`
-	EstimateBizDays  pgtype.Int4        `json:"estimate_biz_days"`
-	EvidenceRequired bool               `json:"evidence_required"`
-	ManualRisk       bool               `json:"manual_risk"`
-	CompletedAt      pgtype.Timestamptz `json:"completed_at"`
-	CompletedBy      pgtype.UUID        `json:"completed_by"`
-	ConfirmedAt      pgtype.Timestamptz `json:"confirmed_at"`
-	ConfirmedBy      pgtype.UUID        `json:"confirmed_by"`
-	CreatedBy        pgtype.UUID        `json:"created_by"`
-	CreatedAt        pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
-	PersonName       pgtype.Text        `json:"person_name"`
-	PersonEmail      pgtype.Text        `json:"person_email"`
-	Outcome          pgtype.Text        `json:"outcome"`
-	OutcomeReason    pgtype.Text        `json:"outcome_reason"`
-	OutcomeAt        pgtype.Timestamptz `json:"outcome_at"`
-	OutcomeBy        pgtype.UUID        `json:"outcome_by"`
+	ID                 uuid.UUID          `json:"id"`
+	Name               string             `json:"name"`
+	Scope              string             `json:"scope"`
+	ClientID           pgtype.UUID        `json:"client_id"`
+	AreaID             pgtype.UUID        `json:"area_id"`
+	PersonUserID       pgtype.UUID        `json:"person_user_id"`
+	OwnerUserID        pgtype.UUID        `json:"owner_user_id"`
+	Kind               pgtype.Text        `json:"kind"`
+	BonusRank          pgtype.Text        `json:"bonus_rank"`
+	DueDate            pgtype.Date        `json:"due_date"`
+	EstimateBizDays    pgtype.Int4        `json:"estimate_biz_days"`
+	ValidationRequired bool               `json:"validation_required"`
+	ManualRisk         bool               `json:"manual_risk"`
+	CompletedAt        pgtype.Timestamptz `json:"completed_at"`
+	CompletedBy        pgtype.UUID        `json:"completed_by"`
+	ConfirmedAt        pgtype.Timestamptz `json:"confirmed_at"`
+	ConfirmedBy        pgtype.UUID        `json:"confirmed_by"`
+	CreatedBy          pgtype.UUID        `json:"created_by"`
+	CreatedAt          pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
+	PersonName         pgtype.Text        `json:"person_name"`
+	PersonEmail        pgtype.Text        `json:"person_email"`
+	Outcome            pgtype.Text        `json:"outcome"`
+	OutcomeReason      pgtype.Text        `json:"outcome_reason"`
+	OutcomeAt          pgtype.Timestamptz `json:"outcome_at"`
+	OutcomeBy          pgtype.UUID        `json:"outcome_by"`
+	ValidatedAt        pgtype.Timestamptz `json:"validated_at"`
+	ValidatedBy        pgtype.UUID        `json:"validated_by"`
 }
 
 type GoalAlert struct {
@@ -2096,18 +2098,6 @@ type GoalEvent struct {
 	Text      string             `json:"text"`
 	UserID    pgtype.UUID        `json:"user_id"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
-}
-
-type GoalEvidence struct {
-	ID         uuid.UUID          `json:"id"`
-	GoalID     uuid.UUID          `json:"goal_id"`
-	FileName   pgtype.Text        `json:"file_name"`
-	MimeType   pgtype.Text        `json:"mime_type"`
-	SizeBytes  pgtype.Int4        `json:"size_bytes"`
-	FileData   []byte             `json:"file_data"`
-	Url        pgtype.Text        `json:"url"`
-	UploadedBy pgtype.UUID        `json:"uploaded_by"`
-	CreatedAt  pgtype.Timestamptz `json:"created_at"`
 }
 
 type GoalMilestone struct {

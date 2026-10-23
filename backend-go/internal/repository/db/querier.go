@@ -24,7 +24,6 @@ type Querier interface {
 	AddEscalationPoolMember(ctx context.Context, arg AddEscalationPoolMemberParams) error
 	AddForwardStats(ctx context.Context, arg AddForwardStatsParams) error
 	AddGoalEvent(ctx context.Context, arg AddGoalEventParams) error
-	AddGoalEvidence(ctx context.Context, arg AddGoalEvidenceParams) (uuid.UUID, error)
 	AddGroupAreasByCode(ctx context.Context, arg AddGroupAreasByCodeParams) (int64, error)
 	AddGuardMember(ctx context.Context, arg AddGuardMemberParams) (uuid.UUID, error)
 	AddManagementScope(ctx context.Context, arg AddManagementScopeParams) error
@@ -309,7 +308,6 @@ type Querier interface {
 	// Lo que se borró en GLPI también sale de la app (keep: «followup:12», «task:7»…).
 	DeleteGlpiTicketCommentsExcept(ctx context.Context, arg DeleteGlpiTicketCommentsExceptParams) error
 	DeleteGoal(ctx context.Context, id uuid.UUID) (int64, error)
-	DeleteGoalEvidence(ctx context.Context, arg DeleteGoalEvidenceParams) (int64, error)
 	DeleteGoalMilestone(ctx context.Context, arg DeleteGoalMilestoneParams) (int64, error)
 	DeleteGoalPersonRule(ctx context.Context, userID uuid.UUID) error
 	DeleteGuardSlot(ctx context.Context, id uuid.UUID) (int64, error)
@@ -462,7 +460,6 @@ type Querier interface {
 	// Importación desde GLPI (spec/16 §5.1, 9.6, 000043).
 	GetGlpiConfig(ctx context.Context) (GlpiConfig, error)
 	GetGlpiTicketState(ctx context.Context, glpiID pgtype.Int4) (GetGlpiTicketStateRow, error)
-	GetGoalEvidenceFile(ctx context.Context, arg GetGoalEvidenceFileParams) (GetGoalEvidenceFileRow, error)
 	GetGuardCycle(ctx context.Context, id uuid.UUID) (GetGuardCycleRow, error)
 	GetGuardSlot(ctx context.Context, id uuid.UUID) (RotationSlot, error)
 	GetIdempotency(ctx context.Context, arg GetIdempotencyParams) (ApiIdempotency, error)
@@ -814,11 +811,14 @@ type Querier interface {
 	ListGlpiRuns(ctx context.Context) ([]ListGlpiRunsRow, error)
 	ListGlpiTicketRuns(ctx context.Context) ([]ListGlpiTicketRunsRow, error)
 	ListGoalEvents(ctx context.Context, goalID uuid.UUID) ([]ListGoalEventsRow, error)
-	ListGoalEvidence(ctx context.Context, goalID uuid.UUID) ([]ListGoalEvidenceRow, error)
 	ListGoalMilestones(ctx context.Context, goalIds []uuid.UUID) ([]ListGoalMilestonesRow, error)
 	// A quién se le puede poner una meta: los usuarios activos con cada área y
 	// nivel; quien no está en ningún área sale una vez sin área (solo lo ve el admin).
 	ListGoalPeople(ctx context.Context) ([]ListGoalPeopleRow, error)
+	// Quién valida la certificación de una persona: el perfil Gestión (la CSM)
+	// sin alcance, o con alguna de las áreas de la persona en su alcance. Nunca
+	// la persona misma. Sin cuenta (NULL), solo las CSM sin alcance.
+	ListGoalValidators(ctx context.Context, personID pgtype.UUID) ([]uuid.UUID, error)
 	// Las metas con los nombres que muestra la pantalla y su avance.
 	ListGoals(ctx context.Context, arg ListGoalsParams) ([]ListGoalsRow, error)
 	// Metas sin cumplir que vencen pronto o se vencieron hace poco, con a quién
@@ -1318,6 +1318,8 @@ type Querier interface {
 	SetGoalOutcome(ctx context.Context, arg SetGoalOutcomeParams) error
 	SetGoalPersonRule(ctx context.Context, arg SetGoalPersonRuleParams) error
 	SetGoalRisk(ctx context.Context, arg SetGoalRiskParams) error
+	// La CSM valida la certificación de una persona (000062).
+	SetGoalValidated(ctx context.Context, arg SetGoalValidatedParams) error
 	SetGuardRemindUncovered(ctx context.Context, arg SetGuardRemindUncoveredParams) error
 	SetLevelRank(ctx context.Context, arg SetLevelRankParams) (int64, error)
 	SetMFASecret(ctx context.Context, arg SetMFASecretParams) error

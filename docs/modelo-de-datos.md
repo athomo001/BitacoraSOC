@@ -2,7 +2,7 @@
 
 > Generado por `backend-go/cmd/er-docs` desde `backend-go/sql/schema/0001_init_schema.sql`, el esquema que usa sqlc, con todas las migraciones aplicadas. **No se edita a mano**: si cambia el esquema, se regenera con `go run ./cmd/er-docs` desde `backend-go/`.
 
-124 tablas en PostgreSQL, agrupadas en 17 dominios. Notación pata de gallo: `||` uno, `|o` / `o|` cero o uno, `o{` cero o muchos. La etiqueta de cada línea es la columna que hace la referencia.
+123 tablas en PostgreSQL, agrupadas en 17 dominios. Notación pata de gallo: `||` uno, `|o` / `o|` cero o uno, `o{` cero o muchos. La etiqueta de cada línea es la columna que hace la referencia.
 
 - Cada entidad muestra todas sus columnas salvo `created_at` y `updated_at`. `PK` clave primaria, `FK` referencia a otra tabla, `UK` valor único.
 - Las tablas de otros dominios aparecen como cajas sin columnas: son la misma tabla, dibujada donde se une.
@@ -20,7 +20,7 @@ Correspondencia con el legacy (MongoDB): [modelo-er-legacy-2.0.md](modelo-er-leg
 5. [Equipos y escalamiento](#5-equipos-y-escalamiento) — 15 tablas
 6. [Turnos, guardias y dotación](#6-turnos-guardias-y-dotación) — 11 tablas
 7. [Agenda](#7-agenda) — 8 tablas
-8. [Gestión CSM](#8-gestión-csm) — 12 tablas
+8. [Gestión CSM](#8-gestión-csm) — 11 tablas
 9. [Integraciones](#9-integraciones) — 6 tablas
 10. [Notificaciones y avisos con acuse](#10-notificaciones-y-avisos-con-acuse) — 6 tablas
 11. [Checklists](#11-checklists) — 4 tablas
@@ -1120,7 +1120,7 @@ erDiagram
 
 ## 8. Gestión CSM
 
-Metas de un cliente, un área o una persona, con hitos (a mano o enlazados a un ticket o a una tarea, que se marcan solos), su historial y el certificado; las plantillas de acciones con cada vez que se aplicaron a un cliente, y el objetivo del SLA. Las acciones son tareas de la Agenda con `action_kind`, `is_key` y `ticket_id`; la cartera (CSM a cargo, inicio del servicio, renovación) vive en `organizations`.
+Metas de un cliente, un área o una persona, con hitos (a mano o enlazados a un ticket o a una tarea, que se marcan solos), su historial y la validación de la CSM en las certificaciones; las plantillas de acciones con cada vez que se aplicaron a un cliente, y el objetivo del SLA. Las acciones son tareas de la Agenda con `action_kind`, `is_key` y `ticket_id`; la cartera (CSM a cargo, inicio del servicio, renovación) vive en `organizations`.
 
 ```mermaid
 erDiagram
@@ -1136,7 +1136,7 @@ erDiagram
         text bonus_rank
         date due_date
         int estimate_biz_days
-        boolean evidence_required
+        boolean validation_required
         boolean manual_risk
         timestamptz completed_at
         uuid completed_by FK
@@ -1149,6 +1149,8 @@ erDiagram
         text outcome_reason
         timestamptz outcome_at
         uuid outcome_by FK
+        timestamptz validated_at
+        uuid validated_by FK
     }
     GOAL_MILESTONES {
         uuid id PK
@@ -1167,16 +1169,6 @@ erDiagram
         uuid goal_id FK
         text text
         uuid user_id FK
-    }
-    GOAL_EVIDENCE {
-        uuid id PK
-        uuid goal_id FK
-        text file_name
-        text mime_type
-        int size_bytes
-        bytea file_data
-        text url
-        uuid uploaded_by FK
     }
     GOAL_ALERTS {
         uuid goal_id PK, FK
@@ -1248,7 +1240,6 @@ erDiagram
     DEPARTMENTS |o--o{ MANAGEMENT_SCOPES : "department_id"
     GOALS ||--o{ GOAL_ALERTS : "goal_id"
     GOALS ||--o{ GOAL_EVENTS : "goal_id"
-    GOALS ||--o{ GOAL_EVIDENCE : "goal_id"
     GOALS ||--o{ GOAL_MILESTONES : "goal_id"
     LEVELS |o--o{ PLAYBOOK_ITEMS : "level_id"
     ORGANIZATIONS |o--o{ GOALS : "client_id"

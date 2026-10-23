@@ -22,7 +22,7 @@ export interface GoalDialogData {
 
 /**
  * Nueva meta / Editar meta (diseño aprobado): para un cliente, un área o una
- * persona; las de una persona con tipo, bono y certificado. El plazo es una
+ * persona; las de una persona con tipo, bono y validación de la CSM. El plazo es una
  * fecha límite o un tiempo estimado en días hábiles (lo convierte el servidor
  * con el calendario de la Agenda).
  */
@@ -137,8 +137,8 @@ export interface GoalDialogData {
           </div>
         }
         @if (scope() === 'person' && kind() === 'certification') {
-          <label class="gd__check"><input type="checkbox" name="gEvidence" [checked]="evidence()" (change)="evidence.set(!evidence())" />
-            <span><b>{{ i18n.t('mg.gf.evidence') }}</b><span class="gd__hint gd__block">{{ i18n.t('mg.gf.evidenceHint') }}</span></span></label>
+          <label class="gd__check"><input type="checkbox" name="gValidation" [checked]="validation()" (change)="validation.set(!validation())" />
+            <span><b>{{ i18n.t('mg.gf.validation') }}</b><span class="gd__hint gd__block">{{ i18n.t('mg.gf.validationHint') }}</span></span></label>
         }
         @if (error(); as e) { <p class="msg msg--error" role="alert">{{ e }}</p> }
       </form>
@@ -194,7 +194,7 @@ export class GoalDialogComponent {
   protected readonly days = signal(String(this.g?.estimateBizDays ?? 15));
   protected readonly steps = signal<string[]>(!this.g && this.scope() === 'person' ? this.certSteps() : []);
   protected readonly stepDraft = signal('');
-  protected readonly evidence = signal(this.g?.evidenceRequired ?? true);
+  protected readonly validation = signal(this.g?.validationRequired ?? true);
   protected readonly busy = signal(false);
   protected readonly error = signal<string | null>(null);
 
@@ -266,7 +266,7 @@ export class GoalDialogComponent {
       name: this.name().trim(), scope,
       dueDate: this.due() === 'date' ? this.date() : undefined,
       estimateBizDays: this.due() === 'days' ? Number(this.days()) : undefined,
-      evidenceRequired: scope === 'person' && this.kind() === 'certification' && this.evidence(),
+      validationRequired: scope === 'person' && this.kind() === 'certification' && this.validation(),
       steps: this.steps(),
     };
     if (scope === 'client') Object.assign(input, { clientId: this.client(), areaId: this.area() || undefined });

@@ -27,37 +27,6 @@ func (q *Queries) AddGoalEvent(ctx context.Context, arg AddGoalEventParams) erro
 	return err
 }
 
-const addGoalEvidence = `-- name: AddGoalEvidence :one
-INSERT INTO goal_evidence (goal_id, file_name, mime_type, size_bytes, file_data, url, uploaded_by)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id
-`
-
-type AddGoalEvidenceParams struct {
-	GoalID     uuid.UUID   `json:"goal_id"`
-	FileName   pgtype.Text `json:"file_name"`
-	MimeType   pgtype.Text `json:"mime_type"`
-	SizeBytes  pgtype.Int4 `json:"size_bytes"`
-	FileData   []byte      `json:"file_data"`
-	Url        pgtype.Text `json:"url"`
-	UploadedBy pgtype.UUID `json:"uploaded_by"`
-}
-
-func (q *Queries) AddGoalEvidence(ctx context.Context, arg AddGoalEvidenceParams) (uuid.UUID, error) {
-	row := q.db.QueryRow(ctx, addGoalEvidence,
-		arg.GoalID,
-		arg.FileName,
-		arg.MimeType,
-		arg.SizeBytes,
-		arg.FileData,
-		arg.Url,
-		arg.UploadedBy,
-	)
-	var id uuid.UUID
-	err := row.Scan(&id)
-	return id, err
-}
-
 const clientResolvedIncidents = `-- name: ClientResolvedIncidents :many
 SELECT a.name AS area_name, t.priority, count(*)::int AS resolved
 FROM tickets t JOIN areas a ON a.id = t.area_id
@@ -148,7 +117,7 @@ func (q *Queries) CreateClientNote(ctx context.Context, arg CreateClientNotePara
 const createGoal = `-- name: CreateGoal :one
 
 INSERT INTO goals (name, scope, client_id, area_id, person_user_id, person_name, person_email, owner_user_id, kind, bonus_rank, due_date,
-  estimate_biz_days, evidence_required, created_by)
+  estimate_biz_days, validation_required, created_by)
 VALUES ($1, $2, $3, $4, $5,
   $6, $7,
   $8, $9, $10, $11, $12,
@@ -157,20 +126,20 @@ RETURNING id
 `
 
 type CreateGoalParams struct {
-	Name             string      `json:"name"`
-	Scope            string      `json:"scope"`
-	ClientID         pgtype.UUID `json:"client_id"`
-	AreaID           pgtype.UUID `json:"area_id"`
-	PersonUserID     pgtype.UUID `json:"person_user_id"`
-	PersonName       pgtype.Text `json:"person_name"`
-	PersonEmail      pgtype.Text `json:"person_email"`
-	OwnerUserID      pgtype.UUID `json:"owner_user_id"`
-	Kind             pgtype.Text `json:"kind"`
-	BonusRank        pgtype.Text `json:"bonus_rank"`
-	DueDate          pgtype.Date `json:"due_date"`
-	EstimateBizDays  pgtype.Int4 `json:"estimate_biz_days"`
-	EvidenceRequired bool        `json:"evidence_required"`
-	CreatedBy        pgtype.UUID `json:"created_by"`
+	Name               string      `json:"name"`
+	Scope              string      `json:"scope"`
+	ClientID           pgtype.UUID `json:"client_id"`
+	AreaID             pgtype.UUID `json:"area_id"`
+	PersonUserID       pgtype.UUID `json:"person_user_id"`
+	PersonName         pgtype.Text `json:"person_name"`
+	PersonEmail        pgtype.Text `json:"person_email"`
+	OwnerUserID        pgtype.UUID `json:"owner_user_id"`
+	Kind               pgtype.Text `json:"kind"`
+	BonusRank          pgtype.Text `json:"bonus_rank"`
+	DueDate            pgtype.Date `json:"due_date"`
+	EstimateBizDays    pgtype.Int4 `json:"estimate_biz_days"`
+	ValidationRequired bool        `json:"validation_required"`
+	CreatedBy          pgtype.UUID `json:"created_by"`
 }
 
 // ===== Metas (§4.4.5) =====
@@ -188,7 +157,7 @@ func (q *Queries) CreateGoal(ctx context.Context, arg CreateGoalParams) (uuid.UU
 		arg.BonusRank,
 		arg.DueDate,
 		arg.EstimateBizDays,
-		arg.EvidenceRequired,
+		arg.ValidationRequired,
 		arg.CreatedBy,
 	)
 	var id uuid.UUID
@@ -341,23 +310,6 @@ func (q *Queries) DeleteGoal(ctx context.Context, id uuid.UUID) (int64, error) {
 	return result.RowsAffected(), nil
 }
 
-const deleteGoalEvidence = `-- name: DeleteGoalEvidence :execrows
-DELETE FROM goal_evidence WHERE id = $1 AND goal_id = $2
-`
-
-type DeleteGoalEvidenceParams struct {
-	ID     uuid.UUID `json:"id"`
-	GoalID uuid.UUID `json:"goal_id"`
-}
-
-func (q *Queries) DeleteGoalEvidence(ctx context.Context, arg DeleteGoalEvidenceParams) (int64, error) {
-	result, err := q.db.Exec(ctx, deleteGoalEvidence, arg.ID, arg.GoalID)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
-}
-
 const deleteGoalMilestone = `-- name: DeleteGoalMilestone :execrows
 DELETE FROM goal_milestones WHERE id = $1 AND goal_id = $2
 `
@@ -411,34 +363,6 @@ func (q *Queries) GetClientNote(ctx context.Context, id uuid.UUID) (ClientNote, 
 		&i.PinnedAt,
 		&i.EditedAt,
 		&i.CreatedAt,
-	)
-	return i, err
-}
-
-const getGoalEvidenceFile = `-- name: GetGoalEvidenceFile :one
-SELECT id, file_name, mime_type, file_data FROM goal_evidence WHERE id = $1 AND goal_id = $2 AND file_data IS NOT NULL
-`
-
-type GetGoalEvidenceFileParams struct {
-	ID     uuid.UUID `json:"id"`
-	GoalID uuid.UUID `json:"goal_id"`
-}
-
-type GetGoalEvidenceFileRow struct {
-	ID       uuid.UUID   `json:"id"`
-	FileName pgtype.Text `json:"file_name"`
-	MimeType pgtype.Text `json:"mime_type"`
-	FileData []byte      `json:"file_data"`
-}
-
-func (q *Queries) GetGoalEvidenceFile(ctx context.Context, arg GetGoalEvidenceFileParams) (GetGoalEvidenceFileRow, error) {
-	row := q.db.QueryRow(ctx, getGoalEvidenceFile, arg.ID, arg.GoalID)
-	var i GetGoalEvidenceFileRow
-	err := row.Scan(
-		&i.ID,
-		&i.FileName,
-		&i.MimeType,
-		&i.FileData,
 	)
 	return i, err
 }
@@ -977,51 +901,6 @@ func (q *Queries) ListGoalEvents(ctx context.Context, goalID uuid.UUID) ([]ListG
 	return items, nil
 }
 
-const listGoalEvidence = `-- name: ListGoalEvidence :many
-SELECT e.id, e.file_name, e.mime_type, e.size_bytes, e.url, e.created_at,
-  COALESCE(NULLIF(u.full_name, ''), u.username, '')::text AS uploaded_by_name
-FROM goal_evidence e LEFT JOIN users u ON u.id = e.uploaded_by
-WHERE e.goal_id = $1 ORDER BY e.created_at DESC
-`
-
-type ListGoalEvidenceRow struct {
-	ID             uuid.UUID          `json:"id"`
-	FileName       pgtype.Text        `json:"file_name"`
-	MimeType       pgtype.Text        `json:"mime_type"`
-	SizeBytes      pgtype.Int4        `json:"size_bytes"`
-	Url            pgtype.Text        `json:"url"`
-	CreatedAt      pgtype.Timestamptz `json:"created_at"`
-	UploadedByName string             `json:"uploaded_by_name"`
-}
-
-func (q *Queries) ListGoalEvidence(ctx context.Context, goalID uuid.UUID) ([]ListGoalEvidenceRow, error) {
-	rows, err := q.db.Query(ctx, listGoalEvidence, goalID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []ListGoalEvidenceRow
-	for rows.Next() {
-		var i ListGoalEvidenceRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.FileName,
-			&i.MimeType,
-			&i.SizeBytes,
-			&i.Url,
-			&i.CreatedAt,
-			&i.UploadedByName,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const listGoalMilestones = `-- name: ListGoalMilestones :many
 SELECT m.id, m.goal_id, m.position, m.name, m.ticket_id, m.agenda_task_id, m.done_at, m.done_by, m.done_by_name, m.done_source, m.created_at, COALESCE(t.ticket_number, '')::text AS ticket_number, COALESCE(t.status::text, '')::text AS ticket_status,
   COALESCE(ta.name, '')::text AS ticket_area, COALESCE(k.name, '')::text AS task_name, COALESCE(ka.name, '')::text AS task_area,
@@ -1145,15 +1024,54 @@ func (q *Queries) ListGoalPeople(ctx context.Context) ([]ListGoalPeopleRow, erro
 	return items, nil
 }
 
+const listGoalValidators = `-- name: ListGoalValidators :many
+SELECT DISTINCT u.id
+FROM users u
+JOIN user_permission_groups upg ON upg.user_id = u.id
+JOIN permission_groups pg ON pg.id = upg.permission_group_id AND pg.active AND pg.profile = 'gestion'
+WHERE u.active AND u.id IS DISTINCT FROM $1::uuid
+  AND (NOT EXISTS (SELECT 1 FROM management_scopes s WHERE s.user_id = u.id)
+    OR EXISTS (
+      SELECT 1 FROM management_scopes s
+      JOIN areas a ON a.id = s.area_id OR a.department_id = s.department_id
+      JOIN permission_group_areas pa ON pa.area_id = a.id
+      JOIN permission_groups ppg ON ppg.id = pa.permission_group_id AND ppg.active
+      JOIN user_permission_groups pu ON pu.permission_group_id = ppg.id
+      WHERE s.user_id = u.id AND pu.user_id = $1::uuid))
+`
+
+// Quién valida la certificación de una persona: el perfil Gestión (la CSM)
+// sin alcance, o con alguna de las áreas de la persona en su alcance. Nunca
+// la persona misma. Sin cuenta (NULL), solo las CSM sin alcance.
+func (q *Queries) ListGoalValidators(ctx context.Context, personID pgtype.UUID) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, listGoalValidators, personID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []uuid.UUID
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listGoals = `-- name: ListGoals :many
-SELECT g.id, g.name, g.scope, g.client_id, g.area_id, g.person_user_id, g.owner_user_id, g.kind, g.bonus_rank, g.due_date, g.estimate_biz_days, g.evidence_required, g.manual_risk, g.completed_at, g.completed_by, g.confirmed_at, g.confirmed_by, g.created_by, g.created_at, g.updated_at, g.person_name, g.person_email, g.outcome, g.outcome_reason, g.outcome_at, g.outcome_by, COALESCE(o.name, '')::text AS client_name, COALESCE(a.name, '')::text AS area_name,
+SELECT g.id, g.name, g.scope, g.client_id, g.area_id, g.person_user_id, g.owner_user_id, g.kind, g.bonus_rank, g.due_date, g.estimate_biz_days, g.validation_required, g.manual_risk, g.completed_at, g.completed_by, g.confirmed_at, g.confirmed_by, g.created_by, g.created_at, g.updated_at, g.person_name, g.person_email, g.outcome, g.outcome_reason, g.outcome_at, g.outcome_by, g.validated_at, g.validated_by, COALESCE(o.name, '')::text AS client_name, COALESCE(a.name, '')::text AS area_name,
   COALESCE(NULLIF(pu.full_name, ''), pu.username, g.person_name, '')::text AS person_display,
   COALESCE(NULLIF(ou.full_name, ''), ou.username, '')::text AS owner_name,
   COALESCE(NULLIF(cu.full_name, ''), cu.username, '')::text AS created_by_name,
   COALESCE(NULLIF(fu.full_name, ''), fu.username, '')::text AS confirmed_by_name,
+  COALESCE(NULLIF(vu.full_name, ''), vu.username, '')::text AS validated_by_name,
   (SELECT count(*) FROM goal_milestones m WHERE m.goal_id = g.id)::int AS milestones,
   (SELECT count(*) FROM goal_milestones m WHERE m.goal_id = g.id AND m.done_at IS NOT NULL)::int AS milestones_done,
-  (SELECT count(*) FROM goal_evidence e WHERE e.goal_id = g.id)::int AS evidence_count,
   COALESCE(rl.rule, 'all')::text AS person_rule
 FROM goals g
 LEFT JOIN organizations o ON o.id = g.client_id
@@ -1162,6 +1080,7 @@ LEFT JOIN users pu ON pu.id = g.person_user_id
 LEFT JOIN users ou ON ou.id = g.owner_user_id
 LEFT JOIN users cu ON cu.id = g.created_by
 LEFT JOIN users fu ON fu.id = g.confirmed_by
+LEFT JOIN users vu ON vu.id = g.validated_by
 LEFT JOIN goal_person_rules rl ON rl.user_id = g.person_user_id
 WHERE ($1::uuid IS NULL OR g.id = $1::uuid)
   AND ($2::uuid IS NULL OR g.client_id = $2::uuid)
@@ -1176,42 +1095,44 @@ type ListGoalsParams struct {
 }
 
 type ListGoalsRow struct {
-	ID               uuid.UUID          `json:"id"`
-	Name             string             `json:"name"`
-	Scope            string             `json:"scope"`
-	ClientID         pgtype.UUID        `json:"client_id"`
-	AreaID           pgtype.UUID        `json:"area_id"`
-	PersonUserID     pgtype.UUID        `json:"person_user_id"`
-	OwnerUserID      pgtype.UUID        `json:"owner_user_id"`
-	Kind             pgtype.Text        `json:"kind"`
-	BonusRank        pgtype.Text        `json:"bonus_rank"`
-	DueDate          pgtype.Date        `json:"due_date"`
-	EstimateBizDays  pgtype.Int4        `json:"estimate_biz_days"`
-	EvidenceRequired bool               `json:"evidence_required"`
-	ManualRisk       bool               `json:"manual_risk"`
-	CompletedAt      pgtype.Timestamptz `json:"completed_at"`
-	CompletedBy      pgtype.UUID        `json:"completed_by"`
-	ConfirmedAt      pgtype.Timestamptz `json:"confirmed_at"`
-	ConfirmedBy      pgtype.UUID        `json:"confirmed_by"`
-	CreatedBy        pgtype.UUID        `json:"created_by"`
-	CreatedAt        pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
-	PersonName       pgtype.Text        `json:"person_name"`
-	PersonEmail      pgtype.Text        `json:"person_email"`
-	Outcome          pgtype.Text        `json:"outcome"`
-	OutcomeReason    pgtype.Text        `json:"outcome_reason"`
-	OutcomeAt        pgtype.Timestamptz `json:"outcome_at"`
-	OutcomeBy        pgtype.UUID        `json:"outcome_by"`
-	ClientName       string             `json:"client_name"`
-	AreaName         string             `json:"area_name"`
-	PersonDisplay    string             `json:"person_display"`
-	OwnerName        string             `json:"owner_name"`
-	CreatedByName    string             `json:"created_by_name"`
-	ConfirmedByName  string             `json:"confirmed_by_name"`
-	Milestones       int32              `json:"milestones"`
-	MilestonesDone   int32              `json:"milestones_done"`
-	EvidenceCount    int32              `json:"evidence_count"`
-	PersonRule       string             `json:"person_rule"`
+	ID                 uuid.UUID          `json:"id"`
+	Name               string             `json:"name"`
+	Scope              string             `json:"scope"`
+	ClientID           pgtype.UUID        `json:"client_id"`
+	AreaID             pgtype.UUID        `json:"area_id"`
+	PersonUserID       pgtype.UUID        `json:"person_user_id"`
+	OwnerUserID        pgtype.UUID        `json:"owner_user_id"`
+	Kind               pgtype.Text        `json:"kind"`
+	BonusRank          pgtype.Text        `json:"bonus_rank"`
+	DueDate            pgtype.Date        `json:"due_date"`
+	EstimateBizDays    pgtype.Int4        `json:"estimate_biz_days"`
+	ValidationRequired bool               `json:"validation_required"`
+	ManualRisk         bool               `json:"manual_risk"`
+	CompletedAt        pgtype.Timestamptz `json:"completed_at"`
+	CompletedBy        pgtype.UUID        `json:"completed_by"`
+	ConfirmedAt        pgtype.Timestamptz `json:"confirmed_at"`
+	ConfirmedBy        pgtype.UUID        `json:"confirmed_by"`
+	CreatedBy          pgtype.UUID        `json:"created_by"`
+	CreatedAt          pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
+	PersonName         pgtype.Text        `json:"person_name"`
+	PersonEmail        pgtype.Text        `json:"person_email"`
+	Outcome            pgtype.Text        `json:"outcome"`
+	OutcomeReason      pgtype.Text        `json:"outcome_reason"`
+	OutcomeAt          pgtype.Timestamptz `json:"outcome_at"`
+	OutcomeBy          pgtype.UUID        `json:"outcome_by"`
+	ValidatedAt        pgtype.Timestamptz `json:"validated_at"`
+	ValidatedBy        pgtype.UUID        `json:"validated_by"`
+	ClientName         string             `json:"client_name"`
+	AreaName           string             `json:"area_name"`
+	PersonDisplay      string             `json:"person_display"`
+	OwnerName          string             `json:"owner_name"`
+	CreatedByName      string             `json:"created_by_name"`
+	ConfirmedByName    string             `json:"confirmed_by_name"`
+	ValidatedByName    string             `json:"validated_by_name"`
+	Milestones         int32              `json:"milestones"`
+	MilestonesDone     int32              `json:"milestones_done"`
+	PersonRule         string             `json:"person_rule"`
 }
 
 // Las metas con los nombres que muestra la pantalla y su avance.
@@ -1236,7 +1157,7 @@ func (q *Queries) ListGoals(ctx context.Context, arg ListGoalsParams) ([]ListGoa
 			&i.BonusRank,
 			&i.DueDate,
 			&i.EstimateBizDays,
-			&i.EvidenceRequired,
+			&i.ValidationRequired,
 			&i.ManualRisk,
 			&i.CompletedAt,
 			&i.CompletedBy,
@@ -1251,15 +1172,17 @@ func (q *Queries) ListGoals(ctx context.Context, arg ListGoalsParams) ([]ListGoa
 			&i.OutcomeReason,
 			&i.OutcomeAt,
 			&i.OutcomeBy,
+			&i.ValidatedAt,
+			&i.ValidatedBy,
 			&i.ClientName,
 			&i.AreaName,
 			&i.PersonDisplay,
 			&i.OwnerName,
 			&i.CreatedByName,
 			&i.ConfirmedByName,
+			&i.ValidatedByName,
 			&i.Milestones,
 			&i.MilestonesDone,
-			&i.EvidenceCount,
 			&i.PersonRule,
 		); err != nil {
 			return nil, err
@@ -1764,7 +1687,8 @@ func (q *Queries) PinClientNote(ctx context.Context, arg PinClientNoteParams) (C
 
 const reopenGoal = `-- name: ReopenGoal :exec
 UPDATE goals SET due_date = $1, completed_at = NULL, completed_by = NULL, confirmed_at = NULL, confirmed_by = NULL,
-  manual_risk = false, outcome = NULL, outcome_reason = NULL, outcome_at = NULL, outcome_by = NULL, updated_at = now()
+  manual_risk = false, outcome = NULL, outcome_reason = NULL, outcome_at = NULL, outcome_by = NULL,
+  validated_at = NULL, validated_by = NULL, updated_at = now()
 WHERE id = $2
 `
 
@@ -1899,6 +1823,21 @@ type SetGoalRiskParams struct {
 
 func (q *Queries) SetGoalRisk(ctx context.Context, arg SetGoalRiskParams) error {
 	_, err := q.db.Exec(ctx, setGoalRisk, arg.ManualRisk, arg.ID)
+	return err
+}
+
+const setGoalValidated = `-- name: SetGoalValidated :exec
+UPDATE goals SET validated_at = now(), validated_by = $1, updated_at = now() WHERE id = $2
+`
+
+type SetGoalValidatedParams struct {
+	ValidatedBy pgtype.UUID `json:"validated_by"`
+	ID          uuid.UUID   `json:"id"`
+}
+
+// La CSM valida la certificación de una persona (000062).
+func (q *Queries) SetGoalValidated(ctx context.Context, arg SetGoalValidatedParams) error {
+	_, err := q.db.Exec(ctx, setGoalValidated, arg.ValidatedBy, arg.ID)
 	return err
 }
 
@@ -2241,20 +2180,20 @@ const updateGoal = `-- name: UpdateGoal :exec
 UPDATE goals SET name = $1, area_id = CASE WHEN scope = 'client' THEN $2 ELSE area_id END,
   owner_user_id = $3, kind = $4, bonus_rank = $5,
   due_date = $6, estimate_biz_days = $7,
-  evidence_required = $8, updated_at = now()
+  validation_required = $8, updated_at = now()
 WHERE id = $9
 `
 
 type UpdateGoalParams struct {
-	Name             string      `json:"name"`
-	AreaID           pgtype.UUID `json:"area_id"`
-	OwnerUserID      pgtype.UUID `json:"owner_user_id"`
-	Kind             pgtype.Text `json:"kind"`
-	BonusRank        pgtype.Text `json:"bonus_rank"`
-	DueDate          pgtype.Date `json:"due_date"`
-	EstimateBizDays  pgtype.Int4 `json:"estimate_biz_days"`
-	EvidenceRequired bool        `json:"evidence_required"`
-	ID               uuid.UUID   `json:"id"`
+	Name               string      `json:"name"`
+	AreaID             pgtype.UUID `json:"area_id"`
+	OwnerUserID        pgtype.UUID `json:"owner_user_id"`
+	Kind               pgtype.Text `json:"kind"`
+	BonusRank          pgtype.Text `json:"bonus_rank"`
+	DueDate            pgtype.Date `json:"due_date"`
+	EstimateBizDays    pgtype.Int4 `json:"estimate_biz_days"`
+	ValidationRequired bool        `json:"validation_required"`
+	ID                 uuid.UUID   `json:"id"`
 }
 
 func (q *Queries) UpdateGoal(ctx context.Context, arg UpdateGoalParams) error {
@@ -2266,7 +2205,7 @@ func (q *Queries) UpdateGoal(ctx context.Context, arg UpdateGoalParams) error {
 		arg.BonusRank,
 		arg.DueDate,
 		arg.EstimateBizDays,
-		arg.EvidenceRequired,
+		arg.ValidationRequired,
 		arg.ID,
 	)
 	return err

@@ -1,6 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, output, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
-import { HttpClient } from '@angular/common/http';
 import { Dialog } from '@angular/cdk/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { Goal, GoalStep, ManagementService } from '../../core/management/management.service';
@@ -12,7 +11,6 @@ import { I18nService } from '../../core/i18n/i18n.service';
 import { PreferencesService } from '../../core/preferences/preferences.service';
 import { MessageKey } from '../../core/i18n/messages';
 import { problemDetail } from '../../core/http-error';
-import { downloadFile } from '../../core/download';
 import { addDays, isoDay, parseDay } from '../agenda/agenda-format';
 import { GOAL_ICON, GOAL_TONE, day, goalStateKey } from './mgmt-format';
 import { GoalDialogComponent, GoalDialogData } from './goal-dialog';
@@ -24,8 +22,8 @@ type LinkKind = 'none' | 'ticket' | 'task';
 /**
  * Detalle de una meta (spec/16 §4.4.5, diseño aprobado): datos, avance,
  * hitos (a mano o enlazados a un ticket o una tarea, que se marcan solos),
- * certificado, historial y acciones (en riesgo, cumplida, confirmar para el
- * bono, reabrir). Lo usan Gestión → Metas, Agenda → Mis metas y Mi equipo.
+ * validación de la CSM en las certificaciones, historial y acciones (en
+ * riesgo, cumplida, confirmar para el bono, reabrir). Lo usan Gestión → Metas, Agenda → Mis metas y Mi equipo.
  */
 @Component({
   selector: 'app-goal-detail',
@@ -48,7 +46,6 @@ export class GoalDetailComponent {
   private readonly features = inject(SystemFeaturesService);
   private readonly orgs = inject(OrganizationsService);
   private readonly prefs = inject(PreferencesService);
-  private readonly http = inject(HttpClient);
   private readonly dialog = inject(Dialog);
 
   protected readonly goal = signal<Goal | null>(null);
@@ -60,7 +57,6 @@ export class GoalDetailComponent {
   protected readonly ticketNumber = signal('');
   protected readonly taskId = signal('');
   protected readonly tasks = signal<{ id: string; label: string }[]>([]);
-  protected readonly evUrl = signal('');
   protected readonly reopening = signal(false);
   protected readonly newDate = signal('');
   protected readonly confirmDelete = signal(false);
@@ -79,9 +75,9 @@ export class GoalDetailComponent {
     if (!g.milestones) return g.state === 'done' ? 100 : 0;
     return Math.round((g.milestonesDone / g.milestones) * 100);
   });
-  protected readonly evidenceMissing = computed(() => {
+  protected readonly validationMissing = computed(() => {
     const g = this.goal();
-    return !!g && g.evidenceRequired && g.evidenceCount === 0;
+    return !!g && g.validationRequired && !g.validatedAt;
   });
   protected readonly closed = computed(() => ['done', 'failed', 'not_needed'].includes(this.goal()?.state ?? ''));
 
@@ -231,39 +227,14 @@ export class GoalDetailComponent {
     if (g) void this.run(() => this.api.confirm(g.id));
   }
 
+  protected validate(): void {
+    const g = this.goal();
+    if (g) void this.run(() => this.api.validate(g.id));
+  }
+
   protected reopen(): void {
     const g = this.goal();
     if (g && this.newDate()) void this.run(() => this.api.reopen(g.id, this.newDate()));
-  }
-
-  protected onFile(e: Event): void {
-    const input = e.target as HTMLInputElement;
-    const file = input.files?.[0];
-    const g = this.goal();
-    input.value = '';
-    if (g && file) void this.run(() => this.api.addEvidenceFile(g.id, file));
-  }
-
-  protected addUrl(): void {
-    const g = this.goal();
-    const url = this.evUrl().trim();
-    if (!g || !url) return;
-    void this.run(() => this.api.addEvidenceUrl(g.id, url)).then(() => this.evUrl.set(''));
-  }
-
-  protected removeEvidence(id: string): void {
-    const g = this.goal();
-    if (g) void this.run(() => this.api.deleteEvidence(g.id, id));
-  }
-
-  protected async download(id: string, name?: string): Promise<void> {
-    const g = this.goal();
-    if (!g) return;
-    try {
-      await downloadFile(this.http, this.api.evidenceUrl(g.id, id), name ?? 'certificado');
-    } catch (e) {
-      this.error.set(problemDetail(e, this.i18n.t('mg.loadError')));
-    }
   }
 
   protected async edit(): Promise<void> {

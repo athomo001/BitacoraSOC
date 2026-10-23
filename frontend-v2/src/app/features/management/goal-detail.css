@@ -137,8 +137,7 @@ mat-icon {
 }
 
 .gt__chips,
-.gt__actions,
-.gt__evadd {
+.gt__actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -231,42 +230,6 @@ mat-icon {
 
 .gt__evic {
   color: var(--text-muted);
-}
-
-.gt__ev a {
-  overflow-wrap: anywhere;
-  color: var(--accent);
-}
-
-.gt__linkbtn {
-  padding: 0;
-  border: none;
-  background: none;
-  color: var(--accent);
-  font: inherit;
-  text-decoration: underline;
-  cursor: pointer;
-}
-
-.gt__evadd {
-  padding: 6px 0 4px;
-}
-
-.gt__evadd .adm-input {
-  flex: 1;
-  min-width: 180px;
-}
-
-.gt__file {
-  position: relative;
-  cursor: pointer;
-}
-
-.gt__file input {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  cursor: pointer;
 }
 
 .gt__pad {

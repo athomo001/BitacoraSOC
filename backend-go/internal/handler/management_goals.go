@@ -4,10 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"net/mail"
-	"net/url"
 	"strings"
 	"time"
 
@@ -57,15 +55,6 @@ type goalEventDTO struct {
 	UserName string    `json:"userName,omitempty"`
 }
 
-type goalEvidenceDTO struct {
-	ID             uuid.UUID `json:"id"`
-	FileName       string    `json:"fileName,omitempty"`
-	URL            string    `json:"url,omitempty"`
-	SizeBytes      int32     `json:"sizeBytes,omitempty"`
-	At             time.Time `json:"at"`
-	UploadedByName string    `json:"uploadedByName,omitempty"`
-}
-
 type goalDTO struct {
 	ID         uuid.UUID  `json:"id"`
 	Name       string     `json:"name"`
@@ -86,11 +75,13 @@ type goalDTO struct {
 	DueDate         string     `json:"dueDate"`
 	BizDaysLeft     int        `json:"bizDaysLeft"`
 	EstimateBizDays *int32     `json:"estimateBizDays,omitempty"`
-	EvidenceNeeded  bool       `json:"evidenceRequired"`
-	EvidenceCount   int32      `json:"evidenceCount"`
-	ManualRisk      bool       `json:"manualRisk"`
-	AutoRisk        bool       `json:"autoRisk"`
-	State           string     `json:"state"` // open | risk | confirm | done (lograda) | failed (no lograda) | not_needed
+	// Certificación que valida la CSM (000062; antes se adjuntaba el PDF).
+	ValidationRequired bool       `json:"validationRequired"`
+	ValidatedAt        *time.Time `json:"validatedAt,omitempty"`
+	ValidatedByName    string     `json:"validatedByName,omitempty"`
+	ManualRisk         bool       `json:"manualRisk"`
+	AutoRisk           bool       `json:"autoRisk"`
+	State              string     `json:"state"` // open | risk | confirm | done (lograda) | failed (no lograda) | not_needed
 	// No lograda o no hace falta: el motivo (vacía y vencida: «Venció el plazo»).
 	OutcomeReason string `json:"outcomeReason,omitempty"`
 	// La regla de la persona (all | any | primary | secondary), solo con cuenta.
@@ -104,13 +95,14 @@ type goalDTO struct {
 	CanEdit         bool       `json:"canEdit"`
 	CanMark         bool       `json:"canMark"`
 	CanConfirm      bool       `json:"canConfirm"`
+	// Validar la certificación: la CSM o el admin, con los hitos hechos.
+	CanValidate bool `json:"canValidate"`
 	// Marcarla no lograda (la jefatura o el admin, nunca la persona).
 	CanOutcome bool `json:"canOutcome"`
 	// Cambiar la regla de la persona.
-	CanRule  bool               `json:"canRule"`
-	Steps    []goalMilestoneDTO `json:"steps,omitempty"`
-	Events   []goalEventDTO     `json:"events,omitempty"`
-	Evidence []goalEvidenceDTO  `json:"evidence,omitempty"`
+	CanRule bool               `json:"canRule"`
+	Steps   []goalMilestoneDTO `json:"steps,omitempty"`
+	Events  []goalEventDTO     `json:"events,omitempty"`
 }
 
 // goalState calcula el estado (nadie lo guarda salvo cumplida y confirmada).
@@ -129,33 +121,38 @@ func goalState(done, total int, bonus, completed, confirmed, manualRisk bool, du
 	return "open", false
 }
 
-// goalPerms: quién ve, edita, marca y confirma una meta.
+// goalPerms: quién ve, edita, marca, confirma y valida una meta.
 type goalPerms struct {
-	see, edit, mark, confirm, rule bool
+	see, edit, mark, confirm, rule, validate bool
 }
 
-func (h *ManagementHandler) goalPermsFor(u agendaUser, g db.ListGoalsRow, personLeads map[uuid.UUID]bool) goalPerms {
+// goalPermsFor: personLeads son las jefaturas de la persona y validators las
+// CSM que validan su certificación (solo si la meta la pide).
+func (h *ManagementHandler) goalPermsFor(u agendaUser, g db.ListGoalsRow, personLeads, validators map[uuid.UUID]bool) goalPerms {
 	creator := uuidEq(g.CreatedBy, u.id)
 	owner := uuidEq(g.OwnerUserID, u.id)
+	csm := g.ValidationRequired && validators[u.id]
 	p := goalPerms{}
 	if g.Scope == "person" && !g.PersonUserID.Valid {
 		// Alguien sin cuenta: es un registro de quien la creó (admin o jefatura).
-		p.see = u.admin || creator || owner
+		p.see = u.admin || creator || owner || csm
 		p.edit = u.admin || creator
 		p.mark = p.edit || owner
 		p.confirm = p.edit
+		p.validate = g.ValidationRequired && (u.admin || csm)
 		return p
 	}
 	if g.Scope == "person" {
 		person := uuidEq(g.PersonUserID, u.id)
 		lead := personLeads[u.id]
-		p.see = u.admin || person || lead || creator || owner
+		p.see = u.admin || person || lead || creator || owner || csm
 		p.edit = u.admin || lead || creator
 		p.mark = p.edit || person || owner
 		// Confirma (y marca no lograda) la jefatura de la persona o el admin;
 		// nunca la persona misma.
 		p.confirm = (u.admin || lead) && !person
 		p.rule = p.confirm
+		p.validate = g.ValidationRequired && (u.admin || csm) && !person
 		return p
 	}
 	areaLead := g.AreaID.Valid && u.leads[uuid.UUID(g.AreaID.Bytes)]
@@ -174,8 +171,9 @@ func (h *ManagementHandler) loadGoals(ctx context.Context, params db.ListGoalsPa
 	}
 	out := []goalDTO{}
 	leadsOf := map[uuid.UUID]map[uuid.UUID]bool{}
+	validatorsOf := map[uuid.UUID]map[uuid.UUID]bool{}
 	for _, g := range rows {
-		leads := map[uuid.UUID]bool{}
+		leads, validators := map[uuid.UUID]bool{}, map[uuid.UUID]bool{}
 		if g.Scope == "person" && g.PersonUserID.Valid {
 			pid := uuid.UUID(g.PersonUserID.Bytes)
 			if leadsOf[pid] == nil {
@@ -190,7 +188,21 @@ func (h *ManagementHandler) loadGoals(ctx context.Context, params db.ListGoalsPa
 			}
 			leads = leadsOf[pid]
 		}
-		perms := h.goalPermsFor(u, g, leads)
+		if g.ValidationRequired {
+			pid := uuid.UUID(g.PersonUserID.Bytes) // uuid.Nil: alguien sin cuenta
+			if validatorsOf[pid] == nil {
+				ids, err := h.Queries.ListGoalValidators(ctx, g.PersonUserID)
+				if err != nil {
+					return nil, err
+				}
+				validatorsOf[pid] = map[uuid.UUID]bool{}
+				for _, id := range ids {
+					validatorsOf[pid][id] = true
+				}
+			}
+			validators = validatorsOf[pid]
+		}
+		perms := h.goalPermsFor(u, g, leads, validators)
 		if !perms.see {
 			continue
 		}
@@ -212,12 +224,13 @@ func (h *ManagementHandler) goalDTOOf(g db.ListGoalsRow, p goalPerms, c mgmtCloc
 	}
 	d := goalDTO{ID: g.ID, Name: g.Name, Scope: g.Scope, ClientID: uuidPtr(g.ClientID), ClientName: g.ClientName, AreaID: uuidPtr(g.AreaID),
 		AreaName: g.AreaName, PersonID: uuidPtr(g.PersonUserID), PersonName: g.PersonDisplay, PersonEmail: g.PersonEmail.String, OwnerID: uuidPtr(g.OwnerUserID), OwnerName: g.OwnerName,
-		Kind: textPtr(g.Kind), Bonus: textPtr(g.BonusRank), DueDate: agenda.FormatDate(due), BizDaysLeft: left, EvidenceNeeded: g.EvidenceRequired,
-		EvidenceCount: g.EvidenceCount, ManualRisk: g.ManualRisk, AutoRisk: autoRisk, State: state, Milestones: g.Milestones,
+		Kind: textPtr(g.Kind), Bonus: textPtr(g.BonusRank), DueDate: agenda.FormatDate(due), BizDaysLeft: left, ValidationRequired: g.ValidationRequired,
+		ValidatedAt: timestamptzPtr(g.ValidatedAt), ValidatedByName: g.ValidatedByName, ManualRisk: g.ManualRisk, AutoRisk: autoRisk, State: state, Milestones: g.Milestones,
 		MilestonesDone: g.MilestonesDone, CompletedAt: timestamptzPtr(g.CompletedAt), ConfirmedAt: timestamptzPtr(g.ConfirmedAt),
 		ConfirmedByName: g.ConfirmedByName, CreatedByName: g.CreatedByName, CanEdit: p.edit, CanMark: p.mark,
 		CanConfirm: p.confirm && state == "confirm", OutcomeReason: g.OutcomeReason.String,
-		CanOutcome: p.confirm && (state == "open" || state == "risk" || state == "confirm"), CanRule: p.rule && g.PersonUserID.Valid}
+		CanOutcome: p.confirm && (state == "open" || state == "risk" || state == "confirm"), CanRule: p.rule && g.PersonUserID.Valid,
+		CanValidate: p.validate && !g.ValidatedAt.Valid && g.MilestonesDone == g.Milestones && (state == "open" || state == "risk")}
 	if g.PersonUserID.Valid {
 		d.PersonRule = g.PersonRule
 	}
@@ -325,14 +338,14 @@ func (h *ManagementHandler) goalFor(w http.ResponseWriter, r *http.Request) (age
 	return u, c, goals[0], rows[0], true
 }
 
-// writeGoal devuelve la meta con hitos, historial y evidencia.
+// writeGoal devuelve la meta con hitos e historial.
 func (h *ManagementHandler) writeGoal(w http.ResponseWriter, r *http.Request, status int) {
 	ctx := r.Context()
 	_, _, g, row, ok := h.goalFor(w, r)
 	if !ok {
 		return
 	}
-	g.Steps, g.Events, g.Evidence = []goalMilestoneDTO{}, []goalEventDTO{}, []goalEvidenceDTO{}
+	g.Steps, g.Events = []goalMilestoneDTO{}, []goalEventDTO{}
 	steps, err := h.Queries.ListGoalMilestones(ctx, []uuid.UUID{g.ID})
 	if err != nil {
 		mgmtFail(w, r)
@@ -347,12 +360,6 @@ func (h *ManagementHandler) writeGoal(w http.ResponseWriter, r *http.Request, st
 	if evs, err := h.Queries.ListGoalEvents(ctx, g.ID); err == nil {
 		for _, e := range evs {
 			g.Events = append(g.Events, goalEventDTO{Text: e.Text, At: e.CreatedAt.Time, UserName: e.UserName})
-		}
-	}
-	if ev, err := h.Queries.ListGoalEvidence(ctx, g.ID); err == nil {
-		for _, e := range ev {
-			g.Evidence = append(g.Evidence, goalEvidenceDTO{ID: e.ID, FileName: e.FileName.String, URL: e.Url.String, SizeBytes: e.SizeBytes.Int32,
-				At: e.CreatedAt.Time, UploadedByName: e.UploadedByName})
 		}
 	}
 	if row.PersonUserID.Valid {
@@ -384,10 +391,10 @@ type goalRequest struct {
 	Kind        string     `json:"kind"`
 	Bonus       string     `json:"bonus"`
 	// Plazo: una fecha límite o un tiempo estimado en días hábiles desde hoy.
-	DueDate          string   `json:"dueDate"`
-	EstimateBizDays  int32    `json:"estimateBizDays"`
-	EvidenceRequired bool     `json:"evidenceRequired"`
-	Steps            []string `json:"steps"`
+	DueDate            string   `json:"dueDate"`
+	EstimateBizDays    int32    `json:"estimateBizDays"`
+	ValidationRequired bool     `json:"validationRequired"`
+	Steps              []string `json:"steps"`
 }
 
 // due: la fecha límite (la del pedido o la que sale de los días hábiles).
@@ -457,7 +464,7 @@ func (h *ManagementHandler) CreateGoal(w http.ResponseWriter, r *http.Request) {
 		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "la fecha límite ya pasó")
 		return
 	}
-	p := db.CreateGoalParams{Name: req.Name, Scope: req.Scope, DueDate: pgDate(due), EvidenceRequired: req.EvidenceRequired,
+	p := db.CreateGoalParams{Name: req.Name, Scope: req.Scope, DueDate: pgDate(due), ValidationRequired: req.ValidationRequired,
 		CreatedBy: pgUUIDOf(u.id), OwnerUserID: optionalUUID(req.OwnerID)}
 	if req.EstimateBizDays > 0 {
 		p.EstimateBizDays = pgtype.Int4{Int32: req.EstimateBizDays, Valid: true}
@@ -509,7 +516,7 @@ func (h *ManagementHandler) CreateGoal(w http.ResponseWriter, r *http.Request) {
 		}
 		p.PersonUserID, p.OwnerUserID = pgUUIDOf(*req.PersonID), pgUUIDOf(*req.PersonID)
 		p.Kind, p.BonusRank = optText(req.Kind), optText(req.Bonus)
-		p.EvidenceRequired = req.EvidenceRequired && req.Kind == "certification"
+		p.ValidationRequired = req.ValidationRequired && req.Kind == "certification"
 	default:
 		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "para quién: client, area o person")
 		return
@@ -580,7 +587,7 @@ func (h *ManagementHandler) externalPerson(w http.ResponseWriter, r *http.Reques
 	p.PersonName, p.PersonEmail = pgtype.Text{String: name, Valid: true}, pgtype.Text{String: email, Valid: true}
 	p.OwnerUserID = pgUUIDOf(u.id)
 	p.Kind, p.BonusRank = optText(req.Kind), optText(req.Bonus)
-	p.EvidenceRequired = req.EvidenceRequired && req.Kind == "certification"
+	p.ValidationRequired = req.ValidationRequired && req.Kind == "certification"
 	return true
 }
 
@@ -612,13 +619,13 @@ func (h *ManagementHandler) UpdateGoal(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	p := db.UpdateGoalParams{ID: g.ID, Name: req.Name, AreaID: optionalUUID(req.AreaID), OwnerUserID: optionalUUID(req.OwnerID), DueDate: pgDate(due),
-		EvidenceRequired: req.EvidenceRequired}
+		ValidationRequired: req.ValidationRequired}
 	if req.EstimateBizDays > 0 {
 		p.EstimateBizDays = pgtype.Int4{Int32: req.EstimateBizDays, Valid: true}
 	}
 	if row.Scope == "person" {
 		p.OwnerUserID, p.Kind, p.BonusRank = row.PersonUserID, optText(req.Kind), optText(req.Bonus)
-		p.EvidenceRequired = req.EvidenceRequired && req.Kind == "certification"
+		p.ValidationRequired = req.ValidationRequired && req.Kind == "certification"
 	}
 	if !p.OwnerUserID.Valid {
 		p.OwnerUserID = row.OwnerUserID
@@ -802,7 +809,8 @@ func (h *ManagementHandler) MarkMilestone(w http.ResponseWriter, r *http.Request
 
 // GoalAction es POST /api/goals/{id}/{action}: risk (marcar o quitar «en
 // riesgo»), complete (marcarla cumplida), confirm (la jefatura confirma una
-// que cuenta para el bono) y reopen (con fecha nueva).
+// que cuenta para el bono), validate (la CSM valida la certificación) y
+// reopen (con fecha nueva).
 func (h *ManagementHandler) GoalAction(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	u, c, g, row, ok := h.goalFor(w, r)
@@ -839,8 +847,8 @@ func (h *ManagementHandler) GoalAction(w http.ResponseWriter, r *http.Request) {
 			problemdetails.Write(w, r, http.StatusConflict, "goal-closed", "la meta ya está cerrada")
 			return
 		}
-		if g.EvidenceNeeded && g.EvidenceCount == 0 {
-			problemdetails.Write(w, r, http.StatusConflict, "evidence-missing", "falta el certificado para darla por cumplida")
+		if g.ValidationRequired && g.ValidatedAt == nil {
+			problemdetails.Write(w, r, http.StatusConflict, "validation-missing", "falta que la CSM valide la certificación")
 			return
 		}
 		p := db.SetGoalCompletedParams{ID: g.ID, CompletedAt: now, CompletedBy: pgUUIDOf(u.id)}
@@ -867,6 +875,18 @@ func (h *ManagementHandler) GoalAction(w http.ResponseWriter, r *http.Request) {
 		}
 		event = "Confirmada por la jefatura: lograda"
 		h.AuditLog.Log(ctx, "goal.bonus.confirmed", audit.LevelWarn, audit.Success(), map[string]any{"goalId": g.ID.String(), "personId": uuidString(uuidPtr(row.PersonUserID)), "bonus": row.BonusRank.String})
+	case "validate":
+		if !g.CanValidate {
+			problemdetails.Write(w, r, http.StatusForbidden, "forbidden", "la valida la CSM o el admin, con los hitos hechos")
+			return
+		}
+		if err := h.Queries.SetGoalValidated(ctx, db.SetGoalValidatedParams{ID: g.ID, ValidatedBy: pgUUIDOf(u.id)}); err != nil {
+			mgmtFail(w, r)
+			return
+		}
+		// El historial antes de que se cumpla sola.
+		h.goalEvent(ctx, g.ID, "Certificación validada por la CSM", u.id)
+		h.reconcileGoal(ctx, g.ID)
 	case "reopen":
 		if !g.CanEdit || (g.State != "failed" && g.State != "done") {
 			problemdetails.Write(w, r, http.StatusConflict, "goal-open", "se reabre una meta cumplida o no cumplida")
@@ -909,7 +929,9 @@ func (h *ManagementHandler) GoalAction(w http.ResponseWriter, r *http.Request) {
 		problemdetails.Write(w, r, http.StatusNotFound, "not-found", "acción desconocida")
 		return
 	}
-	h.goalEvent(ctx, g.ID, event, u.id)
+	if event != "" {
+		h.goalEvent(ctx, g.ID, event, u.id)
+	}
 	h.applyPersonRule(ctx, row.PersonUserID)
 	h.AuditLog.Log(ctx, "goal."+action, audit.LevelInfo, audit.Success(), map[string]any{"goalId": g.ID.String()})
 	publishSync(ctx, h.Hub, "management.changed", map[string]string{"goalId": g.ID.String()})
@@ -1020,118 +1042,6 @@ func (h *ManagementHandler) PersonRule(w http.ResponseWriter, r *http.Request) {
 	writeData(w, http.StatusOK, map[string]string{"rule": req.Rule})
 }
 
-// ===== Certificado =====
-
-const maxGoalEvidenceBytes = 10 << 20
-
-var evidenceTypes = map[string]bool{"application/pdf": true, "image/png": true, "image/jpeg": true, "image/webp": true}
-
-// AddEvidence es POST /api/goals/{id}/evidence: un archivo (multipart
-// «file»: PDF o imagen, hasta 10 MB) o un enlace de verificación (JSON {url}).
-func (h *ManagementHandler) AddEvidence(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	u, _, g, _, ok := h.goalFor(w, r)
-	if !ok {
-		return
-	}
-	if !g.CanMark {
-		problemdetails.Write(w, r, http.StatusForbidden, "forbidden", "el certificado lo adjunta la persona o la jefatura")
-		return
-	}
-	p := db.AddGoalEvidenceParams{GoalID: g.ID, UploadedBy: pgUUIDOf(u.id)}
-	if strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/") {
-		r.Body = http.MaxBytesReader(w, r.Body, maxGoalEvidenceBytes+1<<20)
-		file, header, err := r.FormFile("file")
-		if err != nil {
-			problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "adjunta el certificado (PDF o imagen, hasta 10 MB)")
-			return
-		}
-		defer file.Close()
-		data, err := io.ReadAll(io.LimitReader(file, maxGoalEvidenceBytes+1))
-		if err != nil || len(data) == 0 || len(data) > maxGoalEvidenceBytes {
-			problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "el certificado va hasta 10 MB")
-			return
-		}
-		mime := http.DetectContentType(data)
-		if i := strings.Index(mime, ";"); i >= 0 {
-			mime = mime[:i]
-		}
-		if !evidenceTypes[mime] {
-			problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "el certificado va en PDF, PNG, JPG o WebP")
-			return
-		}
-		name := strings.TrimSpace(header.Filename)
-		if name == "" || len(name) > 200 {
-			name = "certificado"
-		}
-		p.FileName, p.MimeType = pgtype.Text{String: name, Valid: true}, pgtype.Text{String: mime, Valid: true}
-		p.SizeBytes, p.FileData = pgtype.Int4{Int32: int32(len(data)), Valid: true}, data
-	} else {
-		var req struct {
-			URL string `json:"url"`
-		}
-		if err := decodeJSON(w, r, &req); err != nil {
-			problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "JSON inválido")
-			return
-		}
-		link, err := url.Parse(strings.TrimSpace(req.URL))
-		if err != nil || (link.Scheme != "http" && link.Scheme != "https") || link.Host == "" || len(req.URL) > 500 {
-			problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "el enlace de verificación debe ser una URL http(s)")
-			return
-		}
-		p.Url = pgtype.Text{String: link.String(), Valid: true}
-	}
-	if _, err := h.Queries.AddGoalEvidence(ctx, p); err != nil {
-		mgmtFail(w, r)
-		return
-	}
-	h.goalEvent(ctx, g.ID, "Certificado adjunto", u.id)
-	h.reconcileGoal(ctx, g.ID)
-	h.AuditLog.Log(ctx, "goal.evidence.added", audit.LevelInfo, audit.Success(), map[string]any{"goalId": g.ID.String()})
-	h.writeGoal(w, r, http.StatusCreated)
-}
-
-// Evidence es GET /api/goals/{id}/evidence/{eid}: descarga el archivo.
-func (h *ManagementHandler) Evidence(w http.ResponseWriter, r *http.Request) {
-	_, _, g, _, ok := h.goalFor(w, r)
-	if !ok {
-		return
-	}
-	eid, err := uuid.Parse(r.PathValue("eid"))
-	if err != nil {
-		problemdetails.Write(w, r, http.StatusNotFound, "not-found", "archivo no encontrado")
-		return
-	}
-	f, err := h.Queries.GetGoalEvidenceFile(r.Context(), db.GetGoalEvidenceFileParams{ID: eid, GoalID: g.ID})
-	if err != nil {
-		problemdetails.Write(w, r, http.StatusNotFound, "not-found", "archivo no encontrado")
-		return
-	}
-	writeImage(w, f.MimeType.String, f.FileName.String, f.FileData)
-}
-
-// DeleteEvidence es DELETE /api/goals/{id}/evidence/{eid}.
-func (h *ManagementHandler) DeleteEvidence(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	u, _, g, _, ok := h.goalFor(w, r)
-	if !ok {
-		return
-	}
-	eid, err := uuid.Parse(r.PathValue("eid"))
-	if err != nil || !g.CanMark || g.State == "done" {
-		problemdetails.Write(w, r, http.StatusConflict, "goal-closed", "con la meta cumplida el certificado se queda")
-		return
-	}
-	if n, err := h.Queries.DeleteGoalEvidence(ctx, db.DeleteGoalEvidenceParams{ID: eid, GoalID: g.ID}); err != nil || n == 0 {
-		problemdetails.Write(w, r, http.StatusNotFound, "not-found", "archivo no encontrado")
-		return
-	}
-	h.goalEvent(ctx, g.ID, "Certificado quitado", u.id)
-	h.reconcileGoal(ctx, g.ID)
-	h.AuditLog.Log(ctx, "goal.evidence.deleted", audit.LevelInfo, audit.Success(), map[string]any{"goalId": g.ID.String()})
-	h.writeGoal(w, r, http.StatusOK)
-}
-
 // ===== Hitos que se marcan solos =====
 
 // syncLinked marca o desmarca los hitos enlazados según su ticket o su tarea
@@ -1180,9 +1090,10 @@ func (h *ManagementHandler) syncLinked(ctx context.Context) {
 	}
 }
 
-// reconcileGoal: con todos los hitos hechos (y el certificado si se pide) la
-// meta se cumple sola; si después se desmarca un hito, vuelve a estar en
-// curso (salvo que alguien la haya marcado o confirmado a mano).
+// reconcileGoal: con todos los hitos hechos (y la validación de la CSM si se
+// pide) la meta se cumple sola; si después se desmarca un hito, vuelve a
+// estar en curso (salvo que alguien la haya marcado o confirmado a mano). Si
+// solo falta la validación, avisa una vez a las CSM que la validan.
 func (h *ManagementHandler) reconcileGoal(ctx context.Context, id uuid.UUID) {
 	rows, err := h.Queries.ListGoals(ctx, db.ListGoalsParams{GoalID: pgUUIDOf(id)})
 	if err != nil || len(rows) == 0 {
@@ -1193,7 +1104,10 @@ func (h *ManagementHandler) reconcileGoal(ctx context.Context, id uuid.UUID) {
 	if g.Outcome.Valid {
 		return // no lograda o no hace falta: los hitos no la cumplen
 	}
-	ready := g.Milestones > 0 && g.MilestonesDone == g.Milestones && (!g.EvidenceRequired || g.EvidenceCount > 0)
+	validated := !g.ValidationRequired || g.ValidatedAt.Valid
+	// Sin hitos, la validación de la CSM es lo único que la cumple.
+	allDone := g.MilestonesDone == g.Milestones && (g.Milestones > 0 || (g.ValidationRequired && g.ValidatedAt.Valid))
+	ready := allDone && validated
 	switch {
 	case ready && !g.CompletedAt.Valid:
 		_ = h.Queries.SetGoalCompleted(ctx, db.SetGoalCompletedParams{ID: id, CompletedAt: pgtype.Timestamptz{Time: h.now(), Valid: true}})
@@ -1204,8 +1118,26 @@ func (h *ManagementHandler) reconcileGoal(ctx context.Context, id uuid.UUID) {
 		h.goalEvent(ctx, id, text, uuid.Nil)
 	case !ready && g.CompletedAt.Valid && !g.CompletedBy.Valid && !g.ConfirmedAt.Valid && g.Milestones > 0:
 		_ = h.Queries.SetGoalCompleted(ctx, db.SetGoalCompletedParams{ID: id})
-		h.goalEvent(ctx, id, "Vuelve a estar en curso: falta un hito o el certificado", uuid.Nil)
+		h.goalEvent(ctx, id, "Vuelve a estar en curso: falta un hito o la validación de la CSM", uuid.Nil)
+	case !validated && g.MilestonesDone == g.Milestones && g.Milestones > 0 && !g.CompletedAt.Valid:
+		h.askValidation(ctx, g)
 	}
+}
+
+// askValidation: los hitos están hechos y falta que la CSM valide la
+// certificación. Queda en el historial y avisa en la campana, una sola vez.
+func (h *ManagementHandler) askValidation(ctx context.Context, g db.ListGoalsRow) {
+	fresh, err := h.Queries.InsertGoalAlert(ctx, db.InsertGoalAlertParams{GoalID: g.ID, Alert: "validate"})
+	if err != nil || fresh == 0 {
+		return
+	}
+	h.goalEvent(ctx, g.ID, "Hitos completos: falta la validación de la CSM", uuid.Nil)
+	ids, err := h.Queries.ListGoalValidators(ctx, g.PersonUserID)
+	if err != nil {
+		return
+	}
+	h.Notify.Send(ctx, ids, NotifMsg{Kind: NotifAgendaAssigned, Title: "Valida la certificación «" + g.Name + "»",
+		Body: g.PersonDisplay + " completó los hitos", Link: "/management?tab=goals"})
 }
 
 // SyncTick corre en el scheduler: los hitos enlazados se marcan aunque nadie

@@ -119,7 +119,7 @@ func TestMetasSinCuenta_RegistroQuePasaALaCuenta(t *testing.T) {
 	due := time.Now().AddDate(0, 2, 0).Format("2006-01-02")
 	email := "ana.rojas." + n + "@cliente.cl"
 	body := map[string]any{"name": "Certificación ITIL", "scope": "person", "personName": " Ana Rojas ", "personEmail": email,
-		"kind": "certification", "bonus": "primary", "dueDate": due, "evidenceRequired": true, "steps": []string{"Inscribirse"}}
+		"kind": "certification", "bonus": "primary", "dueDate": due, "validationRequired": true, "steps": []string{"Inscribirse"}}
 	if w := call(h.CreateGoal, camila, "user", "POST", "/api/goals", body); w.Code != http.StatusForbidden {
 		t.Fatalf("sin ser jefatura: %d %s", w.Code, w.Body)
 	}
@@ -133,7 +133,7 @@ func TestMetasSinCuenta_RegistroQuePasaALaCuenta(t *testing.T) {
 	}
 	var g goalDTO
 	decode(w, &g)
-	if g.PersonID != nil || g.PersonName != "Ana Rojas" || g.PersonEmail != email || !g.CanEdit || !g.CanMark || !g.EvidenceNeeded {
+	if g.PersonID != nil || g.PersonName != "Ana Rojas" || g.PersonEmail != email || !g.CanEdit || !g.CanMark || !g.ValidationRequired {
 		t.Fatalf("meta: %+v", g)
 	}
 	// Es un registro de quien la creó: otra persona del área no la ve.

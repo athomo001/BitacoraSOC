@@ -630,19 +630,16 @@ Spec/16 §4.4 (9.4). Ven Gestión el perfil Gestión, las jefaturas y el admin; 
 | `GET` | `/api/management/indicators` | Gestión — `?by=client\|area&period=month\|prev\|90`: tareas a tiempo, tickets en SLA, atrasos abiertos, tiempos medios, tendencia de 6 meses y carga por área (las jefaturas ven sus áreas) |
 | `GET` | `/api/management/tickets/{id}/actions` | Gestión — las acciones de seguimiento de un ticket |
 | `GET` | `/api/goals` | Sesión — `?mine=1` (Agenda → Mis metas), `?person=` (Mi equipo) o `?client=`; sin filtro, solo Gestión |
-| `POST` | `/api/goals` | Gestión — `{name, scope: client\|area\|person, clientId, areaId, personId, ownerId, kind, bonus, dueDate o estimateBizDays, evidenceRequired, steps}`; las de una persona, su jefatura o el admin. Alguien sin cuenta: `personName` y `personEmail` en vez de `personId` (admin o una jefatura; 409 si el correo ya es de un usuario) |
-| `GET` | `/api/goals/{id}` | Quien ve la meta — con hitos, historial y certificado |
+| `POST` | `/api/goals` | Gestión — `{name, scope: client\|area\|person, clientId, areaId, personId, ownerId, kind, bonus, dueDate o estimateBizDays, validationRequired, steps}`; las de una persona, su jefatura o el admin. Alguien sin cuenta: `personName` y `personEmail` en vez de `personId` (admin o una jefatura; 409 si el correo ya es de un usuario) |
+| `GET` | `/api/goals/{id}` | Quien ve la meta — con hitos e historial |
 | `PUT` | `/api/goals/{id}` | Quien la creó, la jefatura o el admin |
 | `DELETE` | `/api/goals/{id}` | Quien la creó, la jefatura o el admin |
 | `POST` | `/api/goals/{id}/milestones` | `{name, ticketId \| taskId}`: un hito enlazado se marca solo cuando el ticket se resuelve o la tarea se hace |
 | `PUT` | `/api/goals/{id}/milestones/{mid}` | Igual; cambiar el enlace lo deja sin marcar |
 | `DELETE` | `/api/goals/{id}/milestones/{mid}` | Quien edita la meta |
 | `POST` | `/api/goals/{id}/milestones/{mid}/done` | `{done}` — el responsable, a mano (`409 milestone-linked` si está enlazado) |
-| `POST` | `/api/goals/{id}/{action}` | `risk {risk}`, `complete` (`409 evidence-missing` sin el certificado), `confirm` (la jefatura, en las metas con escalón), `not-achieved {reason}` (no lograda: la jefatura de la persona o el admin, nunca la persona) o `reopen {dueDate}`. El estado es `open`, `risk`, `confirm`, `done` (lograda), `failed` (no lograda o vencida; `outcomeReason`) o `not_needed` (la cerró la regla de la persona) |
+| `POST` | `/api/goals/{id}/{action}` | `risk {risk}`, `complete` (`409 validation-missing` si pide la validación de la CSM y no la tiene), `confirm` (la jefatura, en las metas con escalón), `validate` (la CSM que valida a la persona o el admin, nunca la persona, con los hitos hechos; `canValidate`), `not-achieved {reason}` (no lograda: la jefatura de la persona o el admin, nunca la persona) o `reopen {dueDate}`. El estado es `open`, `risk`, `confirm`, `done` (lograda), `failed` (no lograda o vencida; `outcomeReason`) o `not_needed` (la cerró la regla de la persona) |
 | `PUT` | `/api/goal-rules/{userId}` | La jefatura de la persona o el admin — `{rule: all\|any\|primary\|secondary}`: la regla de sus metas con escalón (`bonus`: `primary`, `secondary`, `tertiary`); al lograr la que pide, las demás abiertas quedan `not_needed`, y vuelven a abrirse si deja de estar lograda |
-| `POST` | `/api/goals/{id}/evidence` | El certificado: multipart `file` (PDF o imagen, hasta 10 MB) o `{url}` |
-| `GET` | `/api/goals/{id}/evidence/{eid}` | Descarga el archivo |
-| `DELETE` | `/api/goals/{id}/evidence/{eid}` | Mientras la meta no esté cumplida |
 | `GET` | `/api/playbooks` | Gestión — plantillas con sus acciones (quién y cuántos días antes o después) |
 | `POST` | `/api/playbooks` | Gestión — `{name, description, anchor: apply\|date\|renewal, items}` |
 | `PUT` | `/api/playbooks/{id}` | Gestión — en las que vienen con la app no cambia `anchor` |

@@ -174,8 +174,10 @@ export interface Goal {
   dueDate: string;
   bizDaysLeft: number;
   estimateBizDays?: number;
-  evidenceRequired: boolean;
-  evidenceCount: number;
+  /** Certificación que valida la CSM (antes se adjuntaba el certificado). */
+  validationRequired: boolean;
+  validatedAt?: string;
+  validatedByName?: string;
   manualRisk: boolean;
   autoRisk: boolean;
   state: GoalState;
@@ -194,9 +196,10 @@ export interface Goal {
   canEdit: boolean;
   canMark: boolean;
   canConfirm: boolean;
+  /** La CSM (o el admin) valida la certificación, con los hitos hechos. */
+  canValidate?: boolean;
   steps?: GoalStep[];
   events?: { text: string; at: string; userName?: string }[];
-  evidence?: { id: string; fileName?: string; url?: string; sizeBytes?: number; at: string; uploadedByName?: string }[];
 }
 
 export interface GoalInput {
@@ -213,7 +216,7 @@ export interface GoalInput {
   bonus?: GoalBonus | '';
   dueDate?: string;
   estimateBizDays?: number;
-  evidenceRequired?: boolean;
+  validationRequired?: boolean;
   steps?: string[];
 }
 
@@ -377,20 +380,10 @@ export class ManagementService {
   setRisk(goalId: string, risk: boolean): Promise<Goal> { return this.send('POST', `/api/goals/${goalId}/risk`, { risk }); }
   complete(goalId: string): Promise<Goal> { return this.send('POST', `/api/goals/${goalId}/complete`); }
   confirm(goalId: string): Promise<Goal> { return this.send('POST', `/api/goals/${goalId}/confirm`); }
+  validate(goalId: string): Promise<Goal> { return this.send('POST', `/api/goals/${goalId}/validate`); }
   reopen(goalId: string, dueDate: string): Promise<Goal> { return this.send('POST', `/api/goals/${goalId}/reopen`, { dueDate }); }
   notAchieved(goalId: string, reason: string): Promise<Goal> { return this.send('POST', `/api/goals/${goalId}/not-achieved`, { reason }); }
   async setPersonRule(userId: string, rule: GoalRule): Promise<void> { await this.send('PUT', `/api/goal-rules/${userId}`, { rule }); }
-
-  async addEvidenceFile(goalId: string, file: File): Promise<Goal> {
-    const form = new FormData();
-    form.append('file', file);
-    return (await firstValueFrom(this.http.post<ApiEnvelope<Goal>>(`/api/goals/${goalId}/evidence`, form))).data;
-  }
-  addEvidenceUrl(goalId: string, url: string): Promise<Goal> { return this.send('POST', `/api/goals/${goalId}/evidence`, { url }); }
-  async deleteEvidence(goalId: string, id: string): Promise<Goal> {
-    return (await firstValueFrom(this.http.delete<ApiEnvelope<Goal>>(`/api/goals/${goalId}/evidence/${id}`))).data;
-  }
-  evidenceUrl(goalId: string, id: string): string { return `/api/goals/${goalId}/evidence/${id}`; }
 
   playbooks(): Promise<Playbook[]> { return this.get('/api/playbooks'); }
   savePlaybook(p: { id?: string; name: string; description: string; anchor: PlaybookAnchor; items: PlaybookItem[] }): Promise<Playbook> {

@@ -240,14 +240,14 @@ describe('Detalle de una meta', () => {
   let http: HttpTestingController;
   const GOAL: Goal = {
     id: 'g5', name: 'Certificación CompTIA Security+', scope: 'person', personId: 'u-camila', personName: 'Camila Rojas', kind: 'certification', bonus: 'primary',
-    dueDate: '2026-12-15', bizDaysLeft: 40, evidenceRequired: true, evidenceCount: 0, manualRisk: false, autoRisk: false, state: 'open',
+    dueDate: '2026-12-15', bizDaysLeft: 40, validationRequired: true, manualRisk: false, autoRisk: false, state: 'open',
     milestones: 3, milestonesDone: 2, canEdit: false, canMark: true, canConfirm: false,
     steps: [
       { id: 's1', name: 'Inscripción en el curso', doneAt: '2026-09-28T12:00:00Z', doneByName: 'Camila', doneSource: 'manual' },
       { id: 's2', name: 'Curso terminado', ticketId: 'tk9', ticketNumber: 'TKT-2026-00052', ticketStatus: 'in_progress', ticketArea: 'SOC' },
       { id: 's3', name: 'Examen aprobado' },
     ],
-    events: [], evidence: [],
+    events: [],
   };
 
   beforeEach(() => {
@@ -266,14 +266,15 @@ describe('Detalle de una meta', () => {
     return { fixture, el: fixture.nativeElement as HTMLElement };
   }
 
-  it('un hito enlazado se marca solo y sin certificado no se puede marcar lograda', async () => {
+  it('un hito enlazado se marca solo y sin la validación de la CSM no se puede marcar lograda', async () => {
     const { el } = await render(GOAL);
     const steps = el.querySelectorAll<HTMLButtonElement>('.gt__check');
     expect(steps[1].disabled).toBe(true);
     expect(steps[1].textContent).toContain('TKT-2026-00052');
     expect(steps[1].textContent).toContain('se marca solo');
     expect(el.querySelector('.gt__bono')?.textContent).toContain('primaria');
-    expect(el.textContent).toContain('Falta el certificado');
+    expect(el.textContent).toContain('Falta la validación de la CSM');
+    expect(el.textContent).not.toContain('Validar certificación');
     const done = [...el.querySelectorAll<HTMLButtonElement>('.gt__actions button')].find((b) => b.textContent?.includes('Marcar lograda'))!;
     expect(done.disabled).toBe(true);
     steps[2].click();
@@ -282,8 +283,17 @@ describe('Detalle de una meta', () => {
     req.flush({ data: GOAL });
   });
 
+  it('la CSM valida la certificación con los hitos hechos', async () => {
+    const { el } = await render({ ...GOAL, milestonesDone: 3, canMark: false, canValidate: true });
+    expect(el.querySelector('.gt__note--warn')?.textContent).toContain('Falta que la CSM valide la certificación');
+    ([...el.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent?.includes('Validar certificación')))!.click();
+    http.expectOne('/api/goals/g5/validate').flush({ data: { ...GOAL, state: 'confirm', milestonesDone: 3, validatedAt: '2026-10-23T15:00:00Z', validatedByName: 'Lucía' } });
+    await settle();
+  });
+
   it('la jefatura confirma la meta con escalón', async () => {
-    const { el } = await render({ ...GOAL, state: 'confirm', canConfirm: true, evidenceCount: 1, milestonesDone: 3 });
+    const { el } = await render({ ...GOAL, state: 'confirm', canConfirm: true, validatedAt: '2026-10-19T15:00:00Z', validatedByName: 'Lucía', milestonesDone: 3 });
+    expect(el.textContent).toContain('Validada por Lucía');
     expect(el.querySelector('.gt__note--info')?.textContent).toContain('espera la confirmación de la jefatura');
     ([...el.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent?.includes('Confirmar lograda')))!.click();
     http.expectOne('/api/goals/g5/confirm').flush({ data: { ...GOAL, state: 'done', confirmedByName: 'Jefatura SOC', confirmedAt: '2026-10-20T15:00:00Z' } });
@@ -317,7 +327,7 @@ describe('Detalle de una meta', () => {
 
 describe('Metas por persona', () => {
   let http: HttpTestingController;
-  const base = { kind: 'certification' as const, evidenceRequired: false, evidenceCount: 0, manualRisk: false, autoRisk: false, bizDaysLeft: 30, milestones: 2, milestonesDone: 0, canEdit: true, canMark: true, canConfirm: false };
+  const base = { kind: 'certification' as const, validationRequired: false, manualRisk: false, autoRisk: false, bizDaysLeft: 30, milestones: 2, milestonesDone: 0, canEdit: true, canMark: true, canConfirm: false };
   const GOALS: Goal[] = [
     { ...base, id: 'g3', name: 'Fortinet NSE 1', scope: 'person', personId: 'u-mf', personName: 'Matias Fuentes', bonus: 'tertiary', dueDate: '2027-02-28', state: 'not_needed', personRule: 'any', canRule: true },
     { ...base, id: 'g1', name: 'Btrust BCIE', scope: 'person', personId: 'u-mf', personName: 'Matias Fuentes', bonus: 'primary', dueDate: '2026-12-15', state: 'failed', personRule: 'any', canRule: true },

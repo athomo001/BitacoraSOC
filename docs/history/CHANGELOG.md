@@ -4,6 +4,13 @@ Registro de cambios relevantes del proyecto.
 
 > Las entradas `[Rewrite]` registran avance de la reescritura Go/Angular especificada en `spec/` (ver `spec/02-alcance-y-roadmap.md`), fase por fase. No llevan número de versión de `package.json` porque documentan spec/decisiones/código de un sistema todavía no desplegado — el sistema en producción sigue siendo el de las entradas versionadas de abajo hasta el corte (Fase 14).
 
+## [Rewrite] Certificaciones validadas por la CSM - 2026-10-23
+
+- Pedido del dueño: los certificados ya se guardan en otro sistema, así que una meta de certificación ya no pide subir el PDF o un enlace. En su lugar puede pedir la **validación de la CSM** («Pedir la validación de la CSM» al crearla, encendido por defecto).
+- Con todos los hitos hechos, la meta queda «Falta la validación de la CSM», lo deja en su historial y avisa una vez en la campana a las CSM que la validan: perfil Gestión sin alcance, o con un área de la persona en su alcance. Esa CSM ve la meta y aprieta **Validar certificación**: se cumple sola, o pasa a «Por confirmar» si tiene escalón. Valida la CSM o el admin, nunca la persona ni su jefatura. Reabrirla borra la validación.
+- Modelo (migración 000062): `goals.evidence_required` pasa a `validation_required`, más `validated_at` y `validated_by`. Las certificaciones que ya estaban cumplidas quedan validadas. Se quitan la tabla `goal_evidence` y las rutas `/api/goals/{id}/evidence…`; la acción nueva es `POST /api/goals/{id}/validate`.
+- Pruebas: contra la base (sin validación no se cumple; la persona y su jefatura no validan; la CSM la ve, valida y queda esperando a la jefatura) y la pantalla (la CSM valida con los hitos hechos; «Validada por…»).
+
 ## [Rewrite] La Gestión funciona sin la Ticketera - 2026-10-23
 
 - Pedido del dueño: la Gestión tiene que funcionar sin el módulo de tickets (habrá integraciones con GLPI, y sin integración igual se usa con clientes, metas e indicadores). Antes, con la Ticketera apagada, la pantalla no cargaba: pedía las áreas a `/api/tickets/scope`, que responde 403 sin el módulo. Ahora las áreas vienen en `GET /api/management/meta` (`areas`).

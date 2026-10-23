@@ -25,9 +25,9 @@
     <dd class="gt__adv"><span class="meter"><span [style.width.%]="pct()"></span></span>
       <span class="adm-hint">{{ g.milestones ? i18n.tf('mg.g.progress', g.milestonesDone + ' ' + i18n.t('mg.g.of') + ' ' + g.milestones) : i18n.t('mg.g.noStepsHint') }}</span></dd>
   </dl>
-  @if (g.scope === 'person') { <p class="gt__vis"><mat-icon>visibility</mat-icon>{{ g.personEmail ? i18n.t('mg.g.visExt') : i18n.tf('mg.g.vis', g.personName ?? '') }}</p> }
+  @if (g.scope === 'person') { <p class="gt__vis"><mat-icon>visibility</mat-icon>{{ g.personEmail ? i18n.t('mg.g.visExt') : i18n.tf(g.validationRequired ? 'mg.g.visCsm' : 'mg.g.vis', g.personName ?? '') }}</p> }
   @if (g.state === 'risk' && g.autoRisk) { <p class="gt__note gt__note--warn">{{ i18n.t('mg.g.riskNote') }}</p> }
-  @if (g.milestones && g.milestonesDone === g.milestones && evidenceMissing()) { <p class="gt__note gt__note--warn">{{ i18n.t('mg.g.evNote') }}</p> }
+  @if (g.milestones && g.milestonesDone === g.milestones && validationMissing()) { <p class="gt__note gt__note--warn">{{ i18n.t('mg.g.valNote') }}</p> }
   @if (g.state === 'confirm') { <p class="gt__note gt__note--info">{{ i18n.t('mg.g.confirmNote') }}</p> }
   @if (g.state === 'failed') { <p class="gt__note gt__note--warn">{{ i18n.tf('mg.g.failedWhy', g.outcomeReason || i18n.t('mg.g.expired')) }}</p> }
   @if (g.state === 'not_needed') { <p class="gt__note gt__note--info">{{ i18n.tf('mg.g.notNeededWhy', g.outcomeReason ?? '') }}</p> }
@@ -88,33 +88,19 @@
     }
   </section>
 
-  @if (g.evidenceRequired || g.evidence?.length) {
+  @if (g.validationRequired) {
     <section class="gt__sec">
-      <h3>{{ i18n.t('mg.g.evidence') }}</h3>
-      @for (e of g.evidence; track e.id) {
-        <div class="gt__ev"><mat-icon class="gt__evic">{{ e.url ? 'link' : 'description' }}</mat-icon>
-          <span>
-            @if (e.url) { <a class="mono" [href]="e.url" target="_blank" rel="noopener noreferrer">{{ e.url }}</a> }
-            @else { <button type="button" class="gt__linkbtn" (click)="download(e.id, e.fileName)">{{ e.fileName }}</button> }
-            <span class="adm-hint gt__block">{{ i18n.tf('mg.g.evBy', (e.at | date: 'dd/MM/yyyy') ?? '') }}@if (e.uploadedByName) { · {{ e.uploadedByName }} }</span>
-          </span>
-          @if (g.canMark && g.state !== 'done') {
-            <button type="button" class="adm-icon-btn" [disabled]="busy()" [attr.aria-label]="i18n.t('mg.g.evRemove')" (click)="removeEvidence(e.id)"><mat-icon>close</mat-icon></button>
-          }
-        </div>
-      } @empty {
-        <div class="gt__ev"><mat-icon class="gt__evic">upload_file</mat-icon>
-          <span>{{ i18n.t('mg.g.evMissing') }}<span class="adm-hint gt__block">{{ i18n.t('mg.g.evMissingHint') }}</span></span>
-        </div>
-      }
-      @if (g.canMark && !closed()) {
-        <div class="gt__evadd">
-          <label class="adm-btn gt__file"><mat-icon>upload_file</mat-icon>{{ i18n.t('mg.g.evUpload') }}
-            <input type="file" accept="application/pdf,image/png,image/jpeg,image/webp" (change)="onFile($event)" /></label>
-          <input class="adm-input mono" name="evUrl" maxlength="500" [placeholder]="i18n.t('mg.g.evUrl')" [value]="evUrl()" (input)="evUrl.set(val($event))" />
-          <button type="button" class="adm-btn" [disabled]="busy() || !evUrl().trim()" (click)="addUrl()">{{ i18n.t('mg.g.evAddUrl') }}</button>
-        </div>
-      }
+      <h3>{{ i18n.t('mg.g.validation') }}</h3>
+      <div class="gt__ev"><mat-icon class="gt__evic">{{ g.validatedAt ? 'verified' : 'pending_actions' }}</mat-icon>
+        @if (g.validatedAt) {
+          <span>{{ i18n.tf('mg.g.validatedBy', g.validatedByName || '—') }}<span class="adm-hint gt__block mono">{{ g.validatedAt | date: 'dd/MM/yyyy' }}</span></span>
+        } @else {
+          <span>{{ i18n.t('mg.g.valMissing') }}<span class="adm-hint gt__block">{{ i18n.t('mg.g.valMissingHint') }}</span></span>
+        }
+        @if (g.canValidate) {
+          <button type="button" class="adm-btn adm-btn--primary" [disabled]="busy()" (click)="validate()"><mat-icon>verified</mat-icon>{{ i18n.t('mg.g.validate') }}</button>
+        }
+      </div>
     </section>
   }
 
@@ -144,7 +130,7 @@
     }
     @if (!closed() && g.state !== 'confirm' && g.canMark) {
       <button type="button" class="adm-btn" [disabled]="busy()" (click)="setRisk(!g.manualRisk)">{{ i18n.t(g.manualRisk ? 'mg.g.unrisk' : 'mg.g.markRisk') }}</button>
-      <button type="button" class="adm-btn" [disabled]="busy() || evidenceMissing()" [title]="evidenceMissing() ? i18n.t('mg.g.needEvidence') : ''" (click)="complete()">{{ i18n.t('mg.g.markDone') }}</button>
+      <button type="button" class="adm-btn" [disabled]="busy() || validationMissing()" [title]="validationMissing() ? i18n.t('mg.g.valMissing') : ''" (click)="complete()">{{ i18n.t('mg.g.markDone') }}</button>
     }
     @if (g.canEdit) {
       <button type="button" class="adm-btn" (click)="edit()"><mat-icon>edit</mat-icon>{{ i18n.t('mg.g.edit') }}</button>
