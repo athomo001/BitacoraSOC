@@ -217,6 +217,21 @@ func clientHealth(in healthInput) healthDTO {
 	return h
 }
 
+// ticketsOn: los tickets entran a la Gestión solo con la Ticketera encendida
+// (ahí viven también los de GLPI), como en el Mapa. Apagada, la Gestión sigue
+// con clientes, acciones, metas e indicadores de tareas.
+func (h *ManagementHandler) ticketsOn(ctx context.Context) bool {
+	return featureEnabled(ctx, h.Queries, ticketsFeature)
+}
+
+// withoutTickets borra de la cartera lo que viene de los tickets, para que
+// los que quedaron de antes no pinten la salud de la cuenta.
+func withoutTickets(rows []db.ListManagementClientsRow) {
+	for i := range rows {
+		rows[i].OpenTickets, rows[i].BreachedTickets, rows[i].BreachedFirst = 0, 0, ""
+	}
+}
+
 // ===== Cartera =====
 
 type mgmtClientDTO struct {
@@ -297,6 +312,9 @@ func (h *ManagementHandler) Clients(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		mgmtFail(w, r)
 		return
+	}
+	if !h.ticketsOn(ctx) {
+		withoutTickets(rows)
 	}
 	scope, err := h.clientScope(ctx, u)
 	if err != nil {
@@ -428,6 +446,10 @@ func (h *ManagementHandler) Client(w http.ResponseWriter, r *http.Request) {
 		problemdetails.Write(w, r, http.StatusNotFound, "not-found", "cliente no encontrado")
 		return
 	}
+	withTickets := h.ticketsOn(ctx)
+	if !withTickets {
+		withoutTickets(rows)
+	}
 	row := rows[0]
 	scope, err := h.clientScope(ctx, u)
 	if err != nil {
@@ -443,7 +465,7 @@ func (h *ManagementHandler) Client(w http.ResponseWriter, r *http.Request) {
 
 	// Cifras del mes en curso.
 	from, to := periodRange("month", c)
-	stats, err := h.periodStats(ctx, "client", from, to, c)
+	stats, err := h.periodStats(ctx, "client", from, to, c, withTickets)
 	if err != nil {
 		mgmtFail(w, r)
 		return
@@ -456,10 +478,12 @@ func (h *ManagementHandler) Client(w http.ResponseWriter, r *http.Request) {
 	if ts, err := h.Queries.GetTicketSettings(ctx); err == nil {
 		atRisk = int(ts.AtRiskPercent)
 	}
-	open, err := h.Queries.ListClientOpenTickets(ctx, id)
-	if err != nil {
-		mgmtFail(w, r)
-		return
+	var open []db.ListClientOpenTicketsRow
+	if withTickets {
+		if open, err = h.Queries.ListClientOpenTickets(ctx, id); err != nil {
+			mgmtFail(w, r)
+			return
+		}
 	}
 	for _, t := range open {
 		// Con alcance, solo los tickets de sus áreas.
@@ -503,6 +527,9 @@ func (h *ManagementHandler) Client(w http.ResponseWriter, r *http.Request) {
 	}
 	if tl, err := h.Queries.ListClientTimeline(ctx, id); err == nil {
 		for _, ev := range tl {
+			if !withTickets && (ev.Kind == "ticket_open" || ev.Kind == "ticket_resolved") {
+				continue
+			}
 			d.Timeline = append(d.Timeline, mgmtTimelineDTO{At: ev.At.Time, Kind: ev.Kind, Title: ev.Title, Detail: ev.Detail})
 		}
 	}
@@ -677,6 +704,17 @@ func (h *ManagementHandler) Meta(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	out["people"] = ps
+	// Áreas para las metas por área: no dependen de la Ticketera.
+	areas, err := h.Queries.ListTicketAreas(ctx)
+	if err != nil {
+		mgmtFail(w, r)
+		return
+	}
+	as := make([]ticketAreaDTO, 0, len(areas))
+	for _, a := range areas {
+		as = append(as, ticketAreaDTO{ID: a.ID, Code: a.Code, Name: a.Name, Resolves: a.DefaultProfile != "gestion"})
+	}
+	out["areas"] = as
 	writeData(w, http.StatusOK, out)
 }
 

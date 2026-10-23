@@ -28,6 +28,8 @@ type ClientSummaryOptions struct {
 	Incidents            []ClientSummaryArea
 	Goals                []ClientSummaryGoal
 	Year                 int
+	// NoTickets: la Ticketera está apagada; el resumen son solo las metas.
+	NoTickets bool
 }
 
 // RenderClientSummary usa la plantilla de lista del legacy (la del correo de
@@ -45,16 +47,17 @@ func RenderClientSummary(o ClientSummaryOptions) (string, error) {
       </tr>
     `, e(label))
 	}
-	slaColor := scheduleGreen
-	if o.SLAPct >= 0 && o.SLAPct < o.SLATarget {
-		slaColor = "#F57C00"
-	}
-	sla := `<span style="color:#5B695D;">-</span>`
-	if o.SLAPct >= 0 {
-		sla = fmt.Sprintf(`<span style="display:inline-block; white-space:nowrap; background-color:%s; color:#FFFFFF; padding:6px 12px; border-radius:4px; font-size:13px; line-height:1; font-weight:700;">%d %%</span>`, slaColor, o.SLAPct)
-	}
-	section("INDICADORES DEL PERÍODO")
-	fmt.Fprintf(&rows, `
+	if !o.NoTickets {
+		slaColor := scheduleGreen
+		if o.SLAPct >= 0 && o.SLAPct < o.SLATarget {
+			slaColor = "#F57C00"
+		}
+		sla := `<span style="color:#5B695D;">-</span>`
+		if o.SLAPct >= 0 {
+			sla = fmt.Sprintf(`<span style="display:inline-block; white-space:nowrap; background-color:%s; color:#FFFFFF; padding:6px 12px; border-radius:4px; font-size:13px; line-height:1; font-weight:700;">%d %%</span>`, slaColor, o.SLAPct)
+		}
+		section("INDICADORES DEL PERÍODO")
+		fmt.Fprintf(&rows, `
       <tr>
         <td style="%[1]s font-size:16px; font-weight:700;">Tickets en SLA<br><span style="font-size:13px; font-weight:400; color:#5B695D;">objetivo %[2]d %%</span></td>
         <td colspan="2" style="%[1]s">%[3]s</td>
@@ -63,21 +66,21 @@ func RenderClientSummary(o ClientSummaryOptions) (string, error) {
       </tr>
     `, cell, o.SLATarget, sla, e(o.Response), e(o.Resolution))
 
-	section("INCIDENTES RESUELTOS")
-	if len(o.Incidents) == 0 {
-		fmt.Fprintf(&rows, `
+		section("INCIDENTES RESUELTOS")
+		if len(o.Incidents) == 0 {
+			fmt.Fprintf(&rows, `
       <tr><td colspan="5" style="%s color:#5B695D;">Sin incidentes en el período.</td></tr>
     `, cell)
-	}
-	for _, a := range o.Incidents {
-		n := func(v int) string {
-			if v == 0 {
-				return `<span style="color:#5B695D;">0</span>`
-			}
-			return fmt.Sprintf(`<span style="font-weight:bold; font-size:17px;">%d</span>`, v)
 		}
-		total := a.P1 + a.P2 + a.P3 + a.P4
-		fmt.Fprintf(&rows, `
+		for _, a := range o.Incidents {
+			n := func(v int) string {
+				if v == 0 {
+					return `<span style="color:#5B695D;">0</span>`
+				}
+				return fmt.Sprintf(`<span style="font-weight:bold; font-size:17px;">%d</span>`, v)
+			}
+			total := a.P1 + a.P2 + a.P3 + a.P4
+			fmt.Fprintf(&rows, `
       <tr>
         <td style="%[1]s font-size:16px; font-weight:700;">%[2]s<br><span style="font-size:13px; font-weight:400; color:#5B695D;">%[3]d en total</span></td>
         <td style="%[1]s">P1<br>%[4]s</td>
@@ -86,6 +89,7 @@ func RenderClientSummary(o ClientSummaryOptions) (string, error) {
         <td style="%[1]s text-align:right;">P4<br>%[7]s</td>
       </tr>
     `, cell, e(a.Area), total, n(a.P1), n(a.P2), n(a.P3), n(a.P4))
+		}
 	}
 
 	section("METAS")

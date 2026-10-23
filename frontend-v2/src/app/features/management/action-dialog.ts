@@ -5,6 +5,7 @@ import { ModalComponent } from '../../shared/ui/modal/modal';
 import { ButtonComponent } from '../../shared/ui/button/button';
 import { ActionKind, AgendaMeta, AgendaService } from '../../core/agenda/agenda.service';
 import { I18nService } from '../../core/i18n/i18n.service';
+import { SystemFeaturesService } from '../../core/system-features/system-features.service';
 import { MessageKey } from '../../core/i18n/messages';
 import { problemDetail } from '../../core/http-error';
 import { ACTION_KINDS, kindKey } from './mgmt-format';
@@ -72,10 +73,12 @@ interface Target { id: string; areaId: string; kind: 'level' | 'guard'; label: s
               </select>
             }
           </div>
-          <div class="field">
-            <span>{{ i18n.t('mg.act.ticket') }}</span>
-            <span class="ad__fake" [class.mono]="data.ticket">@if (data.ticket; as t) { <mat-icon>confirmation_number</mat-icon>{{ t.number }} } @else { <span class="ad__muted">{{ i18n.t('mg.act.noTicket') }}</span> }</span>
-          </div>
+          @if (data.ticket || withTickets()) {
+            <div class="field">
+              <span>{{ i18n.t('mg.act.ticket') }}</span>
+              <span class="ad__fake" [class.mono]="data.ticket">@if (data.ticket; as t) { <mat-icon>confirmation_number</mat-icon>{{ t.number }} } @else { <span class="ad__muted">{{ i18n.t('mg.act.noTicket') }}</span> }</span>
+            </div>
+          }
         </div>
         <div class="field">
           <span>{{ i18n.t('mg.act.type') }}</span>
@@ -137,7 +140,9 @@ export class ActionDialogComponent implements OnInit {
   protected readonly data = inject<ActionDialogData>(DIALOG_DATA);
   protected readonly ref = inject(DialogRef<boolean>);
   private readonly agenda = inject(AgendaService);
+  private readonly features = inject(SystemFeaturesService);
 
+  protected readonly withTickets = computed(() => this.features.isEnabled('native_tickets'));
   protected readonly kinds = ACTION_KINDS;
   protected readonly kindKey = kindKey;
   protected readonly suggestions = this.data.ticket ? TICKET_SUGGESTIONS : SUGGESTIONS;

@@ -37,6 +37,10 @@ mat-icon {
   cursor: pointer;
 }
 
+.mc__row--nt {
+  grid-template-columns: 16px minmax(0, 1fr) 50px;
+}
+
 .mc__row--head {
   color: var(--text-muted);
   font-size: 11px;

@@ -5,6 +5,7 @@ import { Indicators, IndicatorRow, ManagementService, MgmtClient, MgmtMeta, Mgmt
 import { I18nService } from '../../core/i18n/i18n.service';
 import { MessageKey } from '../../core/i18n/messages';
 import { PreferencesService } from '../../core/preferences/preferences.service';
+import { SystemFeaturesService } from '../../core/system-features/system-features.service';
 import { problemDetail } from '../../core/http-error';
 import { PERIODS, durationText, monthLong, monthShort, pct } from './mgmt-format';
 import { ExportDialogComponent, ExportDialogData } from './export-dialog';
@@ -42,8 +43,11 @@ export class MgmtIndicatorsComponent {
   private readonly prefs = inject(PreferencesService);
   private readonly dialog = inject(Dialog);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly features = inject(SystemFeaturesService);
   private readonly chartBox = viewChild<ElementRef<HTMLElement>>('chart');
 
+  /** Sin la Ticketera quedan las tareas: sin SLA, tendencia, carga ni tiempos. */
+  protected readonly withTickets = computed(() => this.features.isEnabled('native_tickets'));
   protected readonly periods = PERIODS;
   protected readonly pct = pct;
   protected readonly by = signal<'client' | 'area'>('client');

@@ -3,7 +3,6 @@ import { Dialog } from '@angular/cdk/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { Goal, ManagementService } from '../../core/management/management.service';
 import { OrganizationsService } from '../../core/organizations/organizations.service';
-import { TicketsService } from '../../core/tickets/tickets.service';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { MessageKey } from '../../core/i18n/messages';
 import { problemDetail } from '../../core/http-error';
@@ -55,7 +54,6 @@ export class PersonGoalsComponent {
   protected readonly i18n = inject(I18nService);
   private readonly api = inject(ManagementService);
   private readonly orgs = inject(OrganizationsService);
-  private readonly tickets = inject(TicketsService);
   private readonly dialog = inject(Dialog);
 
   protected readonly tone = GOAL_TONE;
@@ -88,8 +86,8 @@ export class PersonGoalsComponent {
 
   protected async create(): Promise<void> {
     try {
-      const [meta, clients, scope] = await Promise.all([this.api.meta(), this.orgs.list({ clients: true, active: true }), this.tickets.scope()]);
-      const data: GoalDialogData = { meta, clients: clients.map((c) => ({ id: c.id, name: c.name })), areas: scope.areas.map((a) => ({ id: a.id, name: a.name })),
+      const [meta, clients] = await Promise.all([this.api.meta(), this.orgs.list({ clients: true, active: true })]);
+      const data: GoalDialogData = { meta, clients: clients.map((c) => ({ id: c.id, name: c.name })), areas: meta.areas.map((a) => ({ id: a.id, name: a.name })),
         preset: { scope: 'person', personId: this.personId() } };
       this.dialog.open<Goal>(GoalDialogComponent, { data, ariaLabel: this.i18n.t('mg.gf.new') }).closed.subscribe((g) => {
         if (!g) return;

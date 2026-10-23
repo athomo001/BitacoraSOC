@@ -613,7 +613,7 @@ Spec/16 §4.4 (9.4). Ven Gestión el perfil Gestión, las jefaturas y el admin; 
 
 | Método | Ruta | Acceso |
 | --- | --- | --- |
-| `GET` | `/api/management/meta` | Gestión — objetivo del SLA, CSM posibles y las personas a las que el usuario puede ponerles metas |
+| `GET` | `/api/management/meta` | Gestión — objetivo del SLA, CSM posibles, las personas a las que el usuario puede ponerles metas y las áreas (para las metas por área; no dependen de la Ticketera) |
 | `PUT` | `/api/management/settings` | Admin — `{slaTarget}` (50 a 100) |
 | `GET` | `/api/departments/csm-people` | Admin — quienes están marcados como CSM (permiso extra `csm`) |
 | `PUT` | `/api/departments/{id}/csms` | Admin — `{csms: [{id, areas}]}`: las CSM del departamento y a qué áreas va cada una (vacío = todas) |

@@ -125,6 +125,8 @@ export interface MgmtMeta {
   csms: { id: string; name: string }[];
   /** A quién el usuario le puede poner metas por persona. */
   people: MgmtPerson[];
+  /** Áreas para las metas por área (no dependen de la Ticketera). */
+  areas: { id: string; code: string; name: string; resolves: boolean }[];
 }
 
 export type GoalScope = 'client' | 'area' | 'person';
@@ -254,6 +256,8 @@ export interface ClientSummary {
   avgResolutionSecs: number;
   incidents: { area: string; p1: number; p2: number; p3: number; p4: number }[];
   goals: Goal[];
+  /** La Ticketera está encendida (si no, el resumen son las metas). */
+  tickets: boolean;
 }
 
 export interface TicketAction {

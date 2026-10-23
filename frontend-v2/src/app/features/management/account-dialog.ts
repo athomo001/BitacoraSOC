@@ -1,9 +1,10 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
 import { ModalComponent } from '../../shared/ui/modal/modal';
 import { ButtonComponent } from '../../shared/ui/button/button';
 import { ManagementService, MgmtClient, MgmtMeta } from '../../core/management/management.service';
 import { I18nService } from '../../core/i18n/i18n.service';
+import { SystemFeaturesService } from '../../core/system-features/system-features.service';
 import { problemDetail } from '../../core/http-error';
 
 import '../../core/i18n/packs/management';
@@ -36,9 +37,11 @@ export interface AccountDialogData {
             <input name="accStart" class="mono" type="date" [value]="start()" (input)="start.set(val($event))" /></label>
         </div>
         <span class="acc__hint">{{ i18n.t('mg.acc.startHint') }}</span>
-        <label class="field acc__sla"><span>{{ i18n.t('mg.acc.sla') }}</span>
-          <input name="accSla" class="mono" type="number" min="50" max="100" [value]="sla()" (input)="sla.set(val($event))" /></label>
-        <span class="acc__hint">{{ i18n.tf('mg.acc.slaHint', data.meta.slaTarget) }}</span>
+        @if (withTickets()) {
+          <label class="field acc__sla"><span>{{ i18n.t('mg.acc.sla') }}</span>
+            <input name="accSla" class="mono" type="number" min="50" max="100" [value]="sla()" (input)="sla.set(val($event))" /></label>
+          <span class="acc__hint">{{ i18n.tf('mg.acc.slaHint', data.meta.slaTarget) }}</span>
+        }
         @if (error(); as e) { <p class="msg msg--error" role="alert">{{ e }}</p> }
       </form>
       <ng-container app-modal-actions>
@@ -58,7 +61,10 @@ export class AccountDialogComponent {
   protected readonly data = inject<AccountDialogData>(DIALOG_DATA);
   protected readonly ref = inject(DialogRef<boolean>);
   private readonly api = inject(ManagementService);
+  private readonly features = inject(SystemFeaturesService);
 
+  /** El SLA propio es de los tickets: sin la Ticketera no se pide. */
+  protected readonly withTickets = computed(() => this.features.isEnabled('native_tickets'));
   protected readonly csm = signal(this.data.client.csmId ?? '');
   protected readonly start = signal(this.data.client.serviceStart ?? '');
   protected readonly renewal = signal(this.data.client.renewal ?? '');

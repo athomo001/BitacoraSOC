@@ -7,6 +7,7 @@ import { ManagementService, MgmtAction, MgmtClient, MgmtClientDetail, MgmtMeta, 
 import { I18nService } from '../../core/i18n/i18n.service';
 import { MessageKey } from '../../core/i18n/messages';
 import { PreferencesService } from '../../core/preferences/preferences.service';
+import { SystemFeaturesService } from '../../core/system-features/system-features.service';
 import { problemDetail } from '../../core/http-error';
 import { CLOCK_TONE, PRIORITY_SHORT, clockText } from '../../core/tickets/ticket-view';
 import { addDays, isoDay, parseDay } from '../agenda/agenda-format';
@@ -61,7 +62,10 @@ export class MgmtClientsComponent {
   private readonly api = inject(ManagementService);
   private readonly prefs = inject(PreferencesService);
   private readonly dialog = inject(Dialog);
+  private readonly features = inject(SystemFeaturesService);
 
+  /** Sin la Ticketera (ni GLPI), la Gestión sigue sin columnas ni cifras de tickets. */
+  protected readonly withTickets = computed(() => this.features.isEnabled('native_tickets'));
   protected readonly scope = signal<'all' | 'mine'>(this.readScope());
   protected readonly sort = signal<'attn' | 'renew'>('attn');
   protected readonly query = signal('');

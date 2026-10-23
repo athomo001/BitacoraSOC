@@ -6,6 +6,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { Goal, GoalStep, ManagementService } from '../../core/management/management.service';
 import { AgendaService } from '../../core/agenda/agenda.service';
 import { TicketsService } from '../../core/tickets/tickets.service';
+import { SystemFeaturesService } from '../../core/system-features/system-features.service';
 import { OrganizationsService } from '../../core/organizations/organizations.service';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { PreferencesService } from '../../core/preferences/preferences.service';
@@ -44,6 +45,7 @@ export class GoalDetailComponent {
   private readonly api = inject(ManagementService);
   private readonly agenda = inject(AgendaService);
   private readonly tickets = inject(TicketsService);
+  private readonly features = inject(SystemFeaturesService);
   private readonly orgs = inject(OrganizationsService);
   private readonly prefs = inject(PreferencesService);
   private readonly http = inject(HttpClient);
@@ -65,6 +67,8 @@ export class GoalDetailComponent {
   protected readonly failing = signal(false);
   protected readonly failReason = signal('');
 
+  /** Sin la Ticketera, los hitos se enlazan solo a tareas. */
+  protected readonly withTickets = computed(() => this.features.isEnabled('native_tickets'));
   protected readonly goalTone = GOAL_TONE;
   protected readonly goalIcon = GOAL_ICON;
   protected readonly goalStateKey = goalStateKey;
@@ -266,8 +270,8 @@ export class GoalDetailComponent {
     const g = this.goal();
     if (!g) return;
     try {
-      const [meta, clients, scope] = await Promise.all([this.api.meta(), this.orgs.list({ clients: true, active: true }), this.tickets.scope()]);
-      const data: GoalDialogData = { meta, goal: g, clients: clients.map((c) => ({ id: c.id, name: c.name })), areas: scope.areas.map((a) => ({ id: a.id, name: a.name })) };
+      const [meta, clients] = await Promise.all([this.api.meta(), this.orgs.list({ clients: true, active: true })]);
+      const data: GoalDialogData = { meta, goal: g, clients: clients.map((c) => ({ id: c.id, name: c.name })), areas: meta.areas.map((a) => ({ id: a.id, name: a.name })) };
       this.dialog.open<Goal>(GoalDialogComponent, { data, ariaLabel: this.i18n.t('mg.gf.edit') }).closed.subscribe((saved) => {
         if (saved) {
           this.goal.set(saved);

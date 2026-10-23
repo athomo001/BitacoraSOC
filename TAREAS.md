@@ -34,6 +34,7 @@ Lo hecho, lo que está en revisión y lo que falta hasta el corte. Marca con `[x
 - [ ] Revisar en la app guardias del departamento, ubicación y grupos de equipos (2026-10-23): `migrate … up` para la 000061; en Mi equipo → «Departamento CDC» → Guardias, elegir SOC o NOC; en el Inventario crear un grupo en Grupos (pegar coordenadas de Google Maps), elegirlo en dos equipos, editar el grupo y ver que se mueven; en el Mapa, la capa Equipos y «Ver en el mapa» desde la ficha; ponerle cliente a un grupo, elegir ese cliente en el Mapa y abrir un ticket o una entrada de incidente sobre uno de sus equipos para verlo en rojo con su tarjetita — Dueño
 - [ ] Revisar en la app la Calidad (10f): Mi equipo → Calidad en SOC o NOC; elegir a una persona y abrir «Cómo se calcula el puntaje». Con un usuario auditor, Mi equipo muestra solo esa pestaña — Dueño
 - [ ] Revisar en la app la Gestión CSM (9.4, con las notas internas): antes correr `migrate … up` hasta la 000057; ponerle a cada cliente su CSM, inicio del servicio y renovación (Gestión → ficha → Datos de la cuenta) — Dueño y CSM
+- [ ] Revisar en la app la Gestión sin la Ticketera: apagarla en Administración → Módulos, abrir Gestión (Clientes, ficha, Indicadores y Exportar resumen) y ver que carga sin columnas ni cifras de tickets; encenderla de nuevo y ver que vuelven — Dueño
 
 ## Por hacer
 
@@ -46,6 +47,7 @@ Lo hecho, lo que está en revisión y lo que falta hasta el corte. Marca con `[x
 - [x] Metas por persona: agrupadas por persona, escalones primaria/secundaria/terciaria, regla por persona, lograda o no lograda (diseño aprobado y construido 2026-10-21; `migrate … up` para la 000058)
 - [ ] Ubicar en su área y nivel a los usuarios marcados «Sin área» (Administración → Usuarios y grupos → Áreas y nivel); kmateluna va al área CSM — Dueño
 - [x] Gestión CSM: aviso antes del vencimiento de una meta y metas cumplidas por persona en el Resumen mensual (2026-10-21; `migrate … up` para la 000055)
+- [x] La Gestión funciona sin la Ticketera: clientes, acciones, metas e indicadores de tareas, sin nada de tickets (2026-10-23)
 
 ### Paridad con el legacy (revisión y decisiones del dueño, 2026-10-16)
 - [x] Correo «no se hizo el checklist de inicio»: igual al legacy (09:30, a la guardia N1 no hábil y a los N2)

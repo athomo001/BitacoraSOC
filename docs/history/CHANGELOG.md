@@ -4,6 +4,12 @@ Registro de cambios relevantes del proyecto.
 
 > Las entradas `[Rewrite]` registran avance de la reescritura Go/Angular especificada en `spec/` (ver `spec/02-alcance-y-roadmap.md`), fase por fase. No llevan número de versión de `package.json` porque documentan spec/decisiones/código de un sistema todavía no desplegado — el sistema en producción sigue siendo el de las entradas versionadas de abajo hasta el corte (Fase 14).
 
+## [Rewrite] La Gestión funciona sin la Ticketera - 2026-10-23
+
+- Pedido del dueño: la Gestión tiene que funcionar sin el módulo de tickets (habrá integraciones con GLPI, y sin integración igual se usa con clientes, metas e indicadores). Antes, con la Ticketera apagada, la pantalla no cargaba: pedía las áreas a `/api/tickets/scope`, que responde 403 sin el módulo. Ahora las áreas vienen en `GET /api/management/meta` (`areas`).
+- Con la Ticketera apagada, la Gestión deja fuera todo lo de tickets, como el Mapa y el Resumen mensual: los tickets de antes no pintan la salud de la cuenta; sin columnas Tickets y Fuera de SLA en la cartera; sin «Tickets abiertos», SLA ni tiempos en la ficha; sin eventos de tickets en la línea de tiempo; Indicadores con «Tareas a tiempo» y «Atrasos abiertos» (sin tendencia del SLA, carga por área ni objetivo de SLA); sin SLA propio en Datos de la cuenta; hitos enlazados solo a tareas; el resumen del cliente (pantalla, PDF y correo) con las metas (`spec/16` §4.4).
+- Pruebas: contra la base (con la Ticketera apagada: la salud sin el ticket fuera de SLA, la ficha sin tickets ni eventos de tickets, las áreas en la meta, indicadores sin carga, el resumen y su correo sin incidentes) y las pantallas (Clientes e Indicadores sin la Ticketera, sin pedir `/api/tickets/scope`).
+
 ## [Rewrite] Guardias desde el departamento, ubicación de los equipos en el mapa y grupos de equipos - 2026-10-23
 
 - Pedido del dueño (tres puntos). **Guardias en el departamento**: en Mi equipo, con «Departamento X» elegido, vuelve la pestaña **Guardias** con el selector «Área de la guardia» (las áreas del departamento). Cada guardia sigue siendo de un área; a cada una solo se suma gente de esa área. Escalamiento sigue por área. Sin cambios en el servidor: la jefatura del departamento ya era jefatura de todas sus áreas.

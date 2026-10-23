@@ -373,6 +373,7 @@ const ES = {
   'mg.i.resolution': 'Resolución',
   'mg.i.inChart': 'En el gráfico',
   'mg.i.foot': 'Se calculan solos. Tareas a tiempo: ocurrencias de la Agenda cerradas antes de vencer. Tickets en SLA: resueltos dentro del plazo; la marca vertical es el objetivo. Atrasos abiertos: tareas vencidas sin hacer más tickets abiertos fuera de SLA. 1.ª respuesta y Resolución: tiempo medio de los tickets del período.',
+  'mg.i.footNt': 'Se calculan solos. Tareas a tiempo: ocurrencias de la Agenda cerradas antes de vencer. Atrasos abiertos: tareas vencidas sin hacer.',
   'mg.i.empty': 'Sin datos todavía.',
   'mg.i.sla.setTarget': 'Objetivo general del SLA',
 
@@ -803,6 +804,7 @@ const EN: Record<ManagementKey, string> = {
   'mg.i.resolution': 'Resolution',
   'mg.i.inChart': 'In the chart',
   'mg.i.foot': 'Computed automatically. Tasks on time: Agenda occurrences closed before their due time. Tickets within SLA: resolved within the deadline; the vertical mark is the target. Open delays: overdue tasks plus open tickets out of SLA. First response and Resolution: average time of the period’s tickets.',
+  'mg.i.footNt': 'Computed automatically. Tasks on time: Agenda occurrences closed before their due time. Open delays: overdue tasks not yet done.',
   'mg.i.empty': 'No data yet.',
   'mg.i.sla.setTarget': 'General SLA target',
 

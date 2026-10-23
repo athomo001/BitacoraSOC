@@ -12,14 +12,16 @@
       <button type="button" class="seg" [attr.aria-pressed]="sort() === 'attn'" (click)="sort.set('attn')">{{ i18n.t('mg.sort.attn') }}</button>
       <button type="button" class="seg" [attr.aria-pressed]="sort() === 'renew'" (click)="sort.set('renew')">{{ i18n.t('mg.sort.renew') }}</button>
     </div>
-    <div class="mc__row mc__row--head" aria-hidden="true">
+    <div class="mc__row mc__row--head" [class.mc__row--nt]="!withTickets()" aria-hidden="true">
       <span></span><span>{{ i18n.t('mg.col.client') }}</span>
-      <span class="mc__num" [title]="i18n.t('mg.col.ticketsHint')">{{ i18n.t('mg.col.tickets') }}</span>
-      <span class="mc__num" [title]="i18n.t('mg.col.slaHint')">{{ i18n.t('mg.col.sla') }}</span>
+      @if (withTickets()) {
+        <span class="mc__num" [title]="i18n.t('mg.col.ticketsHint')">{{ i18n.t('mg.col.tickets') }}</span>
+        <span class="mc__num" [title]="i18n.t('mg.col.slaHint')">{{ i18n.t('mg.col.sla') }}</span>
+      }
       <span class="mc__num" [title]="i18n.t('mg.col.lateHint')">{{ i18n.t('mg.col.late') }}</span>
     </div>
     @for (c of list(); track c.id) {
-      <button type="button" class="mc__row" [attr.aria-current]="selected() === c.id" (click)="select(c.id)">
+      <button type="button" class="mc__row" [class.mc__row--nt]="!withTickets()" [attr.aria-current]="selected() === c.id" (click)="select(c.id)">
         <mat-icon class="text-{{ healthTone[c.health.state] }}" [attr.aria-label]="i18n.t(healthKey(c.health.state))">{{ healthIcon[c.health.state] }}</mat-icon>
         <span class="mc__cell">
           <b>{{ c.name }}</b>@if (scope() === 'all' && !c.mine && c.csmName) { <span class="adm-hint"> ({{ c.csmName }})</span> }
@@ -32,8 +34,10 @@
             }
           </span>
         </span>
-        <span class="mc__num" [class.mc__zero]="!c.openTickets">{{ c.openTickets }}</span>
-        <span class="mc__num" [class.text-bad]="c.breached" [class.mc__zero]="!c.breached">{{ c.breached }}</span>
+        @if (withTickets()) {
+          <span class="mc__num" [class.mc__zero]="!c.openTickets">{{ c.openTickets }}</span>
+          <span class="mc__num" [class.text-bad]="c.breached" [class.mc__zero]="!c.breached">{{ c.breached }}</span>
+        }
         <span class="mc__num" [class.text-warn]="c.lateActions" [class.mc__zero]="!c.lateActions">{{ c.lateActions }}</span>
       </button>
     } @empty {
@@ -60,7 +64,9 @@
           <p class="mc__state"><mat-icon class="text-{{ healthTone[c.health.state] }}">{{ healthIcon[c.health.state] }}</mat-icon>
             <span><b>{{ i18n.t(healthKey(c.health.state)) }}</b>@if (c.health.reasons[0]) {: {{ reason(c) }}}</span></p>
           <dl class="mc__comps">
-            <dt><mat-icon class="text-{{ healthTone[c.health.tickets.state] }}">{{ healthIcon[c.health.tickets.state] }}</mat-icon>{{ i18n.t('mg.c.tickets') }}</dt><dd>{{ ticketsText(c) }}</dd>
+            @if (withTickets()) {
+              <dt><mat-icon class="text-{{ healthTone[c.health.tickets.state] }}">{{ healthIcon[c.health.tickets.state] }}</mat-icon>{{ i18n.t('mg.c.tickets') }}</dt><dd>{{ ticketsText(c) }}</dd>
+            }
             <dt><mat-icon class="text-{{ healthTone[c.health.contact.state] }}">{{ healthIcon[c.health.contact.state] }}</mat-icon>{{ i18n.t('mg.c.contact') }}</dt><dd>{{ contact(c) }}</dd>
             <dt><mat-icon class="text-{{ healthTone[c.health.keyTasks.state] }}">{{ healthIcon[c.health.keyTasks.state] }}</mat-icon>{{ i18n.t('mg.c.key') }}</dt><dd>{{ keyText(c) }}</dd>
           </dl>
@@ -105,10 +111,14 @@
 
       <div class="mc__figs">
         <span><span class="adm-hint">{{ i18n.t('mg.f.onTime') }}</span><b>{{ pct(d.figures.onTimePct) }}</b></span>
-        <span><span class="adm-hint">{{ i18n.t('mg.f.sla') }}</span><b [class.text-warn]="d.figures.slaPct >= 0 && d.figures.slaPct < d.figures.slaTarget">{{ pct(d.figures.slaPct) }}</b><span class="adm-hint">{{ i18n.tf('mg.f.target', d.figures.slaTarget) }}</span></span>
+        @if (withTickets()) {
+          <span><span class="adm-hint">{{ i18n.t('mg.f.sla') }}</span><b [class.text-warn]="d.figures.slaPct >= 0 && d.figures.slaPct < d.figures.slaTarget">{{ pct(d.figures.slaPct) }}</b><span class="adm-hint">{{ i18n.tf('mg.f.target', d.figures.slaTarget) }}</span></span>
+        }
         <span><span class="adm-hint">{{ i18n.t('mg.f.late') }}</span><b [class.text-bad]="d.figures.openLate">{{ d.figures.openLate }}</b></span>
-        <span [title]="i18n.t('mg.f.responseHint')"><span class="adm-hint">{{ i18n.t('mg.f.response') }}</span><b>{{ dur(d.figures.avgResponseSecs) }}</b></span>
-        <span [title]="i18n.t('mg.f.resolutionHint')"><span class="adm-hint">{{ i18n.t('mg.f.resolution') }}</span><b>{{ dur(d.figures.avgResolutionSecs) }}</b></span>
+        @if (withTickets()) {
+          <span [title]="i18n.t('mg.f.responseHint')"><span class="adm-hint">{{ i18n.t('mg.f.response') }}</span><b>{{ dur(d.figures.avgResponseSecs) }}</b></span>
+          <span [title]="i18n.t('mg.f.resolutionHint')"><span class="adm-hint">{{ i18n.t('mg.f.resolution') }}</span><b>{{ dur(d.figures.avgResolutionSecs) }}</b></span>
+        }
       </div>
 
       <div class="adm-tabs" role="tablist">
@@ -142,18 +152,20 @@
             </div></div>
         </div>
       } @else {
-        <section class="mc__sec">
-          <h3>{{ i18n.t('mg.s.tickets') }} <span class="mc__n">{{ d.tickets.length }}</span></h3>
-          @for (t of d.tickets; track t.id) {
-            <div class="mc__tr mc__tr--t">
-              <span class="mc__main"><a class="mono mc__tid" routerLink="/tickets" [queryParams]="{ id: t.id }">{{ t.number }}</a>{{ t.title }}</span>
-              <span class="mc__area">{{ t.area }}</span>
-              <b class="mono">{{ prioShort[t.priority] }}</b>
-              <span class="mc__when text-{{ slaTone(t) }}">{{ slaText(t) }}</span>
-              <button type="button" class="adm-icon-btn" [title]="i18n.tf('mg.a.follow', t.number)" [attr.aria-label]="i18n.tf('mg.a.follow', t.number)" (click)="newAction(t)"><mat-icon>add_task</mat-icon></button>
-            </div>
-          } @empty { <p class="mc__none">{{ i18n.t('mg.s.noTickets') }}</p> }
-        </section>
+        @if (withTickets()) {
+          <section class="mc__sec">
+            <h3>{{ i18n.t('mg.s.tickets') }} <span class="mc__n">{{ d.tickets.length }}</span></h3>
+            @for (t of d.tickets; track t.id) {
+              <div class="mc__tr mc__tr--t">
+                <span class="mc__main"><a class="mono mc__tid" routerLink="/tickets" [queryParams]="{ id: t.id }">{{ t.number }}</a>{{ t.title }}</span>
+                <span class="mc__area">{{ t.area }}</span>
+                <b class="mono">{{ prioShort[t.priority] }}</b>
+                <span class="mc__when text-{{ slaTone(t) }}">{{ slaText(t) }}</span>
+                <button type="button" class="adm-icon-btn" [title]="i18n.tf('mg.a.follow', t.number)" [attr.aria-label]="i18n.tf('mg.a.follow', t.number)" (click)="newAction(t)"><mat-icon>add_task</mat-icon></button>
+              </div>
+            } @empty { <p class="mc__none">{{ i18n.t('mg.s.noTickets') }}</p> }
+          </section>
+        }
         <section class="mc__sec">
           <h3>{{ i18n.t('mg.s.actions') }} <span class="mc__n">{{ d.actions.length }}</span></h3>
           @for (a of d.actions; track a.occurrenceId) {

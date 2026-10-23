@@ -81,6 +81,7 @@ func TestManagement_SaludMetasYPlantillas(t *testing.T) {
 	netics := id(`INSERT INTO organizations (name, code) VALUES ('Netics '||$1, 'net'||$1) RETURNING id`, n)
 	// La Gestión se usa desde hace 90 días (si no, todos quedarían con la línea base de hoy).
 	exec(`UPDATE management_settings SET started_on = CURRENT_DATE - 90`)
+	exec(`UPDATE system_features SET is_enabled = true WHERE code = 'native_tickets'`)
 
 	rec := &recordedAudit{}
 	auditLog := audit.NewLogger(rec, slog.Default())
@@ -367,5 +368,43 @@ func TestManagement_SaludMetasYPlantillas(t *testing.T) {
 	decode(w, &ind)
 	if len(ind.Rows) != 1 || ind.Rows[0].ID != soc {
 		t.Fatalf("la jefatura del SOC ve su área: %s", w.Body)
+	}
+
+	// Sin la Ticketera (sin integración con GLPI), la Gestión sigue: clientes,
+	// acciones, metas e indicadores de tareas, sin nada de tickets.
+	exec(`UPDATE system_features SET is_enabled = false WHERE code = 'native_tickets'`)
+	exec(`UPDATE tickets SET status = 'in_progress', resolved_at = NULL WHERE id = $1`, tk)
+	if c := clientOf(lucia, casinos); c.OpenTickets != 0 || c.Breached != 0 || c.Health.Tickets.Breached != 0 || strings.Contains(fmt.Sprint(c.Health.Reasons), "ticketBreached") {
+		t.Fatalf("sin la Ticketera, los tickets no pintan la salud: %+v", c)
+	}
+	w = call(h.Client, lucia, "GET", "/", nil, "id", casinos.String())
+	detail = mgmtClientDetailDTO{}
+	decode(w, &detail)
+	if len(detail.Tickets) != 0 || len(detail.Actions) == 0 || strings.Contains(w.Body.String(), `"ticket_open"`) {
+		t.Fatalf("ficha sin la Ticketera: %s", w.Body)
+	}
+	w = call(h.Meta, lucia, "GET", "/", nil)
+	var meta struct{ Areas []ticketAreaDTO }
+	decode(w, &meta)
+	if len(meta.Areas) == 0 {
+		t.Fatalf("las áreas de las metas no dependen de la Ticketera: %s", w.Body)
+	}
+	w = call(h.Indicators, lucia, "GET", "/api/management/indicators?by=client&period=month", nil)
+	var noTk struct {
+		Rows []mgmtIndicatorRowDTO
+		Load []mgmtLoadDTO
+	}
+	decode(w, &noTk)
+	if w.Code != 200 || len(noTk.Load) != 0 || len(noTk.Rows) == 0 {
+		t.Fatalf("indicadores sin la Ticketera: %d %s", w.Code, w.Body)
+	}
+	w = call(h.Summary, lucia, "GET", "/?period=month", nil, "id", casinos.String())
+	sum = mgmtSummaryDTO{}
+	decode(w, &sum)
+	if sum.Tickets || len(sum.Incidents) != 0 || len(sum.Goals) == 0 {
+		t.Fatalf("resumen sin la Ticketera: %s", w.Body)
+	}
+	if html, _, err := (&ManagementHandler{Notify: &Notifier{Queries: q}}).summaryMail(ctx, sum); err != nil || strings.Contains(html, "INCIDENTES") || !strings.Contains(html, "METAS") {
+		t.Fatalf("correo del resumen sin la Ticketera: %v", err)
 	}
 }

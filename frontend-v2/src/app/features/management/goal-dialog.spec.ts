@@ -13,7 +13,7 @@ describe('Nueva meta para una persona', () => {
 
   function render(meta: Partial<MgmtMeta>) {
     const data: GoalDialogData = {
-      meta: { slaTarget: 95, me: 'u-adm', admin: false, gestion: false, leadAreas: [], csms: [], people: [], ...meta },
+      meta: { slaTarget: 95, me: 'u-adm', admin: false, gestion: false, leadAreas: [], csms: [], people: [], areas: [], ...meta },
       clients: [], areas: [], preset: { scope: 'person' },
     };
     TestBed.configureTestingModule({

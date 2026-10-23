@@ -63,19 +63,22 @@ func (s periodStat) slaPct() int {
 	return -1
 }
 
-// periodStats junta tickets y tareas del período por cliente o por área.
-func (h *ManagementHandler) periodStats(ctx context.Context, by string, from, to time.Time, c mgmtClock) (map[uuid.UUID]periodStat, error) {
+// periodStats junta tickets y tareas del período por cliente o por área
+// (sin la Ticketera, solo las tareas).
+func (h *ManagementHandler) periodStats(ctx context.Context, by string, from, to time.Time, c mgmtClock, withTickets bool) (map[uuid.UUID]periodStat, error) {
 	out := map[uuid.UUID]periodStat{}
-	rows, err := h.Queries.TicketPeriodStats(ctx, db.TicketPeriodStatsParams{By: by,
-		FromAt: pgtype.Timestamptz{Time: c.instant(from), Valid: true}, ToAt: pgtype.Timestamptz{Time: c.instant(to.AddDate(0, 0, 1)), Valid: true}})
-	if err != nil {
-		return nil, err
-	}
-	for _, r := range rows {
-		s := out[r.KeyID]
-		s.resolved, s.withSLA, s.inSLA, s.created = int(r.Resolved), int(r.WithSla), int(r.InSla), int(r.Created)
-		s.avgResponse, s.avgResolution = r.AvgResponseSecs, r.AvgResolutionSecs
-		out[r.KeyID] = s
+	if withTickets {
+		rows, err := h.Queries.TicketPeriodStats(ctx, db.TicketPeriodStatsParams{By: by,
+			FromAt: pgtype.Timestamptz{Time: c.instant(from), Valid: true}, ToAt: pgtype.Timestamptz{Time: c.instant(to.AddDate(0, 0, 1)), Valid: true}})
+		if err != nil {
+			return nil, err
+		}
+		for _, r := range rows {
+			s := out[r.KeyID]
+			s.resolved, s.withSLA, s.inSLA, s.created = int(r.Resolved), int(r.WithSla), int(r.InSla), int(r.Created)
+			s.avgResponse, s.avgResolution = r.AvgResponseSecs, r.AvgResolutionSecs
+			out[r.KeyID] = s
+		}
 	}
 	occs, err := h.Queries.ListAgendaOccurrencesForStats(ctx, db.ListAgendaOccurrencesForStatsParams{FromDay: pgDate(from), ToDay: pgDate(to)})
 	if err != nil {
@@ -150,15 +153,19 @@ func (h *ManagementHandler) Indicators(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	from, to := periodRange(period, c)
-	stats, err := h.periodStats(ctx, by, from, to, c)
+	// Sin la Ticketera quedan las tareas: sin SLA, tendencia ni carga.
+	withTickets := h.ticketsOn(ctx)
+	stats, err := h.periodStats(ctx, by, from, to, c, withTickets)
 	if err != nil {
 		mgmtFail(w, r)
 		return
 	}
-	breached, err := h.Queries.OpenBreachedTickets(ctx, db.OpenBreachedTicketsParams{By: by, Now: pgtype.Timestamptz{Time: c.now, Valid: true}})
-	if err != nil {
-		mgmtFail(w, r)
-		return
+	var breached []db.OpenBreachedTicketsRow
+	if withTickets {
+		if breached, err = h.Queries.OpenBreachedTickets(ctx, db.OpenBreachedTicketsParams{By: by, Now: pgtype.Timestamptz{Time: c.now, Valid: true}}); err != nil {
+			mgmtFail(w, r)
+			return
+		}
 	}
 	open := map[uuid.UUID]int{}
 	for _, b := range breached {
@@ -169,11 +176,13 @@ func (h *ManagementHandler) Indicators(w http.ResponseWriter, r *http.Request) {
 	for i := range months {
 		months[i] = monthStart.AddDate(0, i, 0).Format("2006-01")
 	}
-	trendRows, err := h.Queries.TicketSLAByMonth(ctx, db.TicketSLAByMonthParams{By: by, Tz: c.ac.loc.String(),
-		FromAt: pgtype.Timestamptz{Time: c.instant(monthStart), Valid: true}, ToAt: pgtype.Timestamptz{Time: c.now, Valid: true}})
-	if err != nil {
-		mgmtFail(w, r)
-		return
+	var trendRows []db.TicketSLAByMonthRow
+	if withTickets {
+		if trendRows, err = h.Queries.TicketSLAByMonth(ctx, db.TicketSLAByMonthParams{By: by, Tz: c.ac.loc.String(),
+			FromAt: pgtype.Timestamptz{Time: c.instant(monthStart), Valid: true}, ToAt: pgtype.Timestamptz{Time: c.now, Valid: true}}); err != nil {
+			mgmtFail(w, r)
+			return
+		}
 	}
 	trend := map[uuid.UUID]map[string]int{}
 	for _, t := range trendRows {
@@ -235,24 +244,26 @@ func (h *ManagementHandler) Indicators(w http.ResponseWriter, r *http.Request) {
 		rows = append(rows, row)
 	}
 	// Carga por área: tickets creados en el período, de todos los clientes.
-	areaStats := stats
-	if by != "area" {
-		if areaStats, err = h.periodStats(ctx, "area", from, to, c); err != nil {
+	if withTickets {
+		areaStats := stats
+		if by != "area" {
+			if areaStats, err = h.periodStats(ctx, "area", from, to, c, true); err != nil {
+				mgmtFail(w, r)
+				return
+			}
+		}
+		areas, err := h.Queries.ListTicketAreas(ctx)
+		if err != nil {
 			mgmtFail(w, r)
 			return
 		}
-	}
-	areas, err := h.Queries.ListTicketAreas(ctx)
-	if err != nil {
-		mgmtFail(w, r)
-		return
-	}
-	for _, a := range areas {
-		if a.DefaultProfile == "gestion" {
-			continue
+		for _, a := range areas {
+			if a.DefaultProfile == "gestion" {
+				continue
+			}
+			s := areaStats[a.ID]
+			load = append(load, mgmtLoadDTO{ID: a.ID, Name: a.Name, Tickets: s.created, SLAPct: s.slaPct()})
 		}
-		s := areaStats[a.ID]
-		load = append(load, mgmtLoadDTO{ID: a.ID, Name: a.Name, Tickets: s.created, SLAPct: s.slaPct()})
 	}
 	writeData(w, http.StatusOK, map[string]any{"by": by, "period": period, "from": agenda.FormatDate(from), "to": agenda.FormatDate(to),
 		"months": months, "slaTarget": settings.SlaTarget, "rows": rows, "load": load})
@@ -278,6 +289,8 @@ type mgmtSummaryDTO struct {
 		P4   int    `json:"p4"`
 	} `json:"incidents"`
 	Goals []goalDTO `json:"goals"`
+	// Tickets: la Ticketera está encendida (si no, el resumen son las metas).
+	Tickets bool `json:"tickets"`
 }
 
 func (h *ManagementHandler) summary(ctx context.Context, u agendaUser, id uuid.UUID, period string) (mgmtSummaryDTO, bool, error) {
@@ -301,14 +314,15 @@ func (h *ManagementHandler) summary(ctx context.Context, u agendaUser, id uuid.U
 		period = "month"
 	}
 	from, to := periodRange(period, c)
-	stats, err := h.periodStats(ctx, "client", from, to, c)
+	withTickets := h.ticketsOn(ctx)
+	stats, err := h.periodStats(ctx, "client", from, to, c, withTickets)
 	if err != nil {
 		return mgmtSummaryDTO{}, false, err
 	}
 	s := stats[id]
 	d := mgmtSummaryDTO{ClientID: id, ClientName: rows[0].Name, Period: period, From: agenda.FormatDate(from), To: agenda.FormatDate(to),
 		SLAPct: s.slaPct(), SLATarget: slaTargetFor(rows[0], settings), AvgResponseSecs: s.avgResponse, AvgResolutionSecs: s.avgResolution,
-		Goals: []goalDTO{}}
+		Goals: []goalDTO{}, Tickets: withTickets}
 	d.Incidents = []struct {
 		Area string `json:"area"`
 		P1   int    `json:"p1"`
@@ -316,10 +330,12 @@ func (h *ManagementHandler) summary(ctx context.Context, u agendaUser, id uuid.U
 		P3   int    `json:"p3"`
 		P4   int    `json:"p4"`
 	}{}
-	inc, err := h.Queries.ClientResolvedIncidents(ctx, db.ClientResolvedIncidentsParams{ClientID: id,
-		FromAt: pgtype.Timestamptz{Time: c.instant(from), Valid: true}, ToAt: pgtype.Timestamptz{Time: c.instant(to.AddDate(0, 0, 1)), Valid: true}})
-	if err != nil {
-		return d, false, err
+	var inc []db.ClientResolvedIncidentsRow
+	if withTickets {
+		if inc, err = h.Queries.ClientResolvedIncidents(ctx, db.ClientResolvedIncidentsParams{ClientID: id,
+			FromAt: pgtype.Timestamptz{Time: c.instant(from), Valid: true}, ToAt: pgtype.Timestamptz{Time: c.instant(to.AddDate(0, 0, 1)), Valid: true}}); err != nil {
+			return d, false, err
+		}
 	}
 	for _, x := range inc {
 		if n := len(d.Incidents); n == 0 || d.Incidents[n-1].Area != x.AreaName {
@@ -473,7 +489,7 @@ func (h *ManagementHandler) summaryMail(ctx context.Context, d mgmtSummaryDTO) (
 	name, logo := h.Notify.brand(ctx)
 	opts := mailtpl.ClientSummaryOptions{Title: "Resumen de servicio · " + d.ClientName, PeriodLabel: spanishPeriod(d), LogoSrc: logo, BrandName: name,
 		SLAPct: d.SLAPct, SLATarget: int(d.SLATarget), Response: formatDuration(d.AvgResponseSecs), Resolution: formatDuration(d.AvgResolutionSecs),
-		Year: h.now().Year()}
+		Year: h.now().Year(), NoTickets: !d.Tickets}
 	for _, x := range d.Incidents {
 		opts.Incidents = append(opts.Incidents, mailtpl.ClientSummaryArea{Area: x.Area, P1: x.P1, P2: x.P2, P3: x.P3, P4: x.P4})
 	}

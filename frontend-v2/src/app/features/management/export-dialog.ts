@@ -21,7 +21,8 @@ export interface ExportDialogData {
 
 /**
  * Exportar resumen (spec/16 §4.4.4): SLA del período, tiempos medios,
- * incidentes resueltos por área y prioridad, y metas. «Descargar PDF» usa la
+ * incidentes resueltos por área y prioridad, y metas (sin la Ticketera, solo
+ * las metas). «Descargar PDF» usa la
  * impresión del navegador (como el Resumen mensual) y «Enviar por correo», la
  * plantilla de lista del legacy a los dominios válidos de Reportes.
  */
@@ -47,25 +48,27 @@ export interface ExportDialogData {
         @if (summary(); as s) {
           <article class="ex__doc" id="mgmt-summary">
             <header class="ex__doch"><b>{{ i18n.tf('mg.exp.doc', s.clientName) }}</b><span class="adm-hint">{{ range(s) }}</span></header>
-            <div class="ex__kpis">
-              <div><span class="adm-label">{{ i18n.t('mg.exp.sla') }}</span><b [class.text-warn]="s.slaPct >= 0 && s.slaPct < s.slaTarget" [class.text-ok]="s.slaPct >= s.slaTarget">{{ pct(s.slaPct) }}</b><span class="adm-hint">{{ i18n.tf('mg.f.target', s.slaTarget) }}</span></div>
-              <div><span class="adm-label">{{ i18n.t('mg.f.response') }}</span><b>{{ dur(s.avgResponseSecs) }}</b><span class="adm-hint">{{ i18n.t('mg.exp.avg') }}</span></div>
-              <div><span class="adm-label">{{ i18n.t('mg.f.resolution') }}</span><b>{{ dur(s.avgResolutionSecs) }}</b><span class="adm-hint">{{ i18n.t('mg.exp.avg') }}</span></div>
-            </div>
-            <div class="ex__sec"><span class="adm-label">{{ i18n.t('mg.exp.incidents') }}</span><span class="pill tone-neutral mono">{{ total() }}</span></div>
-            @if (s.incidents.length) {
-              <div class="adm-table-wrap">
-                <table class="adm-table">
-                  <thead><tr><th>{{ i18n.t('mg.exp.area') }}</th><th class="adm-num">P1</th><th class="adm-num">P2</th><th class="adm-num">P3</th><th class="adm-num">P4</th><th class="adm-num">{{ i18n.t('mg.exp.total') }}</th></tr></thead>
-                  <tbody>
-                    @for (x of s.incidents; track x.area) {
-                      <tr><td>{{ x.area }}</td><td class="adm-num mono">{{ x.p1 }}</td><td class="adm-num mono">{{ x.p2 }}</td><td class="adm-num mono">{{ x.p3 }}</td><td class="adm-num mono">{{ x.p4 }}</td><td class="adm-num mono"><b>{{ x.p1 + x.p2 + x.p3 + x.p4 }}</b></td></tr>
-                    }
-                  </tbody>
-                </table>
+            @if (s.tickets) {
+              <div class="ex__kpis">
+                <div><span class="adm-label">{{ i18n.t('mg.exp.sla') }}</span><b [class.text-warn]="s.slaPct >= 0 && s.slaPct < s.slaTarget" [class.text-ok]="s.slaPct >= s.slaTarget">{{ pct(s.slaPct) }}</b><span class="adm-hint">{{ i18n.tf('mg.f.target', s.slaTarget) }}</span></div>
+                <div><span class="adm-label">{{ i18n.t('mg.f.response') }}</span><b>{{ dur(s.avgResponseSecs) }}</b><span class="adm-hint">{{ i18n.t('mg.exp.avg') }}</span></div>
+                <div><span class="adm-label">{{ i18n.t('mg.f.resolution') }}</span><b>{{ dur(s.avgResolutionSecs) }}</b><span class="adm-hint">{{ i18n.t('mg.exp.avg') }}</span></div>
               </div>
-            } @else {
-              <p class="ex__none">{{ i18n.t('mg.exp.noIncidents') }}</p>
+              <div class="ex__sec"><span class="adm-label">{{ i18n.t('mg.exp.incidents') }}</span><span class="pill tone-neutral mono">{{ total() }}</span></div>
+              @if (s.incidents.length) {
+                <div class="adm-table-wrap">
+                  <table class="adm-table">
+                    <thead><tr><th>{{ i18n.t('mg.exp.area') }}</th><th class="adm-num">P1</th><th class="adm-num">P2</th><th class="adm-num">P3</th><th class="adm-num">P4</th><th class="adm-num">{{ i18n.t('mg.exp.total') }}</th></tr></thead>
+                    <tbody>
+                      @for (x of s.incidents; track x.area) {
+                        <tr><td>{{ x.area }}</td><td class="adm-num mono">{{ x.p1 }}</td><td class="adm-num mono">{{ x.p2 }}</td><td class="adm-num mono">{{ x.p3 }}</td><td class="adm-num mono">{{ x.p4 }}</td><td class="adm-num mono"><b>{{ x.p1 + x.p2 + x.p3 + x.p4 }}</b></td></tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              } @else {
+                <p class="ex__none">{{ i18n.t('mg.exp.noIncidents') }}</p>
+            }
             }
             <div class="ex__sec"><span class="adm-label">{{ i18n.t('mg.exp.goals') }}</span></div>
             @for (g of s.goals; track g.id) {

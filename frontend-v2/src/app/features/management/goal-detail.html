@@ -44,7 +44,9 @@
         <input class="adm-input" name="stepName" maxlength="200" [placeholder]="i18n.t('mg.g.stepName')" [value]="stepName()" (input)="stepName.set(val($event))" />
         <div class="gt__chips"><span class="adm-hint">{{ i18n.t('mg.g.linkTo') }}</span>
           <button type="button" class="seg" [attr.aria-pressed]="link() === 'none'" (click)="setLink('none')">{{ i18n.t('mg.g.link.none') }}</button>
-          <button type="button" class="seg" [attr.aria-pressed]="link() === 'ticket'" (click)="setLink('ticket')"><mat-icon>confirmation_number</mat-icon>{{ i18n.t('mg.g.link.ticket') }}</button>
+          @if (withTickets()) {
+            <button type="button" class="seg" [attr.aria-pressed]="link() === 'ticket'" (click)="setLink('ticket')"><mat-icon>confirmation_number</mat-icon>{{ i18n.t('mg.g.link.ticket') }}</button>
+          }
           <button type="button" class="seg" [attr.aria-pressed]="link() === 'task'" (click)="setLink('task')"><mat-icon>event</mat-icon>{{ i18n.t('mg.g.link.task') }}</button>
         </div>
         @if (link() === 'ticket') {

@@ -2,7 +2,6 @@ import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, inject, signal 
 import { MatIconModule } from '@angular/material/icon';
 import { ActivatedRoute, Router } from '@angular/router';
 import { ManagementService, MgmtClient, MgmtMeta } from '../../core/management/management.service';
-import { TicketsService } from '../../core/tickets/tickets.service';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { MessageKey } from '../../core/i18n/messages';
 import { SseService } from '../../core/sse/sse.service';
@@ -74,7 +73,6 @@ export interface MgmtNav { tab: MgmtTab; clientId?: string; playbook?: string; }
 export class ManagementComponent implements OnInit {
   protected readonly i18n = inject(I18nService);
   private readonly api = inject(ManagementService);
-  private readonly tickets = inject(TicketsService);
   private readonly sse = inject(SseService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly route = inject(ActivatedRoute, { optional: true });
@@ -101,10 +99,10 @@ export class ManagementComponent implements OnInit {
     if (tab && TABS.some((t) => t.id === tab)) this.tab.set(tab);
     this.focusClient.set(q?.get('client') ?? null);
     try {
-      const [meta, clients, scope] = await Promise.all([this.api.meta(), this.api.clients(), this.tickets.scope()]);
+      const [meta, clients] = await Promise.all([this.api.meta(), this.api.clients()]);
       this.meta.set(meta);
       this.clients.set(clients);
-      this.areas.set(scope.areas.map((a) => ({ id: a.id, name: a.name, resolves: a.resolves })));
+      this.areas.set(meta.areas.map((a) => ({ id: a.id, name: a.name, resolves: a.resolves })));
     } catch (e) {
       this.error.set(problemDetail(e, this.i18n.t('mg.loadError')));
       return;

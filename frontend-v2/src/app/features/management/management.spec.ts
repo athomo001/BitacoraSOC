@@ -4,6 +4,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideRouter } from '@angular/router';
 import { ManagementComponent } from './management';
 import { SseService } from '../../core/sse/sse.service';
+import { SystemFeaturesService } from '../../core/system-features/system-features.service';
 import { ClientHealth, Goal, Indicators, MgmtClient, MgmtClientDetail, MgmtMeta } from '../../core/management/management.service';
 import { GoalDetailComponent } from './goal-detail';
 import { MgmtIndicatorsComponent } from './mgmt-indicators';
@@ -11,7 +12,11 @@ import { MgmtGoalsComponent } from './mgmt-goals';
 
 const settle = () => new Promise((resolve) => setTimeout(resolve));
 
-const META: MgmtMeta = { slaTarget: 95, me: 'u-lucia', admin: false, gestion: true, leadAreas: [], csms: [{ id: 'u-lucia', name: 'Lucía Vera' }], people: [] };
+const META: MgmtMeta = { slaTarget: 95, me: 'u-lucia', admin: false, gestion: true, leadAreas: [], csms: [{ id: 'u-lucia', name: 'Lucía Vera' }], people: [],
+  areas: [{ id: 'a-soc', code: 'soc', name: 'SOC', resolves: true }] };
+
+/** La Ticketera encendida (los tests que no la quieren la apagan). */
+const ticketsOn = (on = true) => TestBed.inject(SystemFeaturesService).apply({ code: 'native_tickets', isEnabled: on });
 
 function health(state: ClientHealth['state'], over: Partial<ClientHealth> = {}): ClientHealth {
   return {
@@ -54,6 +59,7 @@ describe('Gestión CSM (9.4)', () => {
       providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([]), { provide: SseService, useValue: { connect: () => () => undefined } }],
     });
     http = TestBed.inject(HttpTestingController);
+    ticketsOn();
   });
 
   async function render(first: MgmtClientDetail) {
@@ -61,7 +67,6 @@ describe('Gestión CSM (9.4)', () => {
     fixture.detectChanges();
     http.expectOne('/api/management/meta').flush({ data: META });
     http.expectOne('/api/management/clients').flush({ data: [NETICS, JUNJI, CASINOS] });
-    http.expectOne('/api/tickets/scope').flush({ data: { all: true, myAreas: [], defaultArea: 'soc', areas: [{ id: 'a-soc', code: 'soc', name: 'SOC', resolves: true }] } });
     await settle();
     fixture.detectChanges();
     http.expectOne(`/api/management/clients/${first.client.id}`).flush({ data: first });
@@ -197,7 +202,6 @@ describe('Gestión CSM (9.4)', () => {
     fixture.detectChanges();
     http.expectOne('/api/management/meta').flush({ data: { ...META, gestion: false, leadAreas: ['soc'] } });
     http.expectOne('/api/management/clients').flush({ data: [CASINOS] });
-    http.expectOne('/api/tickets/scope').flush({ data: { all: true, myAreas: [], defaultArea: 'soc', areas: [] } });
     await settle();
     fixture.detectChanges();
     http.expectOne('/api/management/clients/c1').flush({ data: detail(CASINOS) });
@@ -206,6 +210,29 @@ describe('Gestión CSM (9.4)', () => {
     const el = fixture.nativeElement as HTMLElement;
     expect(el.querySelector('.mc')).toBeTruthy();
     expect([...el.querySelectorAll('.adm-tab')].some((b) => b.textContent?.includes('Notas'))).toBe(false);
+  });
+
+  it('sin la Ticketera funciona igual: clientes, acciones y metas, sin columnas ni cifras de tickets', async () => {
+    ticketsOn(false);
+    const fixture = TestBed.createComponent(ManagementComponent);
+    fixture.detectChanges();
+    http.expectOne('/api/management/meta').flush({ data: META });
+    http.expectOne('/api/management/clients').flush({ data: [NETICS] });
+    await settle();
+    fixture.detectChanges();
+    http.expectOne('/api/management/clients/c2').flush({ data: detail(NETICS, {
+      actions: [{ occurrenceId: 'o1', taskId: 't1', name: 'Comité mensual', kind: 'committee', key: false, due: '2026-10-28', late: false, assigneeKind: 'person', area: 'CSM', person: 'Tomás Rivas' }],
+    }) });
+    await settle();
+    fixture.detectChanges();
+    http.expectNone('/api/tickets/scope');
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('.adm-error')).toBeNull();
+    expect(el.querySelector('.mc__row--head')?.textContent).not.toContain('Tickets');
+    expect(el.querySelector('.mc__comps')?.textContent).not.toContain('Tickets');
+    expect(el.querySelector('.mc__figs')?.textContent).not.toContain('SLA');
+    expect([...el.querySelectorAll('.mc__sec h3')].map((h) => h.textContent)).not.toContain(expect.stringContaining('Tickets'));
+    expect(el.querySelector('.mc__tr--a')?.textContent).toContain('Comité mensual');
   });
 });
 
@@ -226,6 +253,7 @@ describe('Detalle de una meta', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({ imports: [GoalDetailComponent], providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])] });
     http = TestBed.inject(HttpTestingController);
+    ticketsOn();
   });
 
   async function render(goal: Goal) {
@@ -363,6 +391,7 @@ describe('Indicadores', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({ imports: [MgmtIndicatorsComponent], providers: [provideHttpClient(), provideHttpClientTesting()] });
     http = TestBed.inject(HttpTestingController);
+    ticketsOn();
   });
 
   it('compara los de SLA más bajo, marca los que están bajo el objetivo y se pueden quitar del gráfico', async () => {
@@ -385,5 +414,21 @@ describe('Indicadores', () => {
     fixture.detectChanges();
     expect(el.querySelectorAll('svg path')).toHaveLength(1);
     expect(el.querySelector('table')?.textContent).toContain('—');
+  });
+
+  it('sin la Ticketera quedan las tareas a tiempo y los atrasos, sin gráficos de SLA ni carga', async () => {
+    ticketsOn(false);
+    const fixture = TestBed.createComponent(MgmtIndicatorsComponent);
+    fixture.componentRef.setInput('meta', { ...META, admin: true });
+    fixture.componentRef.setInput('clients', []);
+    fixture.detectChanges();
+    http.expectOne((r) => r.url === '/api/management/indicators').flush({ data: { ...DATA, load: [] } });
+    await settle();
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('.mi__charts')).toBeNull();
+    expect(el.querySelector('.mi__target')).toBeNull();
+    expect([...el.querySelectorAll('th')].map((t) => t.textContent?.trim())).toHaveLength(3);
+    expect(el.querySelector('tbody tr')?.textContent).toContain('81 %');
   });
 });
