@@ -110,6 +110,8 @@ type agendaUser struct {
 	rank    map[uuid.UUID]int
 	levels  map[uuid.UUID]map[uuid.UUID]int // área → nivel → rango
 	leads   map[uuid.UUID]bool
+	// scope: las áreas que ve en Gestión una CSM con alcance (nil = todo).
+	scope map[uuid.UUID]bool
 }
 
 func loadAgendaUser(ctx context.Context, q *db.Queries) (agendaUser, error) {
@@ -148,6 +150,13 @@ func agendaUserFor(ctx context.Context, q *db.Queries, id uuid.UUID, admin bool)
 		}
 	}
 	u.viewAll = u.admin || u.gestion
+	if u.gestion && !u.admin {
+		scope, err := loadManagementScope(ctx, q, id)
+		if err != nil {
+			return u, err
+		}
+		u.scope = scope
+	}
 	return u, nil
 }
 

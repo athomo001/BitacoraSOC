@@ -40,11 +40,11 @@ describe('ShellComponent', () => {
     delete document.documentElement.dataset['font'];
   });
 
-  async function render(features: { code: string; isEnabled: boolean }[], capabilities: string[] = [], scope: { moduleScope?: string; areas?: string[] } = {}) {
+  async function render(features: { code: string; isEnabled: boolean }[], capabilities: string[] = [], scope: { moduleScope?: string; areas?: string[]; role?: string } = {}) {
     const fixture = TestBed.createComponent(ShellComponent);
     fixture.detectChanges();
     // El usuario lo piden la sesión y los permisos (capacidades de grupo).
-    for (const req of httpMock.match('/api/users/me')) req.flush({ data: { id: '1', username: 'ana.rojas', fullName: 'Ana Rojas', email: 'ana@x.cl', role: 'user' } });
+    for (const req of httpMock.match('/api/users/me')) req.flush({ data: { id: '1', username: 'ana.rojas', fullName: 'Ana Rojas', email: 'ana@x.cl', role: scope.role ?? 'user' } });
     httpMock.expectOne('/api/users/me/capabilities').flush({ data: { moduleScope: scope.moduleScope ?? 'both', capabilities, areas: scope.areas ?? ['soc'] } });
     httpMock.expectOne('/api/system-features').flush({ data: features });
     await fixture.whenStable();
@@ -92,6 +92,14 @@ describe('ShellComponent', () => {
   it('Mi equipo solo aparece para la jefatura de área', async () => {
     const { el } = await render([], ['area:lead']);
     expect(navLabels(el)).toContain('Mi equipo');
+  });
+
+  it('Mi equipo aparece para el auditor, que ve la Calidad', async () => {
+    expect(navLabels((await render([], [], { role: 'auditor' })).el)).toContain('Mi equipo');
+  });
+
+  it('Mi equipo no aparece sin jefatura', async () => {
+    expect(navLabels((await render([])).el)).not.toContain('Mi equipo');
   });
 
   it('tras recargar la página vuelve a pedir el usuario y muestra su nombre al pie de la barra', async () => {

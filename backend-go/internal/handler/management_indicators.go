@@ -197,7 +197,7 @@ func (h *ManagementHandler) Indicators(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		for _, a := range areas {
-			if a.DefaultProfile == "gestion" || !(u.admin || u.gestion || u.leads[a.ID]) {
+			if a.DefaultProfile == "gestion" || !u.seesArea(a.ID) {
 				continue
 			}
 			keys = append(keys, keyName{a.ID, a.Name, settings.SlaTarget})
@@ -208,8 +208,15 @@ func (h *ManagementHandler) Indicators(w http.ResponseWriter, r *http.Request) {
 			mgmtFail(w, r)
 			return
 		}
+		scope, err := h.clientScope(ctx, u)
+		if err != nil {
+			mgmtFail(w, r)
+			return
+		}
 		for _, cl := range clients {
-			keys = append(keys, keyName{cl.ID, cl.Name, slaTargetFor(cl, settings)})
+			if clientAllowed(scope, cl.ID, cl.CsmUserID, u.id) {
+				keys = append(keys, keyName{cl.ID, cl.Name, slaTargetFor(cl, settings)})
+			}
 		}
 	}
 	rows := make([]mgmtIndicatorRowDTO, 0, len(keys))
@@ -285,6 +292,9 @@ func (h *ManagementHandler) summary(ctx context.Context, u agendaUser, id uuid.U
 	rows, err := h.Queries.ListManagementClients(ctx, db.ListManagementClientsParams{Now: pgtype.Timestamptz{Time: c.now, Valid: true},
 		LateBefore: pgDate(c.lateBefore), ClientID: pgUUIDOf(id)})
 	if err != nil || len(rows) == 0 {
+		return mgmtSummaryDTO{}, false, err
+	}
+	if scope, err := h.clientScope(ctx, u); err != nil || !clientAllowed(scope, id, rows[0].CsmUserID, u.id) {
 		return mgmtSummaryDTO{}, false, err
 	}
 	if period != "prev" && period != "90" {

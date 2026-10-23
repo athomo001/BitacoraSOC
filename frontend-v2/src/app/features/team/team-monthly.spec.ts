@@ -10,7 +10,7 @@ const person = (o: Partial<MonthlyPerson>): MonthlyPerson => ({
 });
 
 const VIEW: MonthlyView = {
-  frozen: true, onTimePct: 88, slaPct: 92, previous: { onTimePct: 90, slaPct: 89 },
+  frozen: true, onTimePct: 88, slaPct: 92, previous: { onTimePct: 90, slaPct: 89 }, tickets: true,
   summary: {
     month: '2026-09', areaCode: 'inf', areaName: 'Infraestructura', bizDays: 20, computedAt: '2026-10-01T11:00:00Z',
     people: [
@@ -78,5 +78,35 @@ describe('Mi equipo → Resumen mensual (9.7)', () => {
     await settle();
     fixture.detectChanges();
     expect(el.textContent).toContain('Enviado a 2 correos');
+  });
+
+  it('en un área con Bitácora muestra entradas y calidad; sin Ticketera, no muestra tickets (10f)', async () => {
+    const fixture = TestBed.createComponent(TeamMonthlyComponent);
+    fixture.componentRef.setInput('area', 'soc');
+    fixture.componentRef.setInput('areaName', 'SOC');
+    fixture.detectChanges();
+    const people = [
+      person({ id: 'ana', name: 'Ana Rojas', level: 'N1', entries: 39, quality: 61 }),
+      person({ id: 'luis', name: 'Luis Fuentes', level: 'N1', entries: 4, quality: -1 }),
+    ];
+    http.expectOne((r) => r.url === '/api/team/monthly').flush({ data: {
+      ...VIEW, tickets: false, bitacora: true, previous: { onTimePct: -1, slaPct: -1, quality: 55 },
+      summary: { ...VIEW.summary, areaCode: 'soc', areaName: 'SOC', people, total: person({ name: 'Total SOC', entries: 43, quality: 61 }) },
+    } });
+    await settle();
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    const head = el.querySelector('thead')?.textContent ?? '';
+    expect(head).toContain('Entradas');
+    expect(head).toContain('Calidad');
+    expect(head).not.toContain('Tickets resueltos');
+    expect(el.textContent).not.toContain('Tickets dentro del SLA');
+    expect(el.textContent).toContain('Calidad de registro');
+    expect(el.textContent).toContain('▲ 6 pts');
+    const ana = [...el.querySelectorAll('tbody tr')].find((r) => r.textContent?.includes('Ana Rojas'))!;
+    expect(ana.textContent).toContain('39');
+    expect(ana.querySelector('.tone-warn')?.textContent?.trim()).toBe('61');
+    const luis = [...el.querySelectorAll('tbody tr')].find((r) => r.textContent?.includes('Luis Fuentes'))!;
+    expect(luis.textContent).toContain('—');
   });
 });

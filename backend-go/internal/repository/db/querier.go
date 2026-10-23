@@ -27,6 +27,7 @@ type Querier interface {
 	AddGoalEvidence(ctx context.Context, arg AddGoalEvidenceParams) (uuid.UUID, error)
 	AddGroupAreasByCode(ctx context.Context, arg AddGroupAreasByCodeParams) (int64, error)
 	AddGuardMember(ctx context.Context, arg AddGuardMemberParams) (uuid.UUID, error)
+	AddManagementScope(ctx context.Context, arg AddManagementScopeParams) error
 	AddPolicyStep(ctx context.Context, arg AddPolicyStepParams) (EscalationStep, error)
 	AddRaciLetter(ctx context.Context, arg AddRaciLetterParams) error
 	AddTeamMember(ctx context.Context, arg AddTeamMemberParams) (TeamMember, error)
@@ -36,6 +37,12 @@ type Querier interface {
 	AppendWaitingComment(ctx context.Context, arg AppendWaitingCommentParams) (int64, error)
 	// Solo si ya no tiene servicios, equipos ni activos; el código queda libre.
 	ArchiveOrganization(ctx context.Context, id uuid.UUID) (int64, error)
+	// Borrar y unir áreas (pedido del dueño 2026-10-22, spec/16 §3.3.3): un área
+	// vacía se borra; una con gente o datos se une a otra (todo pasa al destino) y
+	// queda vacía para borrarla.
+	// Lo que tiene un área: su gente (sin contar la jefatura de un departamento)
+	// y sus datos.
+	AreaUsage(ctx context.Context, areaID uuid.UUID) (AreaUsageRow, error)
 	AssetCodeTaken(ctx context.Context, code string) (bool, error)
 	// 409 de spec/04-contratos-api.md: la IP de un activo es su identidad operativa.
 	AssetIPTaken(ctx context.Context, arg AssetIPTakenParams) (bool, error)
@@ -64,11 +71,16 @@ type Querier interface {
 	ClaimShiftReminderSend(ctx context.Context, arg ClaimShiftReminderSendParams) (int64, error)
 	// El comentario reclama las imágenes que subió su autor en ese ticket.
 	ClaimTicketImages(ctx context.Context, arg ClaimTicketImagesParams) (int64, error)
+	ClearAreaShare(ctx context.Context, id uuid.UUID) error
 	ClearAssetIPs(ctx context.Context, assetID uuid.UUID) error
 	ClearAssetResponsibles(ctx context.Context, assetID uuid.UUID) error
 	ClearDefaultTicketSeries(ctx context.Context) error
+	ClearDepartmentAreas(ctx context.Context, departmentID pgtype.UUID) error
+	// Las CSM asignadas a un departamento (al departamento entero o a sus áreas).
+	ClearDepartmentScopes(ctx context.Context, departmentID pgtype.UUID) error
 	ClearEscalationPoolMembers(ctx context.Context, poolID uuid.UUID) error
 	ClearGroupAreas(ctx context.Context, permissionGroupID uuid.UUID) error
+	ClearGroupMembers(ctx context.Context, permissionGroupID uuid.UUID) error
 	ClearPasswordResetToken(ctx context.Context, id uuid.UUID) error
 	// A lo sumo un canal preferido por dueño (índice único parcial del esquema):
 	// marcar uno nuevo desmarca el anterior.
@@ -143,6 +155,9 @@ type Querier interface {
 	CreateComplementUpload(ctx context.Context, arg CreateComplementUploadParams) (CreateComplementUploadRow, error)
 	CreateContact(ctx context.Context, arg CreateContactParams) (uuid.UUID, error)
 	CreateContactChannel(ctx context.Context, arg CreateContactChannelParams) (ContactChannel, error)
+	CreateDepartment(ctx context.Context, name string) (Department, error)
+	// El grupo de jefatura que la app mantiene para el departamento.
+	CreateDepartmentLeadGroup(ctx context.Context, arg CreateDepartmentLeadGroupParams) (uuid.UUID, error)
 	// Fase 9 del roadmap (spec/02-alcance-y-roadmap.md): bitácora — registro
 	// operativo central. HU-7: búsqueda de texto completo con
 	// websearch_to_tsquery, NUNCA to_tsquery directo (rompe con '&'/'!' sueltos),
@@ -237,6 +252,9 @@ type Querier interface {
 	DeactivateUser(ctx context.Context, id uuid.UUID) error
 	DeactivateWindowSeries(ctx context.Context, id uuid.UUID) (int64, error)
 	DecideAssetRequest(ctx context.Context, arg DecideAssetRequestParams) error
+	DeleteArea(ctx context.Context, id uuid.UUID) error
+	// Un área que deja su departamento deja también sus CSM.
+	DeleteAreaScopes(ctx context.Context, areaIds []uuid.UUID) error
 	DeleteAsset(ctx context.Context, id uuid.UUID) error
 	DeleteAssetPolicies(ctx context.Context, assetID pgtype.UUID) error
 	DeleteAssetWithoutHistory(ctx context.Context, arg DeleteAssetWithoutHistoryParams) (int64, error)
@@ -258,7 +276,12 @@ type Querier interface {
 	DeleteComplementFiles(ctx context.Context, complementID uuid.UUID) error
 	DeleteComplementUpload(ctx context.Context, id uuid.UUID) error
 	DeleteContactChannel(ctx context.Context, arg DeleteContactChannelParams) (int64, error)
+	// Sus áreas quedan sin departamento (ON DELETE SET NULL) y su grupo de
+	// jefatura se borra (ON DELETE CASCADE).
+	DeleteDepartment(ctx context.Context, id uuid.UUID) error
 	DeleteDraft(ctx context.Context, arg DeleteDraftParams) (int64, error)
+	// Antes de borrar un área vacía: sus grupos automáticos (solo esa área y sin gente).
+	DeleteEmptyAreaGroups(ctx context.Context, areaID uuid.UUID) error
 	// Borrado real (no soft-delete, HU-7g) — RETURNING para el snapshot de auditoría.
 	DeleteEntry(ctx context.Context, id uuid.UUID) (Entry, error)
 	DeleteEntryTag(ctx context.Context, tag string) (int64, error)
@@ -613,12 +636,15 @@ type Querier interface {
 	ListAreaPeopleGroups(ctx context.Context, areaID uuid.UUID) ([]ListAreaPeopleGroupsRow, error)
 	// Las personas activas de cada área con su nivel en ella (una fila por área y nivel).
 	ListAreaPeopleLevels(ctx context.Context) ([]ListAreaPeopleLevelsRow, error)
+	// El perfil de cada área: la Calidad se ve en las que usan la Bitácora (Operativo).
+	ListAreaProfiles(ctx context.Context) ([]ListAreaProfilesRow, error)
 	ListAreaTicketSeries(ctx context.Context) ([]ListAreaTicketSeriesRow, error)
 	// Las personas de un área (Dotación por área, 9e).
 	ListAreaUserIDs(ctx context.Context, code string) ([]uuid.UUID, error)
 	// Áreas y niveles (000033, spec/16 §3).
 	ListAreas(ctx context.Context) ([]Area, error)
 	// ===== Administración → Áreas y niveles (spec/16, 9b) =====
+	// La jefatura de un departamento no cuenta como grupo del área.
 	ListAreasWithUsage(ctx context.Context) ([]ListAreasWithUsageRow, error)
 	ListAssetEvents(ctx context.Context, assetID uuid.UUID) ([]ListAssetEventsRow, error)
 	ListAssetIPs(ctx context.Context, assetID uuid.UUID) ([]ListAssetIPsRow, error)
@@ -681,6 +707,9 @@ type Querier interface {
 	ListClientServiceIDs(ctx context.Context, organizationID uuid.UUID) ([]uuid.UUID, error)
 	// Línea de tiempo del cliente: tickets, acciones, envíos, metas y plantillas.
 	ListClientTimeline(ctx context.Context, clientID uuid.UUID) ([]ListClientTimelineRow, error)
+	// Los clientes que atienden esas áreas (tienen tickets en ellas): los que ve
+	// una CSM con alcance, además de los suyos.
+	ListClientsWithTicketsInAreas(ctx context.Context, areaIds []uuid.UUID) ([]uuid.UUID, error)
 	ListComplementStorage(ctx context.Context, arg ListComplementStorageParams) ([]ComplementStorage, error)
 	// Complementos (spec/11-complementos.md, Fase 13b).
 	ListComplements(ctx context.Context) ([]Complement, error)
@@ -694,6 +723,10 @@ type Querier interface {
 	// Puede haber más de uno: en el legacy un rol (N2, OL) tenía a veces 2-3
 	// personas a la vez, y todas están de guardia.
 	ListCurrentRotationSlots(ctx context.Context, arg ListCurrentRotationSlotsParams) ([]ListCurrentRotationSlotsRow, error)
+	// La gente del grupo de jefatura de cada departamento.
+	ListDepartmentLeads(ctx context.Context) ([]ListDepartmentLeadsRow, error)
+	// Departamentos (spec/16 §3.5.1, 000060).
+	ListDepartments(ctx context.Context) ([]ListDepartmentsRow, error)
 	// Directorio Global de Contactos (spec/04-contratos-api.md, HU-DIR-1/2).
 	// email/phone están cifrados (AES-256-GCM): la búsqueda por esos campos es por
 	// igualdad exacta contra su índice ciego (email_hash/phone_hash, HMAC), igual
@@ -814,6 +847,9 @@ type Querier interface {
 	// próxima acción. late_before: una pendiente con fecha anterior está
 	// atrasada (hoy, o mañana si ya terminó el horario hábil).
 	ListManagementClients(ctx context.Context, arg ListManagementClientsParams) ([]ListManagementClientsRow, error)
+	// Las áreas que ve una CSM con alcance (por sus departamentos o áreas).
+	ListManagementScopeAreas(ctx context.Context, userID uuid.UUID) ([]uuid.UUID, error)
+	ListManagementScopes(ctx context.Context) ([]ManagementScope, error)
 	// Mapa (#24): cada localidad con coordenadas y lo que hay que revisar en
 	// ella. Un incidente o una ventana sobre un activo cuenta para la localidad
 	// del activo; un ticket, por su lugar (000038). El país solo aparece si
@@ -827,6 +863,8 @@ type Querier interface {
 	ListMapUnitTickets(ctx context.Context, arg ListMapUnitTicketsParams) ([]ListMapUnitTicketsRow, error)
 	// Ventanas de mantenimiento activas ahora en una localidad o sus activos.
 	ListMapUnitWindows(ctx context.Context, unitID uuid.UUID) ([]ListMapUnitWindowsRow, error)
+	// Las personas activas marcadas como CSM (capacidad csm, en su panel).
+	ListMarkedCSMs(ctx context.Context) ([]ListMarkedCSMsRow, error)
 	// Miembros activos de los equipos a resolver, con lo que la tarjeta necesita
 	// mostrar: nombre, especialidad (solo contactos), rol y prioridad.
 	ListMembersForTeams(ctx context.Context, teamIds []uuid.UUID) ([]ListMembersForTeamsRow, error)
@@ -906,6 +944,14 @@ type Querier interface {
 	// Mapa en TV: los mantenimientos en curso con lugar.
 	ListPublicMapWindows(ctx context.Context) ([]ListPublicMapWindowsRow, error)
 	ListPublicTicketComments(ctx context.Context, ticketID uuid.UUID) ([]TicketComment, error)
+	// Días de vacaciones o licencia de cada persona en el período (Dotación).
+	ListQualityAbsences(ctx context.Context, arg ListQualityAbsencesParams) ([]ListQualityAbsencesRow, error)
+	// Los checklists de inicio y cierre: marcan el turno real de cada persona.
+	ListQualityChecks(ctx context.Context, arg ListQualityChecksParams) ([]ListQualityChecksRow, error)
+	// Puntaje de calidad por analista (10f, Mi equipo → Calidad; spec/08 §7).
+	// Las entradas que cuentan: sin el checklist ni lo que entra por API o
+	// complementos.
+	ListQualityEntries(ctx context.Context, arg ListQualityEntriesParams) ([]ListQualityEntriesRow, error)
 	// ===== RACI por cliente (paridad con el legacy: Escalamiento → Matriz RACI) =====
 	// Actividades de un cliente (o de todos), con el nombre del cliente.
 	ListRaciActivities(ctx context.Context, clientID pgtype.UUID) ([]ListRaciActivitiesRow, error)
@@ -938,6 +984,10 @@ type Querier interface {
 	ListSeriesWindows(ctx context.Context, seriesIds []uuid.UUID) ([]ListSeriesWindowsRow, error)
 	// ===== Servicios (módulo SOC) =====
 	ListServices(ctx context.Context, arg ListServicesParams) ([]ListServicesRow, error)
+	// Quienes están en alguna de esas áreas (por cualquier grupo activo).
+	ListSharedAreaMembers(ctx context.Context, codes []string) ([]uuid.UUID, error)
+	// Las áreas que comparten equipo, por departamento (solo los de dos o más).
+	ListSharedSets(ctx context.Context) ([]ListSharedSetsRow, error)
 	ListShiftCheckServices(ctx context.Context, shiftCheckID uuid.UUID) ([]ShiftCheckService, error)
 	ListShiftCheckServicesForReport(ctx context.Context, shiftCheckID uuid.UUID) ([]ListShiftCheckServicesForReportRow, error)
 	ListShiftChecks(ctx context.Context, arg ListShiftChecksParams) ([]ShiftCheck, error)
@@ -953,6 +1003,10 @@ type Querier interface {
 	// Reposición tras reconexión: todo lo publicado después de Last-Event-ID.
 	ListSystemEventsSince(ctx context.Context, arg ListSystemEventsSinceParams) ([]SystemEvent, error)
 	ListSystemFeatures(ctx context.Context) ([]SystemFeature, error)
+	// Mi equipo → Agregar a alguien que ya existe: cuentas activas que todavía
+	// no están en el área, con las áreas en que ya están (el handler deja fuera
+	// a los administradores si quien agrega no lo es).
+	ListTeamCandidates(ctx context.Context, areaID uuid.UUID) ([]ListTeamCandidatesRow, error)
 	ListTeamCoverage(ctx context.Context, teamID uuid.UUID) ([]ListTeamCoverageRow, error)
 	ListTeamGroups(ctx context.Context, arg ListTeamGroupsParams) ([]TeamGroup, error)
 	// Un miembro es un usuario interno O un contacto del directorio (CHECK
@@ -1011,6 +1065,7 @@ type Querier interface {
 	// con un nivel; los grupos («Infra N1», «Jefatura Infra», «Directorio:
 	// escribir») se arman solos.
 	// Los grupos activos de la persona con su forma: áreas, nivel y capacidades.
+	// fixed: la jefatura de un departamento (la mantiene el departamento, no el panel).
 	ListUserGroupShapes(ctx context.Context, userID uuid.UUID) ([]ListUserGroupShapesRow, error)
 	// Todos los grupos activos de una persona con sus áreas (vacío = grupo sin
 	// área): para saber si la jefatura puede tocarla.
@@ -1101,6 +1156,12 @@ type Querier interface {
 	// PATCH /api/config/territorial-labels — merge parcial (jsonb ||): solo pisa
 	// los niveles que vienen en el request, el resto queda como estaba.
 	MergeTerritorialLabels(ctx context.Context, labels []byte) ([]byte, error)
+	// Pasa todos los datos de un área a otra (la gente se mueve aparte, con su
+	// nivel). Las fotos del Resumen mensual del destino se rehacen al abrirlas.
+	MoveAreaData(ctx context.Context, arg MoveAreaDataParams) error
+	// Los grupos hechos a mano que incluían el área origen pasan a incluir el
+	// destino; los automáticos del origen que quedaron sin gente se borran.
+	MoveAreaGroups(ctx context.Context, arg MoveAreaGroupsParams) error
 	MoveAssetToOrganization(ctx context.Context, arg MoveAssetToOrganizationParams) (int64, error)
 	// Pierden la marca de preferido: el principal ya puede tener el suyo (a lo
 	// sumo uno por dueño, uq_contact_channels_preferred_contact).
@@ -1166,6 +1227,8 @@ type Querier interface {
 	RemoveTicketResolver(ctx context.Context, arg RemoveTicketResolverParams) (int64, error)
 	RemoveUserPermissionGroup(ctx context.Context, arg RemoveUserPermissionGroupParams) error
 	RenameAsset(ctx context.Context, arg RenameAssetParams) (int64, error)
+	RenameDepartment(ctx context.Context, arg RenameDepartmentParams) error
+	RenameDepartmentLeadGroup(ctx context.Context, arg RenameDepartmentLeadGroupParams) error
 	// Renombra en todas las entradas; si la entrada ya tenía la nueva, queda una
 	// sola vez y en su lugar. No toca updated_at: no es un cambio del contenido.
 	RenameEntryTag(ctx context.Context, arg RenameEntryTagParams) (int64, error)
@@ -1179,6 +1242,9 @@ type Querier interface {
 	ReopenOccurrence(ctx context.Context, id uuid.UUID) (int64, error)
 	// El orden es la posición en la lista (legacy PUT /api/work-shifts/reorder).
 	ReorderWorkShifts(ctx context.Context, ids []uuid.UUID) (int64, error)
+	// Rehace la foto de un mes congelado con una versión anterior del resumen
+	// (p. ej. antes de las entradas de la Bitácora, 10f).
+	ReplaceMonthlySummary(ctx context.Context, arg ReplaceMonthlySummaryParams) error
 	ReplaceUserPermissionGroups(ctx context.Context, userID uuid.UUID) error
 	ResetAllLoginRateLimits(ctx context.Context) error
 	ResetFailedLoginAttempts(ctx context.Context, id uuid.UUID) error
@@ -1198,6 +1264,7 @@ type Querier interface {
 	SetAgendaTaskActive(ctx context.Context, arg SetAgendaTaskActiveParams) (int64, error)
 	SetAgendaTaskApplication(ctx context.Context, arg SetAgendaTaskApplicationParams) error
 	SetAreaTicketSeries(ctx context.Context, arg SetAreaTicketSeriesParams) (int64, error)
+	SetAreasDepartment(ctx context.Context, arg SetAreasDepartmentParams) error
 	SetAssetActive(ctx context.Context, arg SetAssetActiveParams) error
 	SetAssetGlpiLink(ctx context.Context, arg SetAssetGlpiLinkParams) error
 	// removed=true: dado de baja porque desapareció de GLPI; false: volvió.
@@ -1246,6 +1313,8 @@ type Querier interface {
 	SetPolicyArea(ctx context.Context, arg SetPolicyAreaParams) (EscalationPolicy, error)
 	// Saltar o volver a aplicar una vez; aplicar igual en feriado (queda quién) o quitarlo.
 	SetSeriesWindowState(ctx context.Context, arg SetSeriesWindowStateParams) (MaintenanceWindow, error)
+	// Marca qué áreas del departamento comparten equipo.
+	SetSharedAreas(ctx context.Context, arg SetSharedAreasParams) error
 	// Activar o desactivar a mano anula lo que hizo la organización.
 	SetTeamsActive(ctx context.Context, arg SetTeamsActiveParams) (int64, error)
 	// POST /api/territorial-units/bulk-active — activar o desactivar varias de
@@ -1288,6 +1357,8 @@ type Querier interface {
 	// tampoco los normalizaba y el texto se escribe como en el catálogo.
 	SuggestReportEvents(ctx context.Context, arg SuggestReportEventsParams) ([]ReportEvent, error)
 	SumTicketTaskTime(ctx context.Context, ticketID uuid.UUID) (int64, error)
+	// El grupo de jefatura del departamento queda con todas sus áreas.
+	SyncDepartmentLeadAreas(ctx context.Context, departmentID uuid.UUID) error
 	// La tarea enlazada se hizo (una ocurrencia hecha después de crear el hito).
 	SyncMilestonesFromTasks(ctx context.Context) ([]SyncMilestonesFromTasksRow, error)
 	// El ticket enlazado se resolvió: el hito se marca solo, con quién lo resolvió.

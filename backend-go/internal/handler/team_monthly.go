@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"sort"
 	"time"
@@ -13,6 +14,7 @@ import (
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/audit"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/mailtpl"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/problemdetails"
+	"github.com/athomo001/BitacoraSOC/backend-go/internal/quality"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/repository/db"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -42,7 +44,17 @@ type monthlyPersonDTO struct {
 	AbsentDays int       `json:"absentDays"`
 	// GoalsDone: metas propias cumplidas en el mes (las del bono, confirmadas; 9.4).
 	GoalsDone int `json:"goalsDone"`
+	// Entries y Quality: entradas en la Bitácora y puntaje de calidad del mes
+	// (10f), en las áreas que usan la Bitácora. Quality -1 = sin evaluar; en
+	// el total, el promedio de los evaluados.
+	Entries int `json:"entries"`
+	Quality int `json:"quality"`
 }
+
+// monthlyVersion: la versión del resumen. Una foto congelada con una versión
+// anterior se rehace al abrirla (la 2 suma la Bitácora, 10f; la 3 guarda
+// quiénes eran del área).
+const monthlyVersion = 3
 
 // onTimePct: como en Gestión, hechas a tiempo sobre hechas más atrasadas
 // abiertas (las omitidas no cuentan). -1 = sin datos.
@@ -69,20 +81,44 @@ type monthlyDataDTO struct {
 	Total    monthlyPersonDTO   `json:"total"`
 	// ComputedAt: cuándo se calculó (la foto, en un mes cerrado).
 	ComputedAt time.Time `json:"computedAt"`
+	Version    int       `json:"version"`
+	// Members: quiénes eran del área al sacar la foto. Si la gente del área
+	// cambia (alguien entra o sale), la foto se rehace al abrirla para que
+	// aparezca el historial de quien entró (decisión del dueño 2026-10-22).
+	Members []uuid.UUID `json:"members"`
+}
+
+// sameMembers: la foto es de la misma gente que hoy está en el área.
+func sameMembers(snapshot []uuid.UUID, people []areaPersonRow) bool {
+	if len(snapshot) != len(people) {
+		return false
+	}
+	in := make(map[uuid.UUID]bool, len(snapshot))
+	for _, id := range snapshot {
+		in[id] = true
+	}
+	for _, p := range people {
+		if !in[p.ID] {
+			return false
+		}
+	}
+	return true
 }
 
 type monthlyInput struct {
-	month      time.Time // primer día, medianoche UTC
-	loc        *time.Location
-	dayEnd     agenda.Clock
-	cal        agenda.Calendar
-	now        time.Time
-	people     []monthlyPersonDTO // la gente del área (nombre y nivel)
-	names      map[uuid.UUID]string
-	occs       []db.ListMonthOccurrencesRow
-	tickets    []db.ListMonthResolvedTicketsRow
-	absences   map[uuid.UUID]int
-	goals      map[uuid.UUID]int
+	month    time.Time // primer día, medianoche UTC
+	loc      *time.Location
+	dayEnd   agenda.Clock
+	cal      agenda.Calendar
+	now      time.Time
+	people   []monthlyPersonDTO // la gente del área (nombre y nivel)
+	names    map[uuid.UUID]string
+	occs     []db.ListMonthOccurrencesRow
+	tickets  []db.ListMonthResolvedTicketsRow
+	absences map[uuid.UUID]int
+	goals    map[uuid.UUID]int
+	// quality: el puntaje del mes por persona (nil si el área no usa la Bitácora).
+	quality    map[uuid.UUID]quality.Result
 	areaCode   string
 	areaName   string
 	computedAt time.Time
@@ -169,8 +205,9 @@ func computeMonthly(in monthlyInput) monthlyDataDTO {
 			total.GoalsDone += n
 		}
 	}
+	addQuality(byID, &total, in.quality)
 	out := monthlyDataDTO{Month: in.month.Format("2006-01"), AreaCode: in.areaCode, AreaName: in.areaName, Total: total,
-		People: make([]monthlyPersonDTO, 0, len(order)), ComputedAt: in.computedAt}
+		People: make([]monthlyPersonDTO, 0, len(order)), ComputedAt: in.computedAt, Version: monthlyVersion}
 	for _, id := range order {
 		out.People = append(out.People, *byID[id])
 	}
@@ -180,6 +217,30 @@ func computeMonthly(in monthlyInput) monthlyDataDTO {
 		}
 	}
 	return out
+}
+
+// addQuality pone las entradas y el puntaje de cada persona del área; el
+// total suma las entradas y promedia los puntajes evaluados.
+func addQuality(byID map[uuid.UUID]*monthlyPersonDTO, total *monthlyPersonDTO, results map[uuid.UUID]quality.Result) {
+	total.Quality = -1
+	sum, n := 0, 0
+	for _, p := range byID {
+		p.Quality = -1
+		r, ok := results[p.ID]
+		if !ok {
+			continue
+		}
+		p.Entries = r.Entries
+		total.Entries += r.Entries
+		if r.Evaluated {
+			p.Quality = r.Score
+			sum += r.Score
+			n++
+		}
+	}
+	if n > 0 {
+		total.Quality = int(math.Round(float64(sum) / float64(n)))
+	}
 }
 
 // freezeAt: el primer día hábil del mes siguiente, a la hora de inicio de la Agenda.
@@ -206,12 +267,16 @@ func (h *TeamHandler) monthly(ctx context.Context, area db.ListLeadAreasRow, mon
 	if err != nil {
 		return monthlyDataDTO{}, false, err
 	}
+	people, err := h.areaPeople(ctx, area.ID)
+	if err != nil {
+		return monthlyDataDTO{}, false, err
+	}
 	frozen := !now.Before(freezeAt(month, ac))
 	if frozen {
 		row, err := h.Queries.GetMonthlySummary(ctx, db.GetMonthlySummaryParams{AreaID: area.ID, Month: pgDate(month)})
 		if err == nil {
 			var d monthlyDataDTO
-			if json.Unmarshal(row.Data, &d) == nil {
+			if json.Unmarshal(row.Data, &d) == nil && d.Version >= monthlyVersion && sameMembers(d.Members, people) {
 				return d, true, nil
 			}
 		} else if !errors.Is(err, pgx.ErrNoRows) {
@@ -244,49 +309,32 @@ func (h *TeamHandler) monthly(ctx context.Context, area db.ListLeadAreasRow, mon
 	for _, g := range goals {
 		in.goals[g.UserID] = int(g.Done)
 	}
-	people, err := h.Queries.ListAreaPeopleLevels(ctx)
-	if err != nil {
-		return monthlyDataDTO{}, false, err
-	}
-	levels, err := h.Queries.ListLevels(ctx)
-	if err != nil {
-		return monthlyDataDTO{}, false, err
-	}
-	levelName := map[uuid.UUID]string{}
-	for _, l := range levels {
-		levelName[l.ID] = l.Name
-	}
-	// Una fila por persona, con su nivel de más rango en el área.
-	seen := map[uuid.UUID]int{}
-	rank := map[uuid.UUID]int32{}
+	seen := map[uuid.UUID]bool{}
+	ids := make([]uuid.UUID, 0, len(people))
 	for _, p := range people {
-		if p.AreaID != area.ID {
-			continue
+		seen[p.ID] = true
+		ids = append(ids, p.ID)
+		in.people = append(in.people, monthlyPersonDTO{ID: p.ID, Name: p.Name, Level: p.Level})
+	}
+	// La Bitácora del mes (10f), en las áreas que la usan.
+	if operativo, err := h.qualityAreas(ctx); err != nil {
+		return monthlyDataDTO{}, false, err
+	} else if operativo[area.Code] && len(ids) > 0 {
+		if in.quality, err = h.evaluatePeople(ctx, ids, monthStart, monthStart.AddDate(0, 1, 0)); err != nil {
+			return monthlyDataDTO{}, false, err
 		}
-		lvl := ""
-		if p.LevelID.Valid {
-			lvl = levelName[uuid.UUID(p.LevelID.Bytes)]
-		}
-		if i, ok := seen[p.UserID]; ok {
-			if p.LevelRank > rank[p.UserID] {
-				in.people[i].Level, rank[p.UserID] = lvl, p.LevelRank
-			}
-			continue
-		}
-		seen[p.UserID], rank[p.UserID] = len(in.people), p.LevelRank
-		in.people = append(in.people, monthlyPersonDTO{ID: p.UserID, Name: p.Name, Level: lvl})
 	}
 	var missing []uuid.UUID
 	for _, o := range occs {
 		if o.UserID.Valid {
-			if _, ok := seen[uuid.UUID(o.UserID.Bytes)]; !ok {
+			if !seen[uuid.UUID(o.UserID.Bytes)] {
 				missing = append(missing, uuid.UUID(o.UserID.Bytes))
 			}
 		}
 	}
 	for _, t := range tickets {
 		if t.AssignedUserID.Valid {
-			if _, ok := seen[uuid.UUID(t.AssignedUserID.Bytes)]; !ok {
+			if !seen[uuid.UUID(t.AssignedUserID.Bytes)] {
 				missing = append(missing, uuid.UUID(t.AssignedUserID.Bytes))
 			}
 		}
@@ -299,10 +347,11 @@ func (h *TeamHandler) monthly(ctx context.Context, area db.ListLeadAreasRow, mon
 		}
 	}
 	d := computeMonthly(in)
+	d.Members = ids
 	sort.SliceStable(d.People, func(i, j int) bool { return d.People[i].Name < d.People[j].Name })
 	if frozen {
 		raw, _ := json.Marshal(d)
-		if err := h.Queries.InsertMonthlySummary(ctx, db.InsertMonthlySummaryParams{AreaID: area.ID, Month: pgDate(month), Data: raw}); err != nil {
+		if err := h.Queries.ReplaceMonthlySummary(ctx, db.ReplaceMonthlySummaryParams{AreaID: area.ID, Month: pgDate(month), Data: raw}); err != nil {
 			return d, frozen, err
 		}
 	}
@@ -322,11 +371,40 @@ func (h *TeamHandler) parseMonth(s string) (time.Time, error) {
 	return m, nil
 }
 
-// Monthly: GET /api/team/monthly?area=CODE&month=YYYY-MM. Trae también los
-// totales del mes anterior para la diferencia.
+// monthlyScope: el resumen de un área (area) o de un departamento
+// (department, la jefatura del departamento) y si usa la Bitácora.
+type monthlyScope struct {
+	area     db.ListLeadAreasRow
+	dep      teamDepartmentDTO
+	depAreas []db.ListLeadAreasRow
+	bitacora bool
+}
+
+func (h *TeamHandler) monthlyScopeOf(w http.ResponseWriter, r *http.Request, areaCode, department string) (monthlyScope, bool) {
+	if department != "" {
+		_, dep, areas, ok := h.departmentScope(w, r, department, true)
+		return monthlyScope{dep: dep, depAreas: areas, bitacora: dep.Quality}, ok
+	}
+	_, area, _, ok := h.leadScope(w, r, areaCode)
+	if !ok {
+		return monthlyScope{}, false
+	}
+	operativo, _ := h.qualityAreas(r.Context())
+	return monthlyScope{area: area, bitacora: operativo[area.Code]}, true
+}
+
+func (h *TeamHandler) monthlyOf(ctx context.Context, s monthlyScope, month time.Time) (monthlyDataDTO, bool, error) {
+	if s.depAreas != nil {
+		return h.monthlyDepartment(ctx, s.dep, s.depAreas, month)
+	}
+	return h.monthly(ctx, s.area, month)
+}
+
+// Monthly: GET /api/team/monthly?area=CODE&month=YYYY-MM (o ?department=ID).
+// Trae también los totales del mes anterior para la diferencia.
 func (h *TeamHandler) Monthly(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
-	_, area, _, ok := h.leadScope(w, r, q.Get("area"))
+	scope, ok := h.monthlyScopeOf(w, r, q.Get("area"), q.Get("department"))
 	if !ok {
 		return
 	}
@@ -336,19 +414,23 @@ func (h *TeamHandler) Monthly(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ctx := r.Context()
-	cur, frozen, err := h.monthly(ctx, area, month)
+	cur, frozen, err := h.monthlyOf(ctx, scope, month)
 	if err != nil {
 		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo calcular el resumen")
 		return
 	}
-	prev, _, err := h.monthly(ctx, area, month.AddDate(0, -1, 0))
+	prev, _, err := h.monthlyOf(ctx, scope, month.AddDate(0, -1, 0))
 	if err != nil {
 		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo calcular el resumen")
 		return
 	}
+	bitacora, tickets := scope.bitacora, featureEnabled(ctx, h.Queries, ticketsFeature)
 	writeData(w, http.StatusOK, map[string]any{
 		"summary": cur, "frozen": frozen, "onTimePct": cur.Total.onTimePct(), "slaPct": cur.Total.slaPct(),
-		"previous": map[string]int{"onTimePct": prev.Total.onTimePct(), "slaPct": prev.Total.slaPct()},
+		"previous": map[string]int{"onTimePct": prev.Total.onTimePct(), "slaPct": prev.Total.slaPct(), "quality": prev.Total.Quality},
+		// bitacora: el área usa la Bitácora (entradas y calidad); tickets: la
+		// Ticketera está encendida (si no, sus columnas no aparecen).
+		"bitacora": bitacora, "tickets": tickets,
 	})
 }
 
@@ -356,15 +438,16 @@ func (h *TeamHandler) Monthly(w http.ResponseWriter, r *http.Request) {
 // destinatarios válidos que Reportes (dominios propios).
 func (h *TeamHandler) SendMonthly(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Area  string   `json:"area"`
-		Month string   `json:"month"`
-		To    []string `json:"to"`
+		Area       string   `json:"area"`
+		Department string   `json:"department"`
+		Month      string   `json:"month"`
+		To         []string `json:"to"`
 	}
 	if err := decodeJSON(w, r, &req); err != nil {
 		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "JSON inválido")
 		return
 	}
-	_, area, _, ok := h.leadScope(w, r, req.Area)
+	scope, ok := h.monthlyScopeOf(w, r, req.Area, req.Department)
 	if !ok {
 		return
 	}
@@ -388,7 +471,7 @@ func (h *TeamHandler) SendMonthly(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	d, frozen, err := h.monthly(ctx, area, month)
+	d, frozen, err := h.monthlyOf(ctx, scope, month)
 	if err != nil {
 		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo calcular el resumen")
 		return
@@ -397,7 +480,7 @@ func (h *TeamHandler) SendMonthly(w http.ResponseWriter, r *http.Request) {
 		problemdetails.Write(w, r, http.StatusServiceUnavailable, "mail-unavailable", "el correo no está configurado")
 		return
 	}
-	html, subject, err := h.monthlyMail(ctx, d, frozen)
+	html, subject, err := h.monthlyMail(ctx, d, frozen, scope.bitacora)
 	if err != nil {
 		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo armar el correo")
 		return
@@ -408,17 +491,17 @@ func (h *TeamHandler) SendMonthly(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.Notify.mail(ctx, to, subject, html)
-	h.AuditLog.Log(ctx, "team.monthly.sent", audit.LevelInfo, audit.Success(), map[string]any{"area": area.Code, "month": d.Month, "to": to})
+	h.AuditLog.Log(ctx, "team.monthly.sent", audit.LevelInfo, audit.Success(), map[string]any{"area": cmpOr(scope.area.Code, scope.dep.Name), "month": d.Month, "to": to})
 	writeData(w, http.StatusOK, map[string]any{"sent": len(to)})
 }
 
-func (h *TeamHandler) monthlyMail(ctx context.Context, d monthlyDataDTO, frozen bool) (string, string, error) {
+func (h *TeamHandler) monthlyMail(ctx context.Context, d monthlyDataDTO, frozen, bitacora bool) (string, string, error) {
 	m, _ := time.Parse("2006-01", d.Month)
 	period := fmt.Sprintf("%s %d", spanishMonths[m.Month()-1], m.Year())
 	name, logo := h.Notify.brand(ctx)
 	row := func(p monthlyPersonDTO) mailtpl.MonthlyRow {
 		return mailtpl.MonthlyRow{Name: p.Name, Level: p.Level, Tasks: p.Tasks, OnTimePct: p.onTimePct(), OpenLate: p.OpenLate,
-			Skipped: p.Skipped, Tickets: p.Tickets, SLAPct: p.slaPct(), AbsentDays: p.AbsentDays, GoalsDone: p.GoalsDone}
+			Skipped: p.Skipped, Tickets: p.Tickets, SLAPct: p.slaPct(), AbsentDays: p.AbsentDays, GoalsDone: p.GoalsDone, Entries: p.Entries, Quality: p.Quality}
 	}
 	rows := make([]mailtpl.MonthlyRow, 0, len(d.People))
 	for _, p := range d.People {
@@ -429,8 +512,9 @@ func (h *TeamHandler) monthlyMail(ctx context.Context, d monthlyDataDTO, frozen 
 		intro += " El mes va en curso: los números pueden cambiar hasta el cierre."
 	}
 	title := "Resumen mensual " + d.AreaName
+	tickets := featureEnabled(ctx, h.Queries, ticketsFeature)
 	html, err := mailtpl.RenderMonthlySummary(mailtpl.MonthlySummaryOptions{Rows: rows, Total: row(d.Total), Title: title, PeriodLabel: period,
-		LogoSrc: logo, BrandName: name, Intro: intro, Year: m.Year()})
+		LogoSrc: logo, BrandName: name, Intro: intro, Year: m.Year(), Bitacora: bitacora, NoTickets: !tickets})
 	return html, title + " · " + period, err
 }
 

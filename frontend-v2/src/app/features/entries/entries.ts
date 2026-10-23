@@ -174,6 +174,13 @@ export class EntriesComponent implements OnInit {
 
   async ngOnInit(): Promise<void> {
     await Promise.all([this.perms.load(), this.modules.load()]);
+    // /entries?author=<id>&from=…&to=…: llega filtrada (Mi equipo → Calidad).
+    const query = this.route?.snapshot.queryParamMap;
+    if (query?.get('author')) {
+      this.filterAuthor.set(query.get('author') ?? '');
+      this.filterFrom.set(query.get('from') ?? '');
+      this.filterTo.set(query.get('to') ?? '');
+    }
     await this.load();
     this.destroyRef.onDestroy(() => { if (this.tagTimer) clearTimeout(this.tagTimer); });
     void this.api.authors().then((a) => this.authors.set(a), () => this.authors.set([]));

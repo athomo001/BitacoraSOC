@@ -71,6 +71,7 @@ export const CAPABILITIES: readonly { code: string; labelKey: MessageKey }[] = [
   { code: 'tickets:change_client', labelKey: 'access.cap.ticketsChangeClient' },
   { code: 'notices:send', labelKey: 'access.cap.noticesSend' },
   { code: 'area:lead', labelKey: 'access.cap.areaLead' },
+  { code: 'csm', labelKey: 'access.cap.csm' },
 ];
 
 const ROLES: readonly Role[] = ['admin', 'user', 'auditor'];

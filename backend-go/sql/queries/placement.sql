@@ -4,8 +4,10 @@
 
 -- name: ListUserGroupShapes :many
 -- Los grupos activos de la persona con su forma: áreas, nivel y capacidades.
+-- fixed: la jefatura de un departamento (la mantiene el departamento, no el panel).
 SELECT pg.id, pg.name, pg.level_id, pg.capabilities,
-  COALESCE(array_agg(a.code ORDER BY a.code) FILTER (WHERE a.code IS NOT NULL), '{}')::text[] AS area_codes
+  COALESCE(array_agg(a.code ORDER BY a.code) FILTER (WHERE a.code IS NOT NULL), '{}')::text[] AS area_codes,
+  (pg.department_id IS NOT NULL)::bool AS fixed
 FROM user_permission_groups upg
 JOIN permission_groups pg ON pg.id = upg.permission_group_id AND pg.active
 LEFT JOIN permission_group_areas pa ON pa.permission_group_id = pg.id
@@ -18,7 +20,7 @@ ORDER BY pg.name;
 -- Un grupo activo con exactamente esa forma: un área (o ninguna), ese nivel
 -- (o ninguno) y esas capacidades. El más antiguo, si hubiera varios.
 SELECT pg.id FROM permission_groups pg
-WHERE pg.active
+WHERE pg.active AND pg.department_id IS NULL
   AND pg.level_id IS NOT DISTINCT FROM sqlc.narg('level_id')::uuid
   AND pg.capabilities @> sqlc.arg('capabilities')::text[] AND pg.capabilities <@ sqlc.arg('capabilities')::text[]
   AND COALESCE((SELECT array_agg(a.code ORDER BY a.code) FROM permission_group_areas pa JOIN areas a ON a.id = pa.area_id

@@ -20,3 +20,25 @@ func TestRenderMonthlySummary(t *testing.T) {
 		}
 	}
 }
+
+// 10f: las entradas y la calidad del mes van bajo el nombre; con la Ticketera
+// apagada, ocupan la columna de tickets.
+func TestRenderMonthlySummaryBitacora(t *testing.T) {
+	row := MonthlyRow{Name: "Ana", Tasks: 3, OnTimePct: -1, Tickets: 4, SLAPct: 100, Entries: 42, Quality: 61}
+	html, err := RenderMonthlySummary(MonthlySummaryOptions{Rows: []MonthlyRow{row}, Total: MonthlyRow{Name: "Total", Entries: 42, Quality: -1}, Bitacora: true, Year: 2026})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"42 entradas en la Bitácora, calidad 61", "Bitácora, sin evaluar", "en SLA", "TICKETS"} {
+		if !strings.Contains(html, want) {
+			t.Errorf("con tickets: falta %q", want)
+		}
+	}
+	html, err = RenderMonthlySummary(MonthlySummaryOptions{Rows: []MonthlyRow{row}, Total: row, Bitacora: true, NoTickets: true, Year: 2026})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(html, "BITÁCORA") || strings.Contains(html, "TICKETS") || strings.Contains(html, "en SLA") || !strings.Contains(html, "#F57C00") {
+		t.Errorf("sin tickets, la columna es la Bitácora: %s", html)
+	}
+}

@@ -2,7 +2,7 @@
 
 > Generado por `backend-go/cmd/er-docs` desde `backend-go/sql/schema/0001_init_schema.sql`, el esquema que usa sqlc, con todas las migraciones aplicadas. **No se edita a mano**: si cambia el esquema, se regenera con `go run ./cmd/er-docs` desde `backend-go/`.
 
-121 tablas en PostgreSQL, agrupadas en 17 dominios. Notación pata de gallo: `||` uno, `|o` / `o|` cero o uno, `o{` cero o muchos. La etiqueta de cada línea es la columna que hace la referencia.
+123 tablas en PostgreSQL, agrupadas en 17 dominios. Notación pata de gallo: `||` uno, `|o` / `o|` cero o uno, `o{` cero o muchos. La etiqueta de cada línea es la columna que hace la referencia.
 
 - Cada entidad muestra todas sus columnas salvo `created_at` y `updated_at`. `PK` clave primaria, `FK` referencia a otra tabla, `UK` valor único.
 - Las tablas de otros dominios aparecen como cajas sin columnas: son la misma tabla, dibujada donde se une.
@@ -13,14 +13,14 @@ Correspondencia con el legacy (MongoDB): [modelo-er-legacy-2.0.md](modelo-er-leg
 
 ## Índice
 
-1. [Usuarios, acceso y permisos](#1-usuarios-acceso-y-permisos) — 8 tablas
+1. [Usuarios, acceso y permisos](#1-usuarios-acceso-y-permisos) — 9 tablas
 2. [Territorio, organizaciones y activos](#2-territorio-organizaciones-y-activos) — 16 tablas
 3. [Directorio de contactos](#3-directorio-de-contactos) — 2 tablas
 4. [Ticketera](#4-ticketera) — 8 tablas
 5. [Equipos y escalamiento](#5-equipos-y-escalamiento) — 15 tablas
 6. [Turnos, guardias y dotación](#6-turnos-guardias-y-dotación) — 11 tablas
 7. [Agenda](#7-agenda) — 8 tablas
-8. [Gestión CSM](#8-gestión-csm) — 11 tablas
+8. [Gestión CSM](#8-gestión-csm) — 12 tablas
 9. [Integraciones](#9-integraciones) — 6 tablas
 10. [Notificaciones y avisos con acuse](#10-notificaciones-y-avisos-con-acuse) — 6 tablas
 11. [Checklists](#11-checklists) — 4 tablas
@@ -80,6 +80,7 @@ erDiagram
         boolean active
         text profile
         uuid level_id FK
+        uuid department_id FK, UK
     }
     PERMISSION_GROUP_AREAS {
         uuid permission_group_id PK, FK
@@ -94,6 +95,13 @@ erDiagram
         int sort_order
         text default_profile
         uuid ticket_series_id FK
+        uuid department_id FK
+        boolean shares_team
+    }
+    DEPARTMENTS {
+        uuid id PK
+        text name
+        int sort_order
     }
     LEVELS {
         uuid id PK
@@ -110,6 +118,8 @@ erDiagram
     }
 
     AREAS ||--o{ PERMISSION_GROUP_AREAS : "area_id"
+    DEPARTMENTS |o--o{ AREAS : "department_id"
+    DEPARTMENTS |o--o| PERMISSION_GROUPS : "department_id"
     LEVELS |o--o{ PERMISSION_GROUPS : "level_id"
     PERMISSION_GROUPS ||--o{ PERMISSION_GROUP_AREAS : "permission_group_id"
     PERMISSION_GROUPS ||--o{ USER_PERMISSION_GROUPS : "permission_group_id"
@@ -1209,10 +1219,17 @@ erDiagram
         int sla_target
         date started_on
     }
+    MANAGEMENT_SCOPES {
+        uuid user_id FK
+        uuid department_id FK
+        uuid area_id FK
+    }
 
     AGENDA_TASKS |o--o{ GOAL_MILESTONES : "agenda_task_id"
     AREAS |o--o{ GOALS : "area_id"
+    AREAS |o--o{ MANAGEMENT_SCOPES : "area_id"
     AREAS |o--o{ PLAYBOOK_ITEMS : "area_id"
+    DEPARTMENTS |o--o{ MANAGEMENT_SCOPES : "department_id"
     GOALS ||--o{ GOAL_ALERTS : "goal_id"
     GOALS ||--o{ GOAL_EVENTS : "goal_id"
     GOALS ||--o{ GOAL_EVIDENCE : "goal_id"
@@ -1229,6 +1246,7 @@ erDiagram
     USERS |o--o{ GOALS : "owner_user_id"
     USERS |o--o{ GOALS : "person_user_id"
     USERS |o--o{ GOAL_EVENTS : "user_id"
+    USERS ||--o{ MANAGEMENT_SCOPES : "user_id"
     USERS ||--o| GOAL_PERSON_RULES : "user_id"
 ```
 

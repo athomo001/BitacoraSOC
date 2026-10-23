@@ -298,8 +298,16 @@ func (h *ManagementHandler) Clients(w http.ResponseWriter, r *http.Request) {
 		mgmtFail(w, r)
 		return
 	}
+	scope, err := h.clientScope(ctx, u)
+	if err != nil {
+		mgmtFail(w, r)
+		return
+	}
 	out := make([]mgmtClientDTO, 0, len(rows))
 	for _, row := range rows {
+		if !clientAllowed(scope, row.ID, row.CsmUserID, u.id) {
+			continue
+		}
 		out = append(out, h.clientDTO(row, c, settings, u.id))
 	}
 	writeData(w, http.StatusOK, out)
@@ -421,6 +429,15 @@ func (h *ManagementHandler) Client(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	row := rows[0]
+	scope, err := h.clientScope(ctx, u)
+	if err != nil {
+		mgmtFail(w, r)
+		return
+	}
+	if !clientAllowed(scope, row.ID, row.CsmUserID, u.id) {
+		problemdetails.Write(w, r, http.StatusNotFound, "not-found", "cliente no encontrado")
+		return
+	}
 	d := mgmtClientDetailDTO{Client: h.clientDTO(row, c, settings, u.id), Tickets: []mgmtTicketDTO{}, Actions: []mgmtActionDTO{},
 		Goals: []goalDTO{}, Comms: []mgmtCommDTO{}, Timeline: []mgmtTimelineDTO{}, Renewal: []mgmtRenewalStepDTO{}, Applied: map[string]string{}}
 
@@ -445,6 +462,10 @@ func (h *ManagementHandler) Client(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	for _, t := range open {
+		// Con alcance, solo los tickets de sus áreas.
+		if u.limited() && !u.seesArea(t.Ticket.AreaID) {
+			continue
+		}
 		dto := mgmtTicketDTO{ID: t.Ticket.ID, Number: t.Ticket.TicketNumber, Title: t.Ticket.Title, Area: t.AreaName,
 			Priority: string(t.Ticket.Priority), Status: string(t.Ticket.Status), Source: t.Ticket.Source}
 		if t.Ticket.SlaResolutionDueAt.Valid {

@@ -15,6 +15,9 @@ type MonthlyRow struct {
 	// GoalsDone: metas cumplidas en el mes; van bajo el nombre (la plantilla
 	// del legacy tiene cinco columnas y no se le agrega una).
 	GoalsDone int
+	// Entries y Quality: entradas en la Bitácora y puntaje de calidad del
+	// mes (10f; Quality -1 = sin evaluar). Solo con Bitacora en las opciones.
+	Entries, Quality int
 }
 
 // MonthlySummaryOptions arma el correo del resumen mensual (spec/16 §6.1, 9.7).
@@ -25,6 +28,33 @@ type MonthlySummaryOptions struct {
 	LogoSrc, BrandName string
 	Intro              string
 	Year               int
+	// Bitacora: el área usa la Bitácora (SOC/NOC) y se muestran sus entradas.
+	Bitacora bool
+	// NoTickets: la Ticketera está apagada; su columna pasa a ser la Bitácora
+	// (o un guion si el área no la usa).
+	NoTickets bool
+}
+
+// qualityBadge: el puntaje con los colores de los estados (bajo 50, bajo 75).
+func qualityBadge(v int) string {
+	if v < 0 {
+		return `<span style="color:#5B695D;">sin evaluar</span>`
+	}
+	bg := scheduleGreen
+	switch {
+	case v < 50:
+		bg = "#D32F2F"
+	case v < 75:
+		bg = "#F57C00"
+	}
+	return fmt.Sprintf(`<span style="display:inline-block; white-space:nowrap; background-color:%s; color:#FFFFFF; padding:6px 12px; border-radius:4px; font-size:13px; line-height:1; font-weight:700;">%d</span>`, bg, v)
+}
+
+func entriesText(n int) string {
+	if n == 1 {
+		return "1 entrada"
+	}
+	return fmt.Sprintf("%d entradas", n)
 }
 
 func monthlyPct(v int) string {
@@ -72,8 +102,24 @@ func RenderMonthlySummary(o MonthlySummaryOptions) (string, error) {
 			}
 			name += fmt.Sprintf(`<br><span style="font-size:13px; font-weight:400; color:#5B695D;">%s</span>`, goals)
 		}
+		if o.Bitacora && !o.NoTickets {
+			q := "sin evaluar"
+			if r.Quality >= 0 {
+				q = fmt.Sprintf("calidad %d", r.Quality)
+			}
+			name += fmt.Sprintf(`<br><span style="font-size:13px; font-weight:400; color:#5B695D;">%s en la Bitácora, %s</span>`, entriesText(r.Entries), q)
+		}
 		if bold {
 			weight = "800"
+		}
+		fourth := fmt.Sprintf(`<span style="font-weight:bold; font-size:17px; display:inline-block; margin-bottom:2px;">%d</span><br>
+          <span style="white-space:nowrap;">en SLA</span> %s`, r.Tickets, monthlyBadge(r.SLAPct))
+		switch {
+		case o.NoTickets && o.Bitacora:
+			fourth = fmt.Sprintf(`<span style="font-weight:bold; font-size:17px; display:inline-block; margin-bottom:2px;">%d</span><br>
+          <span style="white-space:nowrap;">calidad</span> %s`, r.Entries, qualityBadge(r.Quality))
+		case o.NoTickets:
+			fourth = `<span style="color:#5B695D;">-</span>`
 		}
 		late := fmt.Sprintf("%d abiertos", r.OpenLate)
 		if r.OpenLate == 1 {
@@ -88,12 +134,11 @@ func RenderMonthlySummary(o MonthlySummaryOptions) (string, error) {
         </td>
         <td style="padding:14px 8px; border-bottom:%[1]s; color:#173831; font-size:15px;">%[6]s<br><span style="font-size:13px; color:#5B695D;">%[7]d omitidas</span></td>
         <td style="padding:14px 8px; border-bottom:%[1]s; color:#173831; font-size:15px;">
-          <span style="font-weight:bold; font-size:17px; display:inline-block; margin-bottom:2px;">%[8]d</span><br>
-          <span style="white-space:nowrap;">en SLA</span> %[9]s
+          %[8]s
         </td>
-        <td style="padding:14px 8px; border-bottom:%[1]s; text-align:right; color:#5B695D; font-size:14px;">%[10]d días</td>
+        <td style="padding:14px 8px; border-bottom:%[1]s; text-align:right; color:#5B695D; font-size:14px;">%[9]d días</td>
       </tr>
-    `, border, weight, name, r.Tasks, monthlyBadge(r.OnTimePct), e(late), r.Skipped, r.Tickets, monthlyBadge(r.SLAPct), r.AbsentDays)
+    `, border, weight, name, r.Tasks, monthlyBadge(r.OnTimePct), e(late), r.Skipped, fourth, r.AbsentDays)
 	}
 	for _, r := range o.Rows {
 		row(r, false, false)
@@ -110,6 +155,10 @@ func RenderMonthlySummary(o MonthlySummaryOptions) (string, error) {
 	if brand == "" {
 		brand = "Bitácora CDC"
 	}
+	h4 := "TICKETS"
+	if o.NoTickets && o.Bitacora {
+		h4 = "BITÁCORA"
+	}
 	var buf bytes.Buffer
 	err := scheduleListTemplate.Execute(&buf, map[string]any{
 		"LogoSrc":     e(o.LogoSrc),
@@ -119,7 +168,7 @@ func RenderMonthlySummary(o MonthlySummaryOptions) (string, error) {
 		"PeriodLabel": e(o.PeriodLabel),
 		"Rows":        strings.TrimRight(rows.String(), " \n"),
 		"Year":        o.Year,
-		"H1":          "PERSONA", "H2": "TAREAS", "H3": "ATRASOS", "H4": "TICKETS", "H5": "AUSENTE",
+		"H1":          "PERSONA", "H2": "TAREAS", "H3": "ATRASOS", "H4": h4, "H5": "AUSENTE",
 	})
 	return buf.String(), err
 }

@@ -155,18 +155,51 @@ func TestTeam_JefaturaDePuntaAPunta(t *testing.T) {
 	if w := call(h.SetGroup, "PUT", "/", map[string]any{"area": code, "groupId": leadG}, p1); w.Code != http.StatusBadRequest {
 		t.Fatalf("no puede nombrar jefaturas: %d", w.Code)
 	}
-	// Quien tiene grupos de otra área, o es la jefatura misma, no se toca.
-	if w := call(h.SetActive, "PATCH", "/", map[string]any{"area": code, "active": false}, p2); w.Code != http.StatusForbidden {
-		t.Fatalf("persona de otra área: %d", w.Code)
+	// Sacar del equipo: quien comparte un grupo con otra área, o la jefatura
+	// misma, no; sacar no da de baja la cuenta.
+	if w := call(h.Leave, "DELETE", "/?area="+code, nil, p2); w.Code != http.StatusForbidden {
+		t.Fatalf("persona con un grupo compartido con otra área: %d", w.Code)
 	}
-	if w := call(h.SetActive, "PATCH", "/", map[string]any{"area": code, "active": false}, lead); w.Code != http.StatusForbidden {
+	if w := call(h.Leave, "DELETE", "/?area="+code, nil, lead); w.Code != http.StatusForbidden {
 		t.Fatalf("a sí misma: %d", w.Code)
 	}
-	if w := call(h.SetActive, "PATCH", "/", map[string]any{"area": code, "active": false}, p1); w.Code != http.StatusNoContent {
-		t.Fatalf("dar de baja: %d %s", w.Code, w.Body)
+	if w := call(h.Leave, "DELETE", "/?area="+code, nil, p1); w.Code != http.StatusNoContent {
+		t.Fatalf("sacar del equipo: %d %s", w.Code, w.Body)
 	}
-	if u, _ := q.GetUserByID(ctx, p1); u.Active {
-		t.Fatal("diego quedó activo")
+	if u, _ := q.GetUserByID(ctx, p1); !u.Active {
+		t.Fatal("sacar del equipo no da de baja la cuenta")
+	}
+	if gs, _ := q.ListUserGroupsWithAreas(ctx, p1); len(gs) != 0 {
+		t.Fatalf("diego sigue con grupos del área: %+v", gs)
+	}
+
+	// Agregar a alguien que ya existe: aparece entre los candidatos (los
+	// admin no, para la jefatura) y entra con el grupo elegido.
+	admin := id(`INSERT INTO users (username, email, full_name, password_hash, role) VALUES ($1, $1 || '@test.local', $1, 'x', 'admin') RETURNING id`, "adm"+nonce)
+	w = call(h.Candidates, "GET", "/?area="+code, nil, uuid.Nil)
+	var cands struct{ Data []teamCandidateDTO }
+	_ = json.Unmarshal(w.Body.Bytes(), &cands)
+	ids := map[uuid.UUID]bool{}
+	for _, c := range cands.Data {
+		ids[c.ID] = true
+	}
+	if !ids[p1] || ids[p2] || ids[admin] || ids[lead] {
+		t.Fatalf("candidatos: diego sí; marcela (ya está), la jefatura y un admin no: %s", w.Body)
+	}
+	if w := call(h.Join, "POST", "/", map[string]any{"area": code, "groupId": n1}, admin); w.Code != http.StatusBadRequest {
+		t.Fatalf("la jefatura no agrega administradores: %d", w.Code)
+	}
+	if w := call(h.Join, "POST", "/", map[string]any{"area": code, "groupId": leadG}, p1); w.Code != http.StatusBadRequest {
+		t.Fatalf("no entra con un grupo de jefatura: %d", w.Code)
+	}
+	if w := call(h.Join, "POST", "/", map[string]any{"area": code, "groupId": n1}, p1); w.Code != http.StatusNoContent {
+		t.Fatalf("agregar a diego: %d %s", w.Code, w.Body)
+	}
+	if gs, _ := q.ListUserGroupsWithAreas(ctx, p1); len(gs) != 1 || gs[0].ID != n1 {
+		t.Fatalf("diego vuelve con su grupo: %+v", gs)
+	}
+	if w := call(h.Join, "POST", "/", map[string]any{"area": code, "groupId": n1}, p1); w.Code != http.StatusBadRequest {
+		t.Fatalf("ya está en el área: %d", w.Code)
 	}
 
 	// Alta: rol usuario, contraseña temporal, el grupo elegido.
@@ -191,7 +224,7 @@ func TestTeam_JefaturaDePuntaAPunta(t *testing.T) {
 		t.Fatalf("usuario repetido: %d", w.Code)
 	}
 
-	for _, want := range []string{"team.person.group", "team.person.deactivate", "team.person.create"} {
+	for _, want := range []string{"team.person.group", "team.person.leave", "team.person.join", "team.person.create"} {
 		if !slices.Contains(rec.events, want) {
 			t.Fatalf("auditoría sin %s: %v", want, rec.events)
 		}

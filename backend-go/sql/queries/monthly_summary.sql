@@ -37,3 +37,9 @@ WHERE scope = 'person'
   AND (CASE WHEN bonus_rank IS NOT NULL THEN confirmed_at ELSE completed_at END) >= sqlc.arg('from_at')::timestamptz
   AND (CASE WHEN bonus_rank IS NOT NULL THEN confirmed_at ELSE completed_at END) < sqlc.arg('to_at')::timestamptz
 GROUP BY person_user_id;
+
+-- name: ReplaceMonthlySummary :exec
+-- Rehace la foto de un mes congelado con una versión anterior del resumen
+-- (p. ej. antes de las entradas de la Bitácora, 10f).
+INSERT INTO monthly_summaries (area_id, month, data) VALUES ($1, $2, $3)
+ON CONFLICT (area_id, month) DO UPDATE SET data = EXCLUDED.data, frozen_at = now();

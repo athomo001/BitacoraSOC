@@ -32,6 +32,8 @@ export interface ShellNavItem {
   requiresAreaOps?: boolean;
   /** Gestión CSM: perfil Gestión, jefaturas y admin (9.4). */
   requiresManagement?: boolean;
+  /** Mi equipo: jefaturas, admin y auditor (10f: el auditor ve la Calidad). */
+  requiresTeam?: boolean;
 }
 
 export const SHELL_NAV_ITEMS: readonly ShellNavItem[] = [
@@ -53,7 +55,7 @@ export const SHELL_NAV_ITEMS: readonly ShellNavItem[] = [
   { path: 'complements', labelKey: 'nav.complements', icon: 'extension', shortcutDigit: '7', requiresFeature: 'complements', requiresComplements: true },
   // Gestión CSM (spec/16 §4.4, 9.4): perfil Gestión, jefaturas y admin.
   { path: 'management', labelKey: 'nav.management', icon: 'insights', requiresManagement: true },
-  // Mi equipo (spec/16 §3.5, 9d): solo la jefatura de área.
-  { path: 'team', labelKey: 'nav.team', icon: 'groups', shortcutDigit: '9', requiresCapability: 'area:lead' },
+  // Mi equipo (spec/16 §3.5, 9d): la jefatura de área; el auditor entra a la Calidad (10f).
+  { path: 'team', labelKey: 'nav.team', icon: 'groups', shortcutDigit: '9', requiresTeam: true },
   { path: 'admin', labelKey: 'nav.admin', icon: 'settings', shortcutDigit: '5' },
 ];

@@ -38,8 +38,14 @@ const MONTHS_BACK = 12;
         <div class="mo__kpis">
           <div class="mo__kpi"><span class="adm-label">{{ i18n.t('team.mo.onTime') }}</span><b>{{ pct(d.onTimePct) }}</b>
             <span class="adm-small" [class]="deltaClass(d.onTimePct, d.previous.onTimePct)">{{ delta(d.onTimePct, d.previous.onTimePct) }}</span></div>
-          <div class="mo__kpi"><span class="adm-label">{{ i18n.t('team.mo.sla') }}</span><b>{{ pct(d.slaPct) }}</b>
-            <span class="adm-small" [class]="deltaClass(d.slaPct, d.previous.slaPct)">{{ delta(d.slaPct, d.previous.slaPct) }}</span></div>
+          @if (d.tickets) {
+            <div class="mo__kpi"><span class="adm-label">{{ i18n.t('team.mo.sla') }}</span><b>{{ pct(d.slaPct) }}</b>
+              <span class="adm-small" [class]="deltaClass(d.slaPct, d.previous.slaPct)">{{ delta(d.slaPct, d.previous.slaPct) }}</span></div>
+          }
+          @if (d.bitacora) {
+            <div class="mo__kpi"><span class="adm-label">{{ i18n.t('team.mo.quality') }}</span><b>{{ score(d.summary.total.quality) }}</b>
+              <span class="adm-small" [class]="deltaClass(d.summary.total.quality ?? -1, d.previous.quality ?? -1)">{{ delta(d.summary.total.quality ?? -1, d.previous.quality ?? -1) }}</span></div>
+          }
           <div class="mo__kpi"><span class="adm-label">{{ i18n.t('team.mo.openLate') }}</span><b [class.text-bad]="d.summary.total.openLate > 0">{{ d.summary.total.openLate }}</b>
             <span class="adm-small adm-muted">{{ i18n.t(d.frozen ? 'team.mo.atClose' : 'team.mo.untilToday') }}</span></div>
           <div class="mo__kpi"><span class="adm-label">{{ i18n.t('team.mo.skipped') }}</span><b>{{ d.summary.total.skipped }}</b>
@@ -49,9 +55,10 @@ const MONTHS_BACK = 12;
           <table class="adm-table">
             <thead><tr>
               <th>{{ i18n.t('team.col.person') }}</th><th>{{ i18n.t('team.mo.level') }}</th>
+              @if (d.bitacora) { <th class="adm-num">{{ i18n.t('team.mo.entries') }}</th><th class="adm-num">{{ i18n.t('team.mo.qualityCol') }}</th> }
               <th class="adm-num">{{ i18n.t('team.mo.tasks') }}</th><th class="adm-num">{{ i18n.t('team.mo.onTimeCol') }}</th>
               <th class="adm-num">{{ i18n.t('team.mo.openLate') }}</th><th class="adm-num">{{ i18n.t('team.mo.skipped') }}</th>
-              <th class="adm-num">{{ i18n.t('team.mo.tickets') }}</th><th class="adm-num">{{ i18n.t('team.mo.slaCol') }}</th>
+              @if (d.tickets) { <th class="adm-num">{{ i18n.t('team.mo.tickets') }}</th><th class="adm-num">{{ i18n.t('team.mo.slaCol') }}</th> }
               <th class="adm-num">{{ i18n.t('team.mo.goals') }}</th><th class="adm-num">{{ i18n.t('team.mo.absent') }}</th>
             </tr></thead>
             <tbody>
@@ -59,12 +66,18 @@ const MONTHS_BACK = 12;
                 <tr>
                   <td><strong>{{ p.name }}</strong></td>
                   <td>@if (p.level) { <span class="pill tone-neutral">{{ p.level }}</span> }</td>
+                  @if (d.bitacora) {
+                    <td class="adm-num mono">{{ p.entries ?? 0 }}</td>
+                    <td class="adm-num"><span class="pill {{ qualityTone(p.quality) }}">{{ score(p.quality) }}</span></td>
+                  }
                   <td class="adm-num mono">{{ p.tasks }}</td>
                   <td class="adm-num"><span class="pill {{ tone(onTime(p)) }}">{{ pct(onTime(p)) }}</span></td>
                   <td class="adm-num mono" [class.text-bad]="p.openLate > 0">{{ p.openLate }}</td>
                   <td class="adm-num mono">{{ p.skipped }}</td>
-                  <td class="adm-num mono">{{ p.tickets }}</td>
-                  <td class="adm-num"><span class="pill {{ tone(sla(p)) }}">{{ pct(sla(p)) }}</span></td>
+                  @if (d.tickets) {
+                    <td class="adm-num mono">{{ p.tickets }}</td>
+                    <td class="adm-num"><span class="pill {{ tone(sla(p)) }}">{{ pct(sla(p)) }}</span></td>
+                  }
                   <td class="adm-num mono">{{ p.goalsDone ?? 0 }}</td>
                   <td class="adm-num mono">{{ p.absentDays }}</td>
                 </tr>
@@ -72,9 +85,10 @@ const MONTHS_BACK = 12;
             </tbody>
             <tfoot><tr>
               <td colspan="2"><strong>{{ i18n.tf('team.mo.total', d.summary.areaName) }}</strong></td>
+              @if (d.bitacora) { <td class="adm-num mono">{{ d.summary.total.entries ?? 0 }}</td><td class="adm-num mono">{{ score(d.summary.total.quality) }}</td> }
               <td class="adm-num mono">{{ d.summary.total.tasks }}</td><td class="adm-num mono">{{ pct(d.onTimePct) }}</td>
               <td class="adm-num mono">{{ d.summary.total.openLate }}</td><td class="adm-num mono">{{ d.summary.total.skipped }}</td>
-              <td class="adm-num mono">{{ d.summary.total.tickets }}</td><td class="adm-num mono">{{ pct(d.slaPct) }}</td>
+              @if (d.tickets) { <td class="adm-num mono">{{ d.summary.total.tickets }}</td><td class="adm-num mono">{{ pct(d.slaPct) }}</td> }
               <td class="adm-num mono">{{ d.summary.total.goalsDone ?? 0 }}</td>
               <td class="adm-num mono">{{ d.summary.total.absentDays }}</td>
             </tr></tfoot>
@@ -109,7 +123,7 @@ const MONTHS_BACK = 12;
     .mo__month { min-width: 130px; text-align: center; text-transform: capitalize; }
     .mo__print-only { display: none; }
     .mo__banner { display: flex; align-items: center; gap: 6px; margin: 12px 14px 0; padding: 8px 12px; border-radius: var(--radius-md); background: var(--status-warning-bg); font-size: 12px; }
-    .mo__kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; padding: 12px 14px; }
+    .mo__kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; padding: 12px 14px; }
     .mo__kpi { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); }
     .mo__kpi b { font-size: 22px; font-variant-numeric: tabular-nums; }
     .mo__foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px 14px; }
@@ -199,6 +213,17 @@ export class TeamMonthlyComponent {
 
   protected pct(v: number): string {
     return v < 0 ? '—' : `${v} %`;
+  }
+
+  /** Puntaje de calidad (10f): -1 o sin dato = sin evaluar. */
+  protected score(v: number | undefined): string {
+    return v === undefined || v < 0 ? '—' : String(v);
+  }
+
+  /** Mismos cortes que los estados de Calidad: bajo 50 y bajo 75. */
+  protected qualityTone(v: number | undefined): string {
+    if (v === undefined || v < 0) return 'tone-neutral';
+    return v >= 75 ? 'tone-ok' : v >= 50 ? 'tone-warn' : 'tone-bad';
   }
 
   protected tone(v: number): string {

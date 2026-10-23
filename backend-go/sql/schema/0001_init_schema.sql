@@ -2765,3 +2765,29 @@ CREATE TABLE client_notes (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX idx_client_notes_client ON client_notes(client_id, pinned DESC, created_at DESC);
+
+-- 000060: departamentos (spec/16 §3.5.1).
+CREATE TABLE departments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL CHECK (length(trim(name)) > 0),
+  sort_order INT NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX idx_departments_name ON departments(lower(name));
+
+ALTER TABLE areas
+  ADD COLUMN department_id UUID REFERENCES departments(id) ON DELETE SET NULL,
+  ADD COLUMN shares_team BOOLEAN NOT NULL DEFAULT false;
+CREATE INDEX idx_areas_department ON areas(department_id);
+
+ALTER TABLE permission_groups
+  ADD COLUMN department_id UUID UNIQUE REFERENCES departments(id) ON DELETE CASCADE;
+
+CREATE TABLE management_scopes (
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  department_id UUID REFERENCES departments(id) ON DELETE CASCADE,
+  area_id UUID REFERENCES areas(id) ON DELETE CASCADE,
+  CHECK ((department_id IS NULL) <> (area_id IS NULL))
+);
+CREATE UNIQUE INDEX idx_management_scopes_dept ON management_scopes(user_id, department_id) WHERE department_id IS NOT NULL;
+CREATE UNIQUE INDEX idx_management_scopes_area ON management_scopes(user_id, area_id) WHERE area_id IS NOT NULL;

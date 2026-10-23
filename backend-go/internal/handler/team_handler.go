@@ -3,7 +3,6 @@ package handler
 import (
 	"context"
 	"crypto/rand"
-	"errors"
 	"net/http"
 	"regexp"
 	"slices"
@@ -46,6 +45,10 @@ type TeamHandler struct {
 type teamAreaDTO struct {
 	Code string `json:"code"`
 	Name string `json:"name"`
+	// Lead: es jefatura del área (el auditor ve las demás solo para la Calidad).
+	Lead bool `json:"lead"`
+	// Quality: el área usa la Bitácora y tiene la pestaña Calidad (10f).
+	Quality bool `json:"quality"`
 }
 
 type leadGroupDTO struct {
@@ -60,12 +63,16 @@ type teamDayDTO struct {
 }
 
 type teamPersonDTO struct {
-	ID       uuid.UUID      `json:"id"`
-	Username string         `json:"username"`
-	FullName string         `json:"fullName"`
-	Email    string         `json:"email"`
-	Active   bool           `json:"active"`
-	Editable bool           `json:"editable"`
+	ID       uuid.UUID `json:"id"`
+	Username string    `json:"username"`
+	FullName string    `json:"fullName"`
+	Email    string    `json:"email"`
+	Active   bool      `json:"active"`
+	Editable bool      `json:"editable"`
+	// Removable: la jefatura la puede sacar del área (Sacar del equipo).
+	Removable bool `json:"removable"`
+	// Areas: en la vista del departamento, las áreas en que está.
+	Areas    []string       `json:"areas,omitempty"`
 	Groups   []leadGroupDTO `json:"groups"`
 	Today    string         `json:"today"`
 	Week     []teamDayDTO   `json:"week"`
@@ -195,25 +202,56 @@ func pgDate(t time.Time) pgtype.Date { return pgtype.Date{Time: t, Valid: true} 
 // Areas es GET /api/team/areas: las áreas de las que soy jefatura.
 func (h *TeamHandler) Areas(w http.ResponseWriter, r *http.Request) {
 	user, _ := middleware.UserFromContext(r.Context())
-	areas, err := h.leadAreas(r.Context(), user)
+	areas, lead, err := h.visibleAreas(r.Context(), user)
+	if err != nil {
+		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudieron leer tus áreas")
+		return
+	}
+	operativo, err := h.qualityAreas(r.Context())
 	if err != nil {
 		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudieron leer tus áreas")
 		return
 	}
 	out := make([]teamAreaDTO, 0, len(areas))
 	for _, a := range areas {
-		out = append(out, teamAreaDTO{Code: a.Code, Name: a.Name})
+		// Al auditor solo le sirven las áreas con Calidad.
+		if !lead[a.Code] && !operativo[a.Code] {
+			continue
+		}
+		out = append(out, teamAreaDTO{Code: a.Code, Name: a.Name, Lead: lead[a.Code], Quality: operativo[a.Code]})
 	}
 	writeData(w, http.StatusOK, out)
 }
 
-// Get es GET /api/team?area=: la gente del área, cómo está y su carga.
+// Get es GET /api/team?area=: la gente del área, cómo está y su carga. Con
+// ?department= es el departamento completo (solo para mirar).
 func (h *TeamHandler) Get(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
+	if dep := r.URL.Query().Get("department"); dep != "" {
+		h.getDepartment(w, r, dep)
+		return
+	}
 	user, area, lead, ok := h.leadScope(w, r, r.URL.Query().Get("area"))
 	if !ok {
 		return
 	}
+	view, err := h.teamView(r.Context(), user, area, lead)
+	if err != nil {
+		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo leer el equipo")
+		return
+	}
+	writeData(w, http.StatusOK, view)
+}
+
+type teamViewDTO struct {
+	Area   teamAreaDTO     `json:"area"`
+	Stats  teamStatsDTO    `json:"stats"`
+	People []teamPersonDTO `json:"people"`
+	// Groups: los grupos del área que la jefatura puede asignar.
+	Groups []leadGroupDTO `json:"groups"`
+}
+
+// teamView arma Mi equipo → Personas de un área.
+func (h *TeamHandler) teamView(ctx context.Context, user middleware.AuthenticatedUser, area db.ListLeadAreasRow, lead map[string]bool) (teamViewDTO, error) {
 	isAdmin := user.Role == "admin"
 	now := time.Now()
 	loc := teamLocation()
@@ -230,33 +268,25 @@ func (h *TeamHandler) Get(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	fail := func() {
-		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo leer el equipo")
-	}
 	people, err := h.Queries.ListAreaPeople(ctx, db.ListAreaPeopleParams{Now: pgtype.Timestamptz{Time: now, Valid: true}, AreaID: area.ID})
 	if err != nil {
-		fail()
-		return
+		return teamViewDTO{}, err
 	}
 	memberships, err := h.Queries.ListAreaPeopleGroups(ctx, area.ID)
 	if err != nil {
-		fail()
-		return
+		return teamViewDTO{}, err
 	}
 	areaGroups, err := h.Queries.ListAreaGroups(ctx, area.ID)
 	if err != nil {
-		fail()
-		return
+		return teamViewDTO{}, err
 	}
 	assignments, err := h.Queries.ListAssignmentsForRange(ctx, db.ListAssignmentsForRangeParams{FromDate: pgDate(from), ToDate: pgDate(to)})
 	if err != nil {
-		fail()
-		return
+		return teamViewDTO{}, err
 	}
 	slots, err := h.Queries.ListGuardSlotsForRange(ctx, db.ListGuardSlotsForRangeParams{FromDate: pgDate(from), ToDate: pgDate(to)})
 	if err != nil {
-		fail()
-		return
+		return teamViewDTO{}, err
 	}
 
 	const dayFmt = "2006-01-02"
@@ -286,13 +316,13 @@ func (h *TeamHandler) Get(w http.ResponseWriter, r *http.Request) {
 	for _, p := range people {
 		groups, err := h.Queries.ListUserGroupsWithAreas(ctx, p.ID)
 		if err != nil {
-			fail()
-			return
+			return teamViewDTO{}, err
 		}
 		person := teamPersonDTO{
 			ID: p.ID, Username: p.Username, FullName: p.FullName, Email: p.Email, Active: p.Active,
-			Editable: personManageable(p.Role, p.ID == user.ID, groups, lead, isAdmin),
-			Groups:   groupsOf[p.ID], Tickets: p.OpenTickets, Breached: p.BreachedTickets,
+			Editable:  personManageable(p.Role, p.ID == user.ID, groups, lead, isAdmin),
+			Removable: personRemovable(p.Role, p.ID == user.ID, groups, area.Code, lead, isAdmin),
+			Groups:    groupsOf[p.ID], Tickets: p.OpenTickets, Breached: p.BreachedTickets,
 			Today: dayCondition(assigned[p.ID][today.Format(dayFmt)], onGuard(p.ID, today)),
 		}
 		if person.Groups == nil {
@@ -320,12 +350,7 @@ func (h *TeamHandler) Get(w http.ResponseWriter, r *http.Request) {
 			assignable = append(assignable, leadGroupDTO{ID: g.ID, Name: g.Name, Level: g.LevelName})
 		}
 	}
-	writeData(w, http.StatusOK, map[string]any{
-		"area":   teamAreaDTO{Code: area.Code, Name: area.Name},
-		"stats":  stats,
-		"people": out,
-		"groups": assignable,
-	})
+	return teamViewDTO{Area: teamAreaDTO{Code: area.Code, Name: area.Name}, Stats: stats, People: out, Groups: assignable}, nil
 }
 
 // target carga a la persona y verifica que la jefatura pueda tocarla.
@@ -498,6 +523,10 @@ func (h *TeamHandler) CreatePerson(w http.ResponseWriter, r *http.Request) {
 		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo asignar el grupo")
 		return
 	}
+	if err := propagateShared(ctx, q, created.ID, placementDTO{}, user.ID); err != nil {
+		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo asignar el grupo")
+		return
+	}
 	if err := tx.Commit(ctx); err != nil {
 		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo agregar a la persona")
 		return
@@ -541,6 +570,11 @@ func (h *TeamHandler) SetGroup(w http.ResponseWriter, r *http.Request) {
 		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudieron leer sus grupos")
 		return
 	}
+	before, err := placementOf(ctx, h.Queries, person.ID)
+	if err != nil {
+		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudieron leer sus grupos")
+		return
+	}
 	err = pgx.BeginFunc(ctx, h.Pool, func(tx pgx.Tx) error {
 		q := h.Queries.WithTx(tx)
 		for _, g := range current {
@@ -550,12 +584,15 @@ func (h *TeamHandler) SetGroup(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		}
-		if slices.ContainsFunc(current, func(g db.ListUserGroupsWithAreasRow) bool { return g.ID == group.ID }) {
-			return nil
+		if !slices.ContainsFunc(current, func(g db.ListUserGroupsWithAreasRow) bool { return g.ID == group.ID }) {
+			if err := q.AddUserPermissionGroup(ctx, db.AddUserPermissionGroupParams{
+				UserID: person.ID, PermissionGroupID: group.ID, AssignedBy: pgtype.UUID{Bytes: user.ID, Valid: true},
+			}); err != nil {
+				return err
+			}
 		}
-		return q.AddUserPermissionGroup(ctx, db.AddUserPermissionGroupParams{
-			UserID: person.ID, PermissionGroupID: group.ID, AssignedBy: pgtype.UUID{Bytes: user.ID, Valid: true},
-		})
+		// El nuevo nivel vale también en las áreas que comparten equipo.
+		return propagateShared(ctx, q, person.ID, before, user.ID)
 	})
 	if err != nil {
 		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo cambiar el grupo")
@@ -567,39 +604,176 @@ func (h *TeamHandler) SetGroup(w http.ResponseWriter, r *http.Request) {
 	writeNoContent(w)
 }
 
-type teamActiveRequest struct {
-	Area   string `json:"area"`
-	Active *bool  `json:"active"`
+// personRemovable: la jefatura puede sacar a la persona del área si no es
+// administradora ni ella misma y todos sus grupos del área son de los que
+// asigna (un grupo compartido con otra área o de jefatura lo saca el admin).
+// El admin saca a cualquiera menos a sí mismo.
+func personRemovable(role db.UserRole, self bool, groups []db.ListUserGroupsWithAreasRow, areaCode string, lead map[string]bool, isAdmin bool) bool {
+	if self {
+		return false
+	}
+	if isAdmin {
+		return true
+	}
+	if role == db.UserRoleAdmin {
+		return false
+	}
+	for _, g := range groups {
+		if slices.Contains(g.AreaCodes, areaCode) && !groupAssignable(g.AreaCodes, g.Capabilities, lead, false) {
+			return false
+		}
+	}
+	return true
 }
 
-// SetActive es PATCH /api/team/people/{id}: dar de baja o reactivar.
-func (h *TeamHandler) SetActive(w http.ResponseWriter, r *http.Request) {
+type teamCandidateDTO struct {
+	ID       uuid.UUID `json:"id"`
+	Username string    `json:"username"`
+	Name     string    `json:"name"`
+	// Areas: las áreas en que ya está (sigue en ellas).
+	Areas []string `json:"areas"`
+}
+
+// Candidates es GET /api/team/candidates?area=: las cuentas activas que
+// todavía no están en el área, para «Agregar a alguien que ya existe». La
+// jefatura no ve a los administradores.
+func (h *TeamHandler) Candidates(w http.ResponseWriter, r *http.Request) {
+	user, area, _, ok := h.leadScope(w, r, r.URL.Query().Get("area"))
+	if !ok {
+		return
+	}
+	rows, err := h.Queries.ListTeamCandidates(r.Context(), area.ID)
+	if err != nil {
+		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo leer la gente")
+		return
+	}
+	out := make([]teamCandidateDTO, 0, len(rows))
+	for _, c := range rows {
+		if c.Role == string(db.UserRoleAdmin) && user.Role != "admin" {
+			continue
+		}
+		out = append(out, teamCandidateDTO{ID: c.ID, Username: c.Username, Name: c.Name, Areas: c.AreaNames})
+	}
+	writeData(w, http.StatusOK, out)
+}
+
+// Join es POST /api/team/people/{id}/join {area, groupId}: suma al área a
+// alguien que ya tiene cuenta, con un grupo del área que la jefatura asigna.
+// Sus otras áreas no se tocan.
+func (h *TeamHandler) Join(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	var req teamActiveRequest
-	if err := decodeJSON(w, r, &req); err != nil || req.Active == nil {
-		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "falta active")
+	var req teamGroupRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "cuerpo de la request inválido")
 		return
 	}
 	user, area, lead, ok := h.leadScope(w, r, req.Area)
 	if !ok {
 		return
 	}
-	person, ok := h.target(w, r, user, area, lead)
+	isAdmin := user.Role == "admin"
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		problemdetails.Write(w, r, http.StatusNotFound, "not-found", "id inválido")
+		return
+	}
+	rows, err := h.Queries.ListTeamCandidates(ctx, area.ID)
+	if err != nil {
+		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo leer la gente")
+		return
+	}
+	idx := slices.IndexFunc(rows, func(c db.ListTeamCandidatesRow) bool { return c.ID == id })
+	if idx < 0 || (rows[idx].Role == string(db.UserRoleAdmin) && !isAdmin) {
+		problemdetails.Write(w, r, http.StatusBadRequest, "not-candidate", "esa persona ya está en el área, no está activa o la agrega el administrador")
+		return
+	}
+	group, ok := h.assignableGroup(w, r, area, lead, isAdmin, req.GroupID)
 	if !ok {
 		return
 	}
-	if _, err := h.Queries.SetUserActive(ctx, db.SetUserActiveParams{ID: person.ID, Active: *req.Active}); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			problemdetails.Write(w, r, http.StatusNotFound, "not-found", "persona no encontrada")
-			return
-		}
-		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo actualizar a la persona")
+	before, err := placementOf(ctx, h.Queries, id)
+	if err != nil {
+		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudieron leer sus grupos")
 		return
 	}
-	action, level := "team.person.reactivate", audit.LevelInfo
-	if !*req.Active {
-		action, level = "team.person.deactivate", audit.LevelWarn
+	err = pgx.BeginFunc(ctx, h.Pool, func(tx pgx.Tx) error {
+		q := h.Queries.WithTx(tx)
+		if err := q.AddUserPermissionGroup(ctx, db.AddUserPermissionGroupParams{
+			UserID: id, PermissionGroupID: group.ID, AssignedBy: pgtype.UUID{Bytes: user.ID, Valid: true},
+		}); err != nil {
+			return err
+		}
+		// Si el área comparte equipo, entra también a sus hermanas.
+		return propagateShared(ctx, q, id, before, user.ID)
+	})
+	if err != nil {
+		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo agregar a la persona")
+		return
 	}
-	h.AuditLog.Log(ctx, action, level, audit.Success(), map[string]any{"area": area.Code, "userId": person.ID.String(), "username": person.Username})
+	h.AuditLog.Log(ctx, "team.person.join", audit.LevelInfo, audit.Success(), map[string]any{
+		"area": area.Code, "userId": id.String(), "username": rows[idx].Username, "group": group.Name,
+	})
+	writeNoContent(w)
+}
+
+// Leave es DELETE /api/team/people/{id}?area=: saca a la persona del área
+// (le quita sus grupos del área). La cuenta sigue activa y sus entradas
+// quedan; dar de baja una cuenta es del administrador (Usuarios y grupos).
+func (h *TeamHandler) Leave(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	user, area, lead, ok := h.leadScope(w, r, r.URL.Query().Get("area"))
+	if !ok {
+		return
+	}
+	isAdmin := user.Role == "admin"
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		problemdetails.Write(w, r, http.StatusNotFound, "not-found", "id inválido")
+		return
+	}
+	person, err := h.Queries.GetUserByID(ctx, id)
+	if err != nil {
+		problemdetails.Write(w, r, http.StatusNotFound, "not-found", "persona no encontrada")
+		return
+	}
+	groups, err := h.Queries.ListUserGroupsWithAreas(ctx, id)
+	if err != nil {
+		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudieron leer sus grupos")
+		return
+	}
+	var inArea []db.ListUserGroupsWithAreasRow
+	for _, g := range groups {
+		if slices.Contains(g.AreaCodes, area.Code) {
+			inArea = append(inArea, g)
+		}
+	}
+	if len(inArea) == 0 {
+		problemdetails.Write(w, r, http.StatusNotFound, "not-found", "la persona no es de esta área")
+		return
+	}
+	if !personRemovable(person.Role, person.ID == user.ID, groups, area.Code, lead, isAdmin) {
+		problemdetails.Write(w, r, http.StatusForbidden, "not-manageable", "esta persona es administradora, eres tú o tiene un grupo compartido con otra área: la saca el administrador")
+		return
+	}
+	before, err := placementOf(ctx, h.Queries, id)
+	if err != nil {
+		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudieron leer sus grupos")
+		return
+	}
+	err = pgx.BeginFunc(ctx, h.Pool, func(tx pgx.Tx) error {
+		q := h.Queries.WithTx(tx)
+		for _, g := range inArea {
+			if err := q.RemoveUserPermissionGroup(ctx, db.RemoveUserPermissionGroupParams{UserID: id, PermissionGroupID: g.ID}); err != nil {
+				return err
+			}
+		}
+		// Si el área comparte equipo, sale también de sus hermanas.
+		return propagateShared(ctx, q, id, before, user.ID)
+	})
+	if err != nil {
+		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo sacar a la persona")
+		return
+	}
+	h.AuditLog.Log(ctx, "team.person.leave", audit.LevelInfo, audit.Success(), map[string]any{"area": area.Code, "userId": id.String(), "username": person.Username})
 	writeNoContent(w)
 }

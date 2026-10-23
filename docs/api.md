@@ -226,8 +226,16 @@ Generada desde `backend-go/cmd/server/main.go`, donde se registran las rutas. La
 | `GET` | `/api/areas` | Admin |
 | `POST` | `/api/areas` | Admin |
 | `PATCH` | `/api/areas/{code}` | Admin |
+| `GET` | `/api/areas/{code}/usage` | Admin — su gente y sus datos (`empty` = se puede borrar) |
+| `DELETE` | `/api/areas/{code}` | Admin — solo un área vacía; SOC y NOC no se borran |
+| `POST` | `/api/areas/{code}/merge` | Admin — `{into}`: toda su gente (con su nivel) y sus datos pasan al área destino; queda vacía |
 | `GET` | `/api/areas/{code}/people` | Admin |
 | `POST` | `/api/areas/{code}/people` | Admin |
+| `GET` | `/api/departments` | Admin — departamentos con sus áreas, las que comparten equipo y su jefatura |
+| `POST` | `/api/departments` | Admin — `{name}`; crea también su grupo de jefatura |
+| `PATCH` | `/api/departments/{id}` | Admin — `{name?, areas?, shared?}`; marcar áreas que comparten equipo iguala su gente |
+| `PUT` | `/api/departments/{id}/leads` | Admin — `{userIds}`: jefatura de todas sus áreas |
+| `DELETE` | `/api/departments/{id}` | Admin — sus áreas quedan sin departamento |
 | `GET` | `/api/levels` | Admin |
 | `POST` | `/api/levels` | Admin |
 | `PUT` | `/api/levels/order` | Admin |
@@ -237,14 +245,18 @@ Generada desde `backend-go/cmd/server/main.go`, donde se registran las rutas. La
 
 | Método | Ruta | Acceso |
 | --- | --- | --- |
-| `GET` | `/api/team/areas` | Capacidad `area:lead` |
+| `GET` | `/api/team/areas` | Capacidad `area:lead` o auditor — cada área con `lead` (es jefatura) y `quality` (usa la Bitácora); el auditor ve solo las de Calidad |
 | `GET` | `/api/team?area=` | Capacidad `area:lead` |
 | `GET` | `/api/team/people/{id}/tickets?area=` | Capacidad `area:lead` |
 | `POST` | `/api/team/people` | Capacidad `area:lead` |
 | `PUT` | `/api/team/people/{id}/group` | Capacidad `area:lead` |
-| `PATCH` | `/api/team/people/{id}` | Capacidad `area:lead` |
-| `GET` | `/api/team/monthly?area=&month=YYYY-MM` | Capacidad `area:lead` — resumen mensual del área: por persona y total (tareas, a tiempo, hechas tarde, atrasos abiertos, omitidas, tickets resueltos, dentro del SLA, días ausente), `frozen` y los porcentajes del mes anterior |
+| `GET` | `/api/team/candidates?area=` | Capacidad `area:lead` — cuentas activas que no están en el área (la jefatura no ve administradores) |
+| `POST` | `/api/team/people/{id}/join` | Capacidad `area:lead` — `{area, groupId}`: suma al área a alguien que ya tiene cuenta |
+| `DELETE` | `/api/team/people/{id}?area=` | Capacidad `area:lead` — lo saca del área (sus grupos del área); la cuenta sigue activa |
+| `GET` | `/api/team/monthly?area=&month=YYYY-MM` | Capacidad `area:lead` — resumen mensual del área: por persona y total (tareas, a tiempo, hechas tarde, atrasos abiertos, omitidas, tickets resueltos, dentro del SLA, días ausente), `frozen` y los porcentajes del mes anterior. En áreas con Bitácora, `entries` y `quality` por persona (10f); la respuesta trae `bitacora` y `tickets` (Ticketera encendida) |
 | `POST` | `/api/team/monthly/send` | Capacidad `area:lead` — `{area, month, to: [correos]}` (1 a 30, dominios válidos de Reportes) |
+| `GET` | `/api/team/quality?area=&days=7\|15\|30` o `&month=YYYY-MM` | Capacidad `area:lead` (sus áreas) o auditor (todas) — puntaje de calidad de registro por persona (10f): entradas, turnos, puntaje, estado, ausencia y las 7 reglas con porcentaje, puntos, si pasa el límite y ejemplos. `404` si el área no usa la Bitácora |
+| `GET` | `/api/team/departments` | Capacidad `area:lead` o auditor — los departamentos que dirige (el admin, todos; el auditor, los que tienen Calidad). `GET /api/team`, `/api/team/monthly` y `/api/team/quality` aceptan `?department=` |
 
 ### Configuración
 
@@ -599,6 +611,8 @@ Spec/16 §4.4 (9.4). Ven Gestión el perfil Gestión, las jefaturas y el admin; 
 | --- | --- | --- |
 | `GET` | `/api/management/meta` | Gestión — objetivo del SLA, CSM posibles y las personas a las que el usuario puede ponerles metas |
 | `PUT` | `/api/management/settings` | Admin — `{slaTarget}` (50 a 100) |
+| `GET` | `/api/departments/csm-people` | Admin — quienes están marcados como CSM (permiso extra `csm`) |
+| `PUT` | `/api/departments/{id}/csms` | Admin — `{csms: [{id, areas}]}`: las CSM del departamento y a qué áreas va cada una (vacío = todas) |
 | `GET` | `/api/management/clients` | Gestión — la cartera: semáforo calculado (`health: {state, reasons, tickets, contact, keyTasks}`), CSM, renovación y próxima acción |
 | `GET` | `/api/management/clients/{id}` | Gestión — la ficha: cifras del mes, tickets abiertos con su SLA, acciones, metas, comunicaciones, línea de tiempo y pasos de la renovación |
 | `GET` | `/api/management/clients/{id}/notes` | Solo el perfil Gestión (ni el admin ni las jefaturas) — notas internas del CSM, las fijadas arriba (`spec/16` §4.7.1) |

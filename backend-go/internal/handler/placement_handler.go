@@ -40,6 +40,7 @@ var extraCapabilities = map[string]string{
 	"directory:delete":      "Directorio: borrar",
 	"tickets:change_client": "Tickets: cambiar cliente",
 	CapNoticesSend:          "Enviar avisos con acuse",
+	CapCSM:                  "CSM",
 }
 
 type placementArea struct {
@@ -60,6 +61,9 @@ type groupShape struct {
 	Level string // "" = sin nivel
 	Caps  []string
 	Areas []string
+	// Fixed: la jefatura de un departamento; la mantiene el departamento y el
+	// panel de la persona no la quita.
+	Fixed bool
 }
 
 // shapeSpec es un grupo automático que hace falta.
@@ -76,7 +80,7 @@ func shapesOf(rows []db.ListUserGroupShapesRow) []groupShape {
 		if r.LevelID.Valid {
 			level = uuid.UUID(r.LevelID.Bytes).String()
 		}
-		out = append(out, groupShape{ID: r.ID, Level: level, Caps: r.Capabilities, Areas: r.AreaCodes})
+		out = append(out, groupShape{ID: r.ID, Level: level, Caps: r.Capabilities, Areas: r.AreaCodes, Fixed: r.Fixed})
 	}
 	return out
 }
@@ -135,6 +139,9 @@ func planPlacement(current []groupShape, want placementDTO, active map[string]bo
 		}
 	}
 	keep := func(g groupShape) bool {
+		if g.Fixed {
+			return true
+		}
 		for _, a := range g.Areas {
 			if !active[a] {
 				continue
@@ -261,6 +268,10 @@ func ensureShapedGroup(ctx context.Context, q *db.Queries, spec shapeSpec, areas
 	if spec.Area != "" {
 		profile = area.DefaultProfile
 	}
+	// La CSM tiene Gestión (perfil Gestión).
+	if slices.Contains(spec.Caps, CapCSM) {
+		profile = "gestion"
+	}
 	var code, name string
 	switch {
 	case slices.Contains(spec.Caps, CapAreaLead):
@@ -347,25 +358,14 @@ func (h *PlacementHandler) Put(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			return err
 		}
-		remove, add := planPlacement(shapesOf(rows), req, activeSet(areas))
-		for _, g := range remove {
-			if err := q.RemoveUserPermissionGroup(ctx, db.RemoveUserPermissionGroupParams{UserID: id, PermissionGroupID: g}); err != nil {
-				return err
-			}
+		sets, err := sharedSets(ctx, q)
+		if err != nil {
+			return err
 		}
-		for _, spec := range add {
-			groupID, err := ensureShapedGroup(ctx, q, spec, areas, levels)
-			if err != nil {
-				return err
-			}
-			if err := q.AddUserPermissionGroup(ctx, db.AddUserPermissionGroupParams{
-				UserID: id, PermissionGroupID: groupID, AssignedBy: pgtype.UUID{Bytes: actor.ID, Valid: actor.ID != uuid.Nil},
-			}); err != nil {
-				return err
-			}
-		}
-		added, removed = len(add), len(remove)
-		return nil
+		// Lo que cambia en un área que comparte equipo vale para sus hermanas.
+		want := shareTeam(derivePlacement(shapesOf(rows), activeSet(areas)), req, sets)
+		added, removed, err = applyPlacement(ctx, q, id, want, areas, levels, actor.ID)
+		return err
 	})
 	if err != nil {
 		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo guardar")
@@ -517,9 +517,12 @@ func (h *PlacementHandler) CreateAreaPerson(w http.ResponseWriter, r *http.Reque
 		if err != nil {
 			return err
 		}
-		return q.AddUserPermissionGroup(ctx, db.AddUserPermissionGroupParams{
+		if err := q.AddUserPermissionGroup(ctx, db.AddUserPermissionGroupParams{
 			UserID: u.ID, PermissionGroupID: groupID, AssignedBy: pgtype.UUID{Bytes: actor.ID, Valid: actor.ID != uuid.Nil},
-		})
+		}); err != nil {
+			return err
+		}
+		return propagateShared(ctx, q, u.ID, placementDTO{}, actor.ID)
 	})
 	if errors.Is(err, errDuplicateUser) {
 		problemdetails.Write(w, r, http.StatusConflict, "duplicate-user", "ya existe alguien con ese usuario o correo")

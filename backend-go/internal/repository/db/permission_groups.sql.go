@@ -31,7 +31,7 @@ func (q *Queries) AddUserPermissionGroup(ctx context.Context, arg AddUserPermiss
 const createPermissionGroup = `-- name: CreatePermissionGroup :one
 INSERT INTO permission_groups (code, name, capabilities, profile, level_id)
 VALUES ($1, $2, $3, $4, $5)
-RETURNING id, code, name, capabilities, active, created_at, profile, level_id
+RETURNING id, code, name, capabilities, active, created_at, profile, level_id, department_id
 `
 
 type CreatePermissionGroupParams struct {
@@ -60,12 +60,13 @@ func (q *Queries) CreatePermissionGroup(ctx context.Context, arg CreatePermissio
 		&i.CreatedAt,
 		&i.Profile,
 		&i.LevelID,
+		&i.DepartmentID,
 	)
 	return i, err
 }
 
 const getPermissionGroup = `-- name: GetPermissionGroup :one
-SELECT id, code, name, capabilities, active, created_at, profile, level_id FROM permission_groups WHERE id = $1
+SELECT id, code, name, capabilities, active, created_at, profile, level_id, department_id FROM permission_groups WHERE id = $1
 `
 
 func (q *Queries) GetPermissionGroup(ctx context.Context, id uuid.UUID) (PermissionGroup, error) {
@@ -80,12 +81,13 @@ func (q *Queries) GetPermissionGroup(ctx context.Context, id uuid.UUID) (Permiss
 		&i.CreatedAt,
 		&i.Profile,
 		&i.LevelID,
+		&i.DepartmentID,
 	)
 	return i, err
 }
 
 const listPermissionGroups = `-- name: ListPermissionGroups :many
-SELECT id, code, name, capabilities, active, created_at, profile, level_id FROM permission_groups
+SELECT id, code, name, capabilities, active, created_at, profile, level_id, department_id FROM permission_groups
 WHERE ($1::boolean IS NULL OR active = $1)
 ORDER BY name
 `
@@ -108,6 +110,7 @@ func (q *Queries) ListPermissionGroups(ctx context.Context, active pgtype.Bool) 
 			&i.CreatedAt,
 			&i.Profile,
 			&i.LevelID,
+			&i.DepartmentID,
 		); err != nil {
 			return nil, err
 		}
@@ -120,7 +123,7 @@ func (q *Queries) ListPermissionGroups(ctx context.Context, active pgtype.Bool) 
 }
 
 const listUserPermissionGroups = `-- name: ListUserPermissionGroups :many
-SELECT pg.id, pg.code, pg.name, pg.capabilities, pg.active, pg.created_at, pg.profile, pg.level_id FROM permission_groups pg
+SELECT pg.id, pg.code, pg.name, pg.capabilities, pg.active, pg.created_at, pg.profile, pg.level_id, pg.department_id FROM permission_groups pg
 JOIN user_permission_groups upg ON upg.permission_group_id = pg.id
 WHERE upg.user_id = $1 AND pg.active = true
 ORDER BY pg.name
@@ -144,6 +147,7 @@ func (q *Queries) ListUserPermissionGroups(ctx context.Context, userID uuid.UUID
 			&i.CreatedAt,
 			&i.Profile,
 			&i.LevelID,
+			&i.DepartmentID,
 		); err != nil {
 			return nil, err
 		}
@@ -172,7 +176,7 @@ UPDATE permission_groups SET
   capabilities = COALESCE($6, capabilities),
   active = COALESCE($7, active)
 WHERE id = $1
-RETURNING id, code, name, capabilities, active, created_at, profile, level_id
+RETURNING id, code, name, capabilities, active, created_at, profile, level_id, department_id
 `
 
 type UpdatePermissionGroupParams struct {
@@ -205,6 +209,7 @@ func (q *Queries) UpdatePermissionGroup(ctx context.Context, arg UpdatePermissio
 		&i.CreatedAt,
 		&i.Profile,
 		&i.LevelID,
+		&i.DepartmentID,
 	)
 	return i, err
 }

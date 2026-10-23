@@ -14,7 +14,7 @@ import (
 
 const findShapedGroup = `-- name: FindShapedGroup :one
 SELECT pg.id FROM permission_groups pg
-WHERE pg.active
+WHERE pg.active AND pg.department_id IS NULL
   AND pg.level_id IS NOT DISTINCT FROM $1::uuid
   AND pg.capabilities @> $2::text[] AND pg.capabilities <@ $2::text[]
   AND COALESCE((SELECT array_agg(a.code ORDER BY a.code) FROM permission_group_areas pa JOIN areas a ON a.id = pa.area_id
@@ -52,7 +52,8 @@ func (q *Queries) GroupCodeTaken(ctx context.Context, code string) (bool, error)
 const listUserGroupShapes = `-- name: ListUserGroupShapes :many
 
 SELECT pg.id, pg.name, pg.level_id, pg.capabilities,
-  COALESCE(array_agg(a.code ORDER BY a.code) FILTER (WHERE a.code IS NOT NULL), '{}')::text[] AS area_codes
+  COALESCE(array_agg(a.code ORDER BY a.code) FILTER (WHERE a.code IS NOT NULL), '{}')::text[] AS area_codes,
+  (pg.department_id IS NOT NULL)::bool AS fixed
 FROM user_permission_groups upg
 JOIN permission_groups pg ON pg.id = upg.permission_group_id AND pg.active
 LEFT JOIN permission_group_areas pa ON pa.permission_group_id = pg.id
@@ -68,12 +69,14 @@ type ListUserGroupShapesRow struct {
 	LevelID      pgtype.UUID `json:"level_id"`
 	Capabilities []string    `json:"capabilities"`
 	AreaCodes    []string    `json:"area_codes"`
+	Fixed        bool        `json:"fixed"`
 }
 
 // Usuarios por área y nivel (2026-10-13): la persona se ubica en cada área
 // con un nivel; los grupos («Infra N1», «Jefatura Infra», «Directorio:
 // escribir») se arman solos.
 // Los grupos activos de la persona con su forma: áreas, nivel y capacidades.
+// fixed: la jefatura de un departamento (la mantiene el departamento, no el panel).
 func (q *Queries) ListUserGroupShapes(ctx context.Context, userID uuid.UUID) ([]ListUserGroupShapesRow, error) {
 	rows, err := q.db.Query(ctx, listUserGroupShapes, userID)
 	if err != nil {
@@ -89,6 +92,7 @@ func (q *Queries) ListUserGroupShapes(ctx context.Context, userID uuid.UUID) ([]
 			&i.LevelID,
 			&i.Capabilities,
 			&i.AreaCodes,
+			&i.Fixed,
 		); err != nil {
 			return nil, err
 		}

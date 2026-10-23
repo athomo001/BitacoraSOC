@@ -3,7 +3,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { provideHttpClient } from '@angular/common/http';
 import { provideRouter } from '@angular/router';
 import { TeamComponent } from './team';
-import { TeamView } from '../../core/team/team.service';
+import { TeamArea, TeamView } from '../../core/team/team.service';
 
 const week = (c: string) => ['2026-10-12', '2026-10-13', '2026-10-14', '2026-10-15', '2026-10-16'].map((date) => ({ date, condition: c }));
 const VIEW: TeamView = {
@@ -11,8 +11,8 @@ const VIEW: TeamView = {
   stats: { people: 2, tickets: 6, breached: 2, away: 1 },
   groups: [{ id: 'g1', name: 'Infra N1', level: 'N1' }, { id: 'g2', name: 'Infra N2', level: 'N2' }],
   people: [
-    { id: 'p1', username: 'dlagos', fullName: 'Diego Lagos', email: 'd@x.cl', active: true, editable: true, groups: [{ id: 'g1', name: 'Infra N1' }], today: 'telework', week: week('telework') as never, tickets: 6, breached: 2 },
-    { id: 'p2', username: 'preyes', fullName: 'Pablo Reyes', email: 'p@x.cl', active: true, editable: false, groups: [{ id: 'g2', name: 'Infra N2' }], today: 'vacation', week: week('vacation') as never, tickets: 0, breached: 0 },
+    { id: 'p1', username: 'dlagos', fullName: 'Diego Lagos', email: 'd@x.cl', active: true, editable: true, removable: true, groups: [{ id: 'g1', name: 'Infra N1' }], today: 'telework', week: week('telework') as never, tickets: 6, breached: 2 },
+    { id: 'p2', username: 'preyes', fullName: 'Pablo Reyes', email: 'p@x.cl', active: true, editable: false, removable: false, groups: [{ id: 'g2', name: 'Infra N2' }], today: 'vacation', week: week('vacation') as never, tickets: 0, breached: 0 },
   ],
 };
 
@@ -25,10 +25,11 @@ describe('TeamComponent (Mi equipo, jefatura de área, spec/16 9d)', () => {
     http = TestBed.inject(HttpTestingController);
   });
 
-  async function render(areas = [{ code: 'infra', name: 'Infraestructura' }, { code: 'ti', name: 'TI' }]) {
+  async function render(areas: TeamArea[] = [{ code: 'infra', name: 'Infraestructura', lead: true }, { code: 'ti', name: 'TI', lead: true }]) {
     const fixture = TestBed.createComponent(TeamComponent);
     fixture.detectChanges();
     http.expectOne('/api/team/areas').flush({ data: areas });
+    http.expectOne('/api/team/departments').flush({ data: [] });
     await settle();
     if (areas.length) {
       http.expectOne((r) => r.url === '/api/team' && r.params.get('area') === 'infra').flush({ data: VIEW });
@@ -54,6 +55,47 @@ describe('TeamComponent (Mi equipo, jefatura de área, spec/16 9d)', () => {
     expect(el.querySelectorAll('.tm__day').length).toBe(5);
   });
 
+  it('el auditor ve solo la Calidad de las áreas que usan la Bitácora (10f)', async () => {
+    const fixture = TestBed.createComponent(TeamComponent);
+    fixture.detectChanges();
+    http.expectOne('/api/team/areas').flush({ data: [{ code: 'soc', name: 'SOC', lead: false, quality: true }] });
+    http.expectOne('/api/team/departments').flush({ data: [] });
+    await settle();
+    fixture.detectChanges();
+    http.expectNone('/api/team');
+    const req = http.expectOne((r) => r.url === '/api/team/quality');
+    expect(req.request.params.get('area')).toBe('soc');
+    req.flush({ data: { areaCode: 'soc', areaName: 'SOC', days: 30, from: '2026-09-23', to: '2026-10-22', minEntries: 10, people: [] } });
+    await settle();
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    const tabs = [...el.querySelectorAll('[role=tab]')].map((t) => t.textContent?.trim());
+    expect(tabs).toEqual(['fact_checkCalidad']);
+    expect(el.textContent).toContain('Calidad de registro en SOC');
+  });
+
+  it('la jefatura del departamento lo ve completo, con las áreas de cada persona y solo para mirar', async () => {
+    const fixture = TestBed.createComponent(TeamComponent);
+    fixture.detectChanges();
+    http.expectOne('/api/team/areas').flush({ data: [{ code: 'soc', name: 'SOC', lead: true, quality: true }] });
+    http.expectOne('/api/team/departments').flush({ data: [{ id: 'd1', name: 'CDC', lead: true, quality: true, areas: [{ code: 'soc', name: 'SOC' }] }] });
+    await settle();
+    const req = http.expectOne((r) => r.url === '/api/team');
+    expect(req.request.params.get('department')).toBe('d1');
+    expect(req.request.params.has('area')).toBe(false);
+    req.flush({ data: { ...VIEW, area: { code: '', name: 'CDC' }, groups: [], people: [{ ...VIEW.people[0], areas: ['SOC', 'NOC'], editable: false, removable: false }] } });
+    await settle();
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    expect([...el.querySelectorAll('.seg')].some((b) => b.textContent?.includes('Departamento CDC'))).toBe(true);
+    expect(el.textContent).toContain('Personas del departamento CDC');
+    expect(el.querySelector('tbody tr')?.textContent).toContain('NOC');
+    expect(el.textContent).toContain('Para agregar o cambiar a alguien, elige un área.');
+    expect(button(el, 'Agregar persona')).toBeUndefined();
+    expect(button(el, 'Guardias')).toBeUndefined();
+    http.expectNone((r) => r.url.includes('/tickets'));
+  });
+
   it('sin áreas a cargo lo dice', async () => {
     const { el } = await render([]);
     expect(el.textContent).toContain('No eres jefatura');
@@ -69,28 +111,53 @@ describe('TeamComponent (Mi equipo, jefatura de área, spec/16 9d)', () => {
     http.expectOne((r) => r.url === '/api/team').flush({ data: VIEW });
   });
 
-  it('a quien no puede tocar no le ofrece cambiar grupo ni dar de baja', async () => {
+  it('a quien no puede tocar no le ofrece cambiar grupo ni sacarlo del equipo', async () => {
     const { fixture, el } = await render();
     (el.querySelectorAll('tbody tr')[1] as HTMLElement).click();
     await settle();
     fixture.detectChanges();
     expect(el.textContent).toContain('la gestiona el administrador');
-    expect(button(el, 'Dar de baja')).toBeUndefined();
+    expect(button(el, 'Sacar del equipo')).toBeUndefined();
+    expect(el.textContent).not.toContain('Dar de baja');
   });
 
-  it('dar de baja pide confirmar', async () => {
+  it('sacar del equipo pide confirmar y no da de baja la cuenta', async () => {
     const { fixture, el } = await render();
-    button(el, 'Dar de baja').click();
+    button(el, 'Sacar del equipo').click();
     fixture.detectChanges();
-    expect(el.textContent).toContain('¿Dar de baja a Diego Lagos?');
-    button(el.querySelector('.tm__confirm') as HTMLElement, 'Dar de baja').click();
-    const req = http.expectOne({ method: 'PATCH', url: '/api/team/people/p1' });
-    expect(req.request.body).toEqual({ area: 'infra', active: false });
+    expect(el.textContent).toContain('¿Sacar a Diego Lagos de Infraestructura? Su cuenta sigue activa');
+    button(el.querySelector('.tm__confirm') as HTMLElement, 'Sacar del equipo').click();
+    const req = http.expectOne({ method: 'DELETE', url: '/api/team/people/p1?area=infra' });
+    req.flush(null);
   });
 
-  it('agregar persona muestra la contraseña temporal una vez', async () => {
+  it('agregar a alguien que ya existe: elige la cuenta y el grupo', async () => {
     const { fixture, el } = await render();
     button(el, 'Agregar persona').click();
+    fixture.detectChanges();
+    http.expectOne((r) => r.url === '/api/team/candidates' && r.params.get('area') === 'infra')
+      .flush({ data: [{ id: 'u7', username: 'rguajardo', name: 'Rafael Guajardo', areas: ['NOC'] }] });
+    await settle();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const select = el.querySelector<HTMLSelectElement>('select[name="candidate"]')!;
+    expect(select.textContent).toContain('Rafael Guajardo (rguajardo), ya está en NOC');
+    select.value = 'u7';
+    select.dispatchEvent(new Event('change'));
+    await settle();
+    fixture.detectChanges();
+    el.querySelector('form')!.dispatchEvent(new Event('submit'));
+    const req = http.expectOne({ method: 'POST', url: '/api/team/people/u7/join' });
+    expect(req.request.body).toEqual({ area: 'infra', groupId: 'g1' });
+  });
+
+  it('agregar persona nueva muestra la contraseña temporal una vez', async () => {
+    const { fixture, el } = await render();
+    button(el, 'Agregar persona').click();
+    fixture.detectChanges();
+    http.expectOne((r) => r.url === '/api/team/candidates').flush({ data: [] });
+    await settle();
+    button(el, 'Persona nueva').click();
     fixture.detectChanges();
     await fixture.whenStable();
     const fill = (name: string, value: string) => {

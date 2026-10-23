@@ -64,6 +64,10 @@ func (h *ManagementHandler) ClientNotes(w http.ResponseWriter, r *http.Request) 
 		problemdetails.Write(w, r, http.StatusNotFound, "not-found", "cliente no encontrado")
 		return
 	}
+	if ok, err := h.clientVisible(r.Context(), u, id); err != nil || !ok {
+		problemdetails.Write(w, r, http.StatusNotFound, "not-found", "cliente no encontrado")
+		return
+	}
 	rows, err := h.Queries.ListClientNotes(r.Context(), id)
 	if err != nil {
 		mgmtFail(w, r)
@@ -102,6 +106,10 @@ func (h *ManagementHandler) CreateClientNote(w http.ResponseWriter, r *http.Requ
 	}
 	client, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
+		problemdetails.Write(w, r, http.StatusNotFound, "not-found", "cliente no encontrado")
+		return
+	}
+	if visible, err := h.clientVisible(r.Context(), u, client); err != nil || !visible {
 		problemdetails.Write(w, r, http.StatusNotFound, "not-found", "cliente no encontrado")
 		return
 	}

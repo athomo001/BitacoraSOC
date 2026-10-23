@@ -359,6 +359,61 @@ func (q *Queries) ListPersonOpenTickets(ctx context.Context, arg ListPersonOpenT
 	return items, nil
 }
 
+const listTeamCandidates = `-- name: ListTeamCandidates :many
+SELECT u.id, u.username, COALESCE(NULLIF(u.full_name, ''), u.username)::text AS name, u.role::text AS role,
+  COALESCE((SELECT array_agg(DISTINCT a.name ORDER BY a.name)
+    FROM user_permission_groups upg
+    JOIN permission_groups pg ON pg.id = upg.permission_group_id AND pg.active
+    JOIN permission_group_areas pa ON pa.permission_group_id = pg.id
+    JOIN areas a ON a.id = pa.area_id
+    WHERE upg.user_id = u.id), '{}')::text[] AS area_names
+FROM users u
+WHERE u.active AND u.role IN ('user', 'admin')
+  AND NOT EXISTS (
+    SELECT 1 FROM user_permission_groups upg
+    JOIN permission_groups pg ON pg.id = upg.permission_group_id AND pg.active
+    JOIN permission_group_areas pa ON pa.permission_group_id = pg.id
+    WHERE upg.user_id = u.id AND pa.area_id = $1)
+ORDER BY 3
+`
+
+type ListTeamCandidatesRow struct {
+	ID        uuid.UUID `json:"id"`
+	Username  string    `json:"username"`
+	Name      string    `json:"name"`
+	Role      string    `json:"role"`
+	AreaNames []string  `json:"area_names"`
+}
+
+// Mi equipo → Agregar a alguien que ya existe: cuentas activas que todavía
+// no están en el área, con las áreas en que ya están (el handler deja fuera
+// a los administradores si quien agrega no lo es).
+func (q *Queries) ListTeamCandidates(ctx context.Context, areaID uuid.UUID) ([]ListTeamCandidatesRow, error) {
+	rows, err := q.db.Query(ctx, listTeamCandidates, areaID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListTeamCandidatesRow
+	for rows.Next() {
+		var i ListTeamCandidatesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Username,
+			&i.Name,
+			&i.Role,
+			&i.AreaNames,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listUserGroupsWithAreas = `-- name: ListUserGroupsWithAreas :many
 SELECT pg.id, pg.capabilities,
   COALESCE(array_agg(a.code ORDER BY a.code) FILTER (WHERE a.code IS NOT NULL), '{}')::text[] AS area_codes

@@ -94,7 +94,8 @@ export class ShellComponent implements OnInit {
         (!item.requiresCapability || this.perms.can(item.requiresCapability)()) &&
         (!item.requiresOperational || this.perms.operational()) &&
         (!item.requiresAreaOps || this.perms.areaOps()) &&
-        (!item.requiresManagement || this.perms.management()),
+        (!item.requiresManagement || this.perms.management()) &&
+        (!item.requiresTeam || this.perms.team()),
     ),
   );
   /** SOC o NOC encendidos en la instalación (sin estado todavía, se asume que sí). */

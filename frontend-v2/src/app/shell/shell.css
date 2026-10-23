@@ -310,3 +310,18 @@
     margin-left: 0;
   }
 }
+
+/* Impresión («Descargar PDF»): la barra se oculta (styles.css) y el contenido
+   ocupa todo el ancho; sin esto quedaba en la columna de la barra, porque la
+   regla global pierde contra este estilo encapsulado. */
+@media print {
+  .shell {
+    display: block;
+    height: auto;
+  }
+
+  .shell__workspace {
+    overflow: visible;
+    padding: 0;
+  }
+}

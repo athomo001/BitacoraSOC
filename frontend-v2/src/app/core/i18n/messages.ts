@@ -19,6 +19,7 @@ import type { RaciKey } from './packs/raci';
 import type { IntegrationsKey } from './packs/integrations';
 import type { ImportsKey } from './packs/imports';
 import type { PublicLinksKey } from './packs/public-links';
+import type { DepartmentsKey } from './packs/departments';
 
 const ES = {
   'nav.entries': 'Bitácora',
@@ -252,7 +253,8 @@ export type MessageKey =
   | RaciKey
   | IntegrationsKey
   | ImportsKey
-  | PublicLinksKey;
+  | PublicLinksKey
+  | DepartmentsKey;
 
 /**
  * El inglés va en messages-en.ts y se descarga solo al cambiar a EN: así no

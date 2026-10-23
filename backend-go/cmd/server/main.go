@@ -355,10 +355,23 @@ func run(logger *slog.Logger) error {
 	mux.Handle("GET /api/permission-groups", authed(permissionGroupsHandler.List))
 	mux.Handle("POST /api/permission-groups", admin(permissionGroupsHandler.Create))
 	// Administración → Áreas y niveles (spec/16, 9b).
-	areasHandler := &handler.AreasHandler{Queries: queries, AuditLog: auditLog}
+	areasHandler := &handler.AreasHandler{Queries: queries, Pool: pool, AuditLog: auditLog}
 	mux.Handle("GET /api/areas", admin(areasHandler.List))
+	// Departamentos (spec/16 §3.5.1): agrupan áreas, su jefatura, las que comparten equipo y qué ve cada CSM.
+	departmentsHandler := &handler.DepartmentsHandler{Queries: queries, Pool: pool, AuditLog: auditLog}
+	mux.Handle("GET /api/departments", admin(departmentsHandler.List))
+	mux.Handle("POST /api/departments", admin(departmentsHandler.Create))
+	mux.Handle("PATCH /api/departments/{id}", admin(departmentsHandler.Patch))
+	mux.Handle("PUT /api/departments/{id}/leads", admin(departmentsHandler.SetLeads))
+	mux.Handle("DELETE /api/departments/{id}", admin(departmentsHandler.Delete))
+	mux.Handle("GET /api/departments/csm-people", admin(departmentsHandler.CSMPeople))
+	mux.Handle("PUT /api/departments/{id}/csms", admin(departmentsHandler.SetCSMs))
 	mux.Handle("POST /api/areas", admin(areasHandler.Create))
 	mux.Handle("PATCH /api/areas/{code}", admin(areasHandler.Patch))
+	// Borrar un área vacía, o unirla a otra (todo pasa al destino) para dejarla vacía.
+	mux.Handle("GET /api/areas/{code}/usage", admin(areasHandler.Usage))
+	mux.Handle("DELETE /api/areas/{code}", admin(areasHandler.Delete))
+	mux.Handle("POST /api/areas/{code}/merge", admin(areasHandler.Merge))
 	mux.Handle("GET /api/levels", admin(areasHandler.ListLevels))
 	mux.Handle("POST /api/levels", admin(areasHandler.CreateLevel))
 	mux.Handle("PUT /api/levels/order", admin(areasHandler.OrderLevels))
@@ -402,12 +415,29 @@ func run(logger *slog.Logger) error {
 	mux.Handle("PUT /api/playbooks/{id}", authed(managementHandler.SavePlaybook))
 	mux.Handle("DELETE /api/playbooks/{id}", authed(managementHandler.DeletePlaybook))
 	mux.Handle("POST /api/playbooks/{id}/apply", authed(managementHandler.ApplyPlaybook))
-	mux.Handle("GET /api/team/areas", withCapability(handler.CapAreaLead, teamHandler.Areas))
+	// 10f: el auditor también entra, a la Calidad de todas las áreas.
+	leadOrAuditor := func(h http.HandlerFunc) http.Handler {
+		lead := middleware.RequireCapability(moduleAccess, handler.CapAreaLead)(h)
+		return authed(func(w http.ResponseWriter, r *http.Request) {
+			if u, ok := middleware.UserFromContext(r.Context()); ok && u.Role == "auditor" {
+				h(w, r)
+				return
+			}
+			lead.ServeHTTP(w, r)
+		})
+	}
+	mux.Handle("GET /api/team/areas", leadOrAuditor(teamHandler.Areas))
+	mux.Handle("GET /api/team/quality", leadOrAuditor(teamHandler.Quality))
+	// Departamentos que dirige (o, el auditor, los que tienen Calidad): Mi equipo del departamento.
+	mux.Handle("GET /api/team/departments", leadOrAuditor(teamHandler.Departments))
 	mux.Handle("GET /api/team", withCapability(handler.CapAreaLead, teamHandler.Get))
 	mux.Handle("GET /api/team/people/{id}/tickets", withCapability(handler.CapAreaLead, teamHandler.PersonTickets))
 	mux.Handle("POST /api/team/people", withCapability(handler.CapAreaLead, teamHandler.CreatePerson))
 	mux.Handle("PUT /api/team/people/{id}/group", withCapability(handler.CapAreaLead, teamHandler.SetGroup))
-	mux.Handle("PATCH /api/team/people/{id}", withCapability(handler.CapAreaLead, teamHandler.SetActive))
+	// Agregar a alguien que ya tiene cuenta y sacarlo del área (no da de baja la cuenta).
+	mux.Handle("GET /api/team/candidates", withCapability(handler.CapAreaLead, teamHandler.Candidates))
+	mux.Handle("POST /api/team/people/{id}/join", withCapability(handler.CapAreaLead, teamHandler.Join))
+	mux.Handle("DELETE /api/team/people/{id}", withCapability(handler.CapAreaLead, teamHandler.Leave))
 	// Resumen mensual (spec/16 §6.1, 9.7): se revisa en la app; la jefatura lo envía o lo descarga.
 	mux.Handle("GET /api/team/monthly", withCapability(handler.CapAreaLead, teamHandler.Monthly))
 	mux.Handle("POST /api/team/monthly/send", withCapability(handler.CapAreaLead, teamHandler.SendMonthly))

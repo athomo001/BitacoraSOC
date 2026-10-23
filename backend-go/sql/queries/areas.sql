@@ -33,7 +33,8 @@ WHERE upg.user_id = $1;
 -- ===== Administración → Áreas y niveles (spec/16, 9b) =====
 
 -- name: ListAreasWithUsage :many
-SELECT a.*, (SELECT count(*) FROM permission_group_areas pa WHERE pa.area_id = a.id)::int AS group_count
+-- La jefatura de un departamento no cuenta como grupo del área.
+SELECT a.*, (SELECT count(*) FROM permission_group_areas pa JOIN permission_groups pg ON pg.id = pa.permission_group_id AND pg.department_id IS NULL WHERE pa.area_id = a.id)::int AS group_count
 FROM areas a ORDER BY a.sort_order, a.name;
 
 -- name: CreateArea :one

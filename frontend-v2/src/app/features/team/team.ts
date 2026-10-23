@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal, v
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
-import { TeamArea, TeamCondition, TeamPerson, TeamService, TeamTicket, TeamView } from '../../core/team/team.service';
+import { TeamArea, TeamCandidate, TeamCondition, TeamPerson, TeamService, TeamTicket, TeamView } from '../../core/team/team.service';
 import { problemDetail } from '../../core/http-error';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { MessageKey } from '../../core/i18n/messages';
@@ -10,9 +10,11 @@ import { AdminGuardsComponent } from '../admin/admin-guards';
 import { AdminEscalationComponent } from '../admin/admin-escalation';
 import { TeamGuardsComponent } from './team-guards';
 import { TeamMonthlyComponent } from './team-monthly';
+import { TeamQualityComponent } from './team-quality';
 import { PersonGoalsComponent } from '../management/person-goals';
 
 import '../../core/i18n/packs/team';
+import '../../core/i18n/packs/departments';
 
 const CONDITION_STYLE: Record<TeamCondition, { icon: string; tone: string }> = {
   office: { icon: 'apartment', tone: 'tone-neutral' },
@@ -34,7 +36,7 @@ const CONDITION_STYLE: Record<TeamCondition, { icon: string; tone: string }> = {
 @Component({
   selector: 'app-team',
   standalone: true,
-  imports: [FormsModule, RouterLink, MatIconModule, AdminGuardsComponent, AdminEscalationComponent, TeamGuardsComponent, TeamMonthlyComponent, PersonGoalsComponent],
+  imports: [FormsModule, RouterLink, MatIconModule, AdminGuardsComponent, AdminEscalationComponent, TeamGuardsComponent, TeamMonthlyComponent, TeamQualityComponent, PersonGoalsComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <header class="tm__head no-print">
@@ -53,13 +55,25 @@ const CONDITION_STYLE: Record<TeamCondition, { icon: string; tone: string }> = {
     </header>
     @if (error(); as e) { <p class="adm-error" role="alert">{{ e }}</p> }
 
-    @if (view(); as v) {
+    @if (areaInfo(); as a) {
       <div class="tm__tabs no-print" role="tablist">
-        <button type="button" role="tab" class="seg" [attr.aria-pressed]="tab() === 'people'" [attr.aria-selected]="tab() === 'people'" (click)="tab.set('people')"><mat-icon>badge</mat-icon>{{ i18n.t('team.tab.people') }}</button>
-        <button type="button" role="tab" class="seg" [attr.aria-pressed]="tab() === 'guards'" [attr.aria-selected]="tab() === 'guards'" (click)="tab.set('guards')"><mat-icon>shield</mat-icon>{{ i18n.t('team.tab.guards') }}</button>
-        <button type="button" role="tab" class="seg" [attr.aria-pressed]="tab() === 'escalation'" [attr.aria-selected]="tab() === 'escalation'" (click)="tab.set('escalation')"><mat-icon>call_split</mat-icon>{{ i18n.t('team.tab.escalation') }}</button>
-        <button type="button" role="tab" class="seg" [attr.aria-pressed]="tab() === 'monthly'" [attr.aria-selected]="tab() === 'monthly'" (click)="tab.set('monthly')"><mat-icon>insights</mat-icon>{{ i18n.t('team.tab.monthly') }}</button>
+        @if (a.lead) {
+          <button type="button" role="tab" class="seg" [attr.aria-pressed]="tab() === 'people'" [attr.aria-selected]="tab() === 'people'" (click)="tab.set('people')"><mat-icon>badge</mat-icon>{{ i18n.t('team.tab.people') }}</button>
+          @if (!a.department) {
+            <button type="button" role="tab" class="seg" [attr.aria-pressed]="tab() === 'guards'" [attr.aria-selected]="tab() === 'guards'" (click)="tab.set('guards')"><mat-icon>shield</mat-icon>{{ i18n.t('team.tab.guards') }}</button>
+            <button type="button" role="tab" class="seg" [attr.aria-pressed]="tab() === 'escalation'" [attr.aria-selected]="tab() === 'escalation'" (click)="tab.set('escalation')"><mat-icon>call_split</mat-icon>{{ i18n.t('team.tab.escalation') }}</button>
+          }
+          <button type="button" role="tab" class="seg" [attr.aria-pressed]="tab() === 'monthly'" [attr.aria-selected]="tab() === 'monthly'" (click)="tab.set('monthly')"><mat-icon>insights</mat-icon>{{ i18n.t('team.tab.monthly') }}</button>
+        }
+        @if (a.quality) {
+          <button type="button" role="tab" class="seg" [attr.aria-pressed]="tab() === 'quality'" [attr.aria-selected]="tab() === 'quality'" (click)="tab.set('quality')"><mat-icon>fact_check</mat-icon>{{ i18n.t('team.tab.quality') }}</button>
+        }
       </div>
+      @if (tab() === 'quality') {
+        @for (code of [a.code]; track code) { <app-team-quality [area]="code" [areaName]="a.name" /> }
+      }
+    }
+    @if (view(); as v) {
       <!-- Cada área monta sus propias guardias y políticas (el @for las recrea al cambiar de área). -->
       @if (tab() === 'guards') {
         @for (code of [v.area.code]; track code) {
@@ -71,7 +85,7 @@ const CONDITION_STYLE: Record<TeamCondition, { icon: string; tone: string }> = {
         @for (code of [v.area.code]; track code) { <app-admin-escalation [area]="code" /> }
       }
       @if (tab() === 'monthly') {
-        <app-team-monthly [area]="v.area.code" [areaName]="v.area.name" />
+        <app-team-monthly [area]="area()" [areaName]="v.area.name" />
       }
     }
 
@@ -88,8 +102,8 @@ const CONDITION_STYLE: Record<TeamCondition, { icon: string; tone: string }> = {
       <div class="tm__grid">
         <section class="adm-card">
           <div class="adm-card__head">
-            <h2 class="adm-card__title"><mat-icon>badge</mat-icon>{{ i18n.tf('team.people', v.area.name) }}</h2>
-            <button type="button" class="adm-btn adm-btn--primary adm-push" (click)="openAdd()"><mat-icon>person_add</mat-icon>{{ i18n.t('team.add') }}</button>
+            <h2 class="adm-card__title"><mat-icon>badge</mat-icon>{{ i18n.tf(isDept() ? 'team.dep.people' : 'team.people', v.area.name) }}</h2>
+            @if (!isDept()) { <button type="button" class="adm-btn adm-btn--primary adm-push" (click)="openAdd()"><mat-icon>person_add</mat-icon>{{ i18n.t('team.add') }}</button> }
           </div>
           @if (!v.people.length) {
             <p class="adm-empty">{{ i18n.t('team.empty') }}</p>
@@ -97,7 +111,7 @@ const CONDITION_STYLE: Record<TeamCondition, { icon: string; tone: string }> = {
             <div class="adm-table-wrap">
               <table class="adm-table">
                 <thead><tr>
-                  <th>{{ i18n.t('team.col.person') }}</th><th>{{ i18n.t('team.col.group') }}</th><th>{{ i18n.t('team.col.today') }}</th>
+                  <th>{{ i18n.t('team.col.person') }}</th><th>{{ i18n.t(isDept() ? 'team.dep.areas' : 'team.col.group') }}</th><th>{{ i18n.t('team.col.today') }}</th>
                   <th class="adm-num">{{ i18n.t('team.col.tickets') }}</th><th class="adm-num">{{ i18n.t('team.col.breached') }}</th>
                 </tr></thead>
                 <tbody>
@@ -106,7 +120,11 @@ const CONDITION_STYLE: Record<TeamCondition, { icon: string; tone: string }> = {
                         (click)="pick(p)" (keydown.enter)="pick(p)">
                       <td><strong>{{ p.fullName || p.username }}</strong><div class="adm-small adm-muted mono">{{ p.username }}</div></td>
                       <td>
-                        @for (g of p.groups; track g.id) { <span class="pill tone-accent tm__gap">{{ g.name }}</span> }
+                        @if (isDept()) {
+                          @for (n of p.areas ?? []; track n) { <span class="pill tone-neutral tm__gap">{{ n }}</span> }
+                        } @else {
+                          @for (g of p.groups; track g.id) { <span class="pill tone-accent tm__gap">{{ g.name }}</span> }
+                        }
                         @if (!p.active) { <span class="pill tone-neutral">{{ i18n.t('team.inactive') }}</span> }
                       </td>
                       <td><span class="pill" [class]="'pill ' + cond(p.today).tone"><mat-icon>{{ cond(p.today).icon }}</mat-icon>{{ i18n.t(condKey(p.today)) }}</span></td>
@@ -121,7 +139,9 @@ const CONDITION_STYLE: Record<TeamCondition, { icon: string; tone: string }> = {
         </section>
 
         <section class="adm-card">
-          @if (created(); as c) {
+          @if (isDept()) {
+            <p class="adm-empty">{{ i18n.t('team.dep.readOnly') }}</p>
+          } @else if (created(); as c) {
             <div class="adm-card__head"><h2 class="adm-card__title"><mat-icon>key</mat-icon>{{ c.username }}</h2></div>
             <div class="tm__body">
               <p>{{ i18n.tf('team.created', c.username) }}</p>
@@ -134,6 +154,24 @@ const CONDITION_STYLE: Record<TeamCondition, { icon: string; tone: string }> = {
           } @else if (mode() === 'add') {
             <div class="adm-card__head"><h2 class="adm-card__title"><mat-icon>person_add</mat-icon>{{ i18n.tf('team.addTo', v.area.name) }}</h2></div>
             <form class="tm__body" (submit)="$event.preventDefault(); create()">
+              <div class="tm__chips" role="group">
+                <button type="button" class="seg" [attr.aria-pressed]="addMode() === 'existing'" (click)="addMode.set('existing')">{{ i18n.t('team.addExisting') }}</button>
+                <button type="button" class="seg" [attr.aria-pressed]="addMode() === 'new'" (click)="addMode.set('new')">{{ i18n.t('team.addNew') }}</button>
+              </div>
+              @if (addMode() === 'existing') {
+                <label class="adm-field"><span class="adm-label">{{ i18n.t('team.f.person') }}</span>
+                  @if (candidates().length) {
+                    <select class="adm-input" name="candidate" [ngModel]="candidateId()" (ngModelChange)="candidateId.set($event)">
+                      <option value="">{{ i18n.t('team.f.pickPerson') }}</option>
+                      @for (c of candidates(); track c.id) {
+                        <option [value]="c.id">{{ candidateLabel(c) }}</option>
+                      }
+                    </select>
+                  } @else {
+                    <span class="adm-small adm-muted">{{ i18n.t('team.noCandidates') }}</span>
+                  }
+                </label>
+              } @else {
               <div class="tm__two">
                 <label class="adm-field"><span class="adm-label">{{ i18n.t('team.f.name') }}</span>
                   <input class="adm-input" name="fullName" maxlength="120" autocomplete="off" [ngModel]="draft().fullName" (ngModelChange)="setDraft('fullName', $event)" /></label>
@@ -142,6 +180,7 @@ const CONDITION_STYLE: Record<TeamCondition, { icon: string; tone: string }> = {
               </div>
               <label class="adm-field"><span class="adm-label">{{ i18n.t('team.f.email') }}</span>
                 <input class="adm-input mono" name="email" type="email" maxlength="160" autocomplete="off" [ngModel]="draft().email" (ngModelChange)="setDraft('email', $event)" /></label>
+              }
               <div class="adm-field">
                 <span class="adm-label">{{ i18n.t('team.f.group') }}</span>
                 @if (v.groups.length) {
@@ -154,7 +193,7 @@ const CONDITION_STYLE: Record<TeamCondition, { icon: string; tone: string }> = {
                   <p class="adm-small text-warn">{{ i18n.t('team.noGroups') }}</p>
                 }
               </div>
-              <p class="adm-small adm-muted">{{ i18n.t('team.addHint') }}</p>
+              <p class="adm-small adm-muted">{{ i18n.t(addMode() === 'existing' ? 'team.addExistingHint' : 'team.addHint') }}</p>
               <div class="tm__actions">
                 <button type="button" class="adm-btn" (click)="mode.set('person')">{{ i18n.t('team.cancel') }}</button>
                 <button type="submit" class="adm-btn adm-btn--primary" [disabled]="busy() || !canCreate()"><mat-icon>person_add</mat-icon>{{ i18n.t('team.create') }}</button>
@@ -204,21 +243,17 @@ const CONDITION_STYLE: Record<TeamCondition, { icon: string; tone: string }> = {
               </div>
               <!-- Metas de la persona (Gestión CSM, 9.4): las pone y confirma la jefatura. -->
               <app-person-goals [personId]="p.id" />
-              @if (p.editable) {
+              @if (p.removable) {
                 @if (confirming()) {
                   <div class="tm__confirm" role="alert">
-                    <span>{{ i18n.tf('team.confirmDeactivate', p.fullName || p.username) }}</span>
+                    <span>{{ removeQuestion(p, v.area.name) }}</span>
                     <button type="button" class="adm-btn" (click)="confirming.set(false)">{{ i18n.t('team.cancel') }}</button>
-                    <button type="button" class="adm-btn adm-btn--danger" [disabled]="busy()" (click)="setActive(p, false)">{{ i18n.t('team.deactivate') }}</button>
+                    <button type="button" class="adm-btn adm-btn--danger" [disabled]="busy()" (click)="leave(p)">{{ i18n.t('team.remove') }}</button>
                   </div>
                 } @else {
                   <div class="tm__actions tm__between">
                     <span class="adm-small adm-muted">{{ i18n.t('team.audited') }}</span>
-                    @if (p.active) {
-                      <button type="button" class="adm-btn adm-btn--danger" [disabled]="busy()" (click)="confirming.set(true)"><mat-icon>person_off</mat-icon>{{ i18n.t('team.deactivate') }}</button>
-                    } @else {
-                      <button type="button" class="adm-btn" [disabled]="busy()" (click)="setActive(p, true)"><mat-icon>person</mat-icon>{{ i18n.t('team.reactivate') }}</button>
-                    }
+                    <button type="button" class="adm-btn adm-btn--danger" [disabled]="busy()" (click)="confirming.set(true)"><mat-icon>group_remove</mat-icon>{{ i18n.t('team.remove') }}</button>
                   </div>
                 }
               }
@@ -270,7 +305,7 @@ export class TeamComponent implements OnInit {
   protected readonly i18n = inject(I18nService);
   private readonly api = inject(TeamService);
 
-  protected readonly tab = signal<'people' | 'guards' | 'escalation' | 'monthly'>('people');
+  protected readonly tab = signal<'people' | 'guards' | 'escalation' | 'monthly' | 'quality'>('people');
   protected readonly guardsTimeline = viewChild(AdminGuardsComponent);
   protected readonly areas = signal<TeamArea[]>([]);
   protected readonly area = signal('');
@@ -286,20 +321,34 @@ export class TeamComponent implements OnInit {
   protected readonly busy = signal(false);
   protected readonly error = signal<string | null>(null);
 
+  /** El área elegida: si es jefatura de ella y si tiene Calidad. */
+  protected readonly areaInfo = computed(() => this.areas().find((a) => a.code === this.area()) ?? null);
+  /** Está mirando un departamento completo (solo para mirar). */
+  protected readonly isDept = computed(() => !!this.areaInfo()?.department);
   protected readonly selected = computed(() => {
     const people = this.view()?.people ?? [];
     return people.find((p) => p.id === this.selectedId()) ?? null;
   });
+  /** Agregar: a alguien que ya tiene cuenta (por defecto) o a una persona nueva. */
+  protected readonly addMode = signal<'existing' | 'new'>('existing');
+  protected readonly candidates = signal<TeamCandidate[]>([]);
+  protected readonly candidateId = signal('');
   protected readonly canCreate = computed(() => {
     const d = this.draft();
+    if (this.addMode() === 'existing') return !!this.candidateId() && !!d.groupId;
     return !!d.fullName.trim() && !!d.username.trim() && d.email.includes('@') && !!d.groupId;
   });
 
   async ngOnInit(): Promise<void> {
     await this.run(async () => {
-      const areas = await this.api.areas();
-      this.areas.set(areas);
-      if (areas.length) await this.pickArea(areas[0].code);
+      const [areas, departments] = await Promise.all([this.api.areas(), this.api.departments().catch(() => [])]);
+      // Primero los departamentos que dirige (todo el departamento junto), después cada área.
+      const all: TeamArea[] = [
+        ...departments.map((d) => ({ code: 'dep:' + d.id, name: this.i18n.tf('team.dep.option', d.name), lead: d.lead, quality: d.quality, department: true })),
+        ...areas,
+      ];
+      this.areas.set(all);
+      if (all.length) await this.pickArea(all[0].code);
     });
     this.loaded.set(true);
   }
@@ -325,6 +374,15 @@ export class TeamComponent implements OnInit {
     this.mode.set('person');
     this.created.set(null);
     this.selectedId.set(null);
+    const info = this.areaInfo();
+    // El auditor (o un área de la que no es jefatura) solo ve la Calidad.
+    if (!info?.lead) {
+      this.view.set(null);
+      this.tab.set('quality');
+      return;
+    }
+    if (this.tab() === 'quality' && !info.quality) this.tab.set('people');
+    if (info.department && (this.tab() === 'guards' || this.tab() === 'escalation')) this.tab.set('people');
     await this.run(() => this.load());
   }
 
@@ -338,7 +396,7 @@ export class TeamComponent implements OnInit {
   private async select(p: TeamPerson): Promise<void> {
     this.selectedId.set(p.id);
     this.confirming.set(false);
-    this.tickets.set(p.tickets ? await this.api.tickets(this.area(), p.id) : []);
+    this.tickets.set(p.tickets && !this.isDept() ? await this.api.tickets(this.area(), p.id) : []);
   }
 
   protected async pick(p: TeamPerson): Promise<void> {
@@ -347,10 +405,19 @@ export class TeamComponent implements OnInit {
     await this.run(() => this.select(p));
   }
 
-  protected openAdd(): void {
+  protected async openAdd(): Promise<void> {
     this.created.set(null);
     this.draft.set({ fullName: '', username: '', email: '', groupId: this.view()?.groups[0]?.id ?? '' });
+    this.addMode.set('existing');
+    this.candidateId.set('');
     this.mode.set('add');
+    await this.run(async () => this.candidates.set(await this.api.candidates(this.area())));
+  }
+
+  /** «Nombre (usuario)» y, si ya está en otras áreas, cuáles. */
+  protected candidateLabel(c: TeamCandidate): string {
+    const base = `${c.name} (${c.username})`;
+    return c.areas.length ? `${base}, ${this.i18n.tf('team.alsoIn', c.areas.join(', '))}` : base;
   }
 
   protected setDraft(field: 'fullName' | 'username' | 'email' | 'groupId', value: string): void {
@@ -360,10 +427,15 @@ export class TeamComponent implements OnInit {
   protected async create(): Promise<void> {
     if (!this.canCreate()) return;
     await this.run(async () => {
-      const result = await this.api.create({ area: this.area(), ...this.draft() });
-      this.copied.set(false);
-      this.created.set({ username: result.username, tempPassword: result.tempPassword });
-      this.selectedId.set(result.id);
+      if (this.addMode() === 'existing') {
+        await this.api.join(this.area(), this.candidateId(), this.draft().groupId);
+        this.selectedId.set(this.candidateId());
+      } else {
+        const result = await this.api.create({ area: this.area(), ...this.draft() });
+        this.copied.set(false);
+        this.created.set({ username: result.username, tempPassword: result.tempPassword });
+        this.selectedId.set(result.id);
+      }
       this.mode.set('person');
       await this.load();
     });
@@ -390,10 +462,16 @@ export class TeamComponent implements OnInit {
     });
   }
 
-  protected async setActive(p: TeamPerson, active: boolean): Promise<void> {
+  protected removeQuestion(p: TeamPerson, areaName: string): string {
+    return this.i18n.t('team.confirmRemove').replace('{v}', p.fullName || p.username).replace('{area}', areaName);
+  }
+
+  /** Sacar del equipo: deja el área; la cuenta y sus entradas quedan. */
+  protected async leave(p: TeamPerson): Promise<void> {
     await this.run(async () => {
-      await this.api.setActive(this.area(), p.id, active);
+      await this.api.leave(this.area(), p.id);
       this.confirming.set(false);
+      this.selectedId.set(null);
       await this.load();
     });
   }

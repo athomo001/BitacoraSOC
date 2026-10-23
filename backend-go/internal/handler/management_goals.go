@@ -256,6 +256,24 @@ func (h *ManagementHandler) Goals(w http.ResponseWriter, r *http.Request) {
 		mgmtFail(w, r)
 		return
 	}
+	// Con alcance, las metas de sus áreas y de los clientes que ve.
+	if u.limited() && q.Get("mine") != "1" {
+		scope, err := h.clientScope(ctx, u)
+		if err != nil {
+			mgmtFail(w, r)
+			return
+		}
+		kept := goals[:0]
+		for _, g := range goals {
+			switch {
+			case g.AreaID != nil && !u.seesArea(*g.AreaID):
+			case g.ClientID != nil && !scope[*g.ClientID] && !(g.OwnerID != nil && *g.OwnerID == u.id):
+			default:
+				kept = append(kept, g)
+			}
+		}
+		goals = kept
+	}
 	if q.Get("mine") == "1" {
 		mine := []goalDTO{}
 		for _, g := range goals {

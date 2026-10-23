@@ -224,7 +224,7 @@ func (h *BulkImportHandler) newUserRow(row csvRowResult, in userRowInput, c user
 				return err
 			}
 		}
-		return nil
+		return propagateShared(ctx, q, u.ID, placementDTO{}, actor)
 	}}
 }
 
@@ -292,26 +292,12 @@ func applyAreas(ctx context.Context, q *db.Queries, userID uuid.UUID, areas []pl
 		a.Lead = slices.ContainsFunc(current.Areas, func(x placementArea) bool { return x.Code == a.Code && x.Lead })
 		want.Areas = append(want.Areas, a)
 	}
-	shapes, err := q.ListUserGroupShapes(ctx, userID)
+	sets, err := sharedSets(ctx, q)
 	if err != nil {
 		return err
 	}
-	remove, add := planPlacement(shapesOf(shapes), want, activeSet(c.areas))
-	for _, g := range remove {
-		if err := q.RemoveUserPermissionGroup(ctx, db.RemoveUserPermissionGroupParams{UserID: userID, PermissionGroupID: g}); err != nil {
-			return err
-		}
-	}
-	for _, spec := range add {
-		groupID, err := ensureShapedGroup(ctx, q, spec, c.areas, c.levels)
-		if err != nil {
-			return err
-		}
-		if err := q.AddUserPermissionGroup(ctx, db.AddUserPermissionGroupParams{UserID: userID, PermissionGroupID: groupID, AssignedBy: pgtype.UUID{Bytes: actor, Valid: actor != uuid.Nil}}); err != nil {
-			return err
-		}
-	}
-	return nil
+	_, _, err = applyPlacement(ctx, q, userID, shareTeam(current, want, sets), c.areas, c.levels, actor)
+	return err
 }
 
 // sameAreas: las mismas áreas con el mismo nivel, en cualquier orden.

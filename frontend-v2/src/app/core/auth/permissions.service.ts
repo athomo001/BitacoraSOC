@@ -43,6 +43,8 @@ export class PermissionsService {
   readonly areaOps = computed(() => this.operational() || this.ownAreas().length > 0);
   /** Gestión CSM (spec/16 §4.4): el perfil Gestión, las jefaturas y el admin (pregunta 1 del dueño). */
   readonly management = computed(() => this.isAdmin() || !!this._caps()?.profiles?.includes('gestion') || !!this._caps()?.capabilities.includes('area:lead'));
+  /** Mi equipo: la jefatura de área, el admin y el auditor (que solo ve la Calidad, 10f). */
+  readonly team = computed(() => this.isAdmin() || this._user()?.role === 'auditor' || !!this._caps()?.capabilities.includes('area:lead'));
   readonly canWriteDirectory = this.can('directory:write');
   readonly canDeleteDirectory = this.can('directory:delete');
 

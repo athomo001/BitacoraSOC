@@ -1438,6 +1438,8 @@ type Area struct {
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 	DefaultProfile string             `json:"default_profile"`
 	TicketSeriesID pgtype.UUID        `json:"ticket_series_id"`
+	DepartmentID   pgtype.UUID        `json:"department_id"`
+	SharesTeam     bool               `json:"shares_team"`
 }
 
 type Asset struct {
@@ -1753,6 +1755,13 @@ type ContactChannel struct {
 	Label          pgtype.Text        `json:"label"`
 	Preferred      bool               `json:"preferred"`
 	Active         bool               `json:"active"`
+}
+
+type Department struct {
+	ID        uuid.UUID          `json:"id"`
+	Name      string             `json:"name"`
+	SortOrder int32              `json:"sort_order"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
 
 type Entry struct {
@@ -2178,6 +2187,12 @@ type MaintenanceWindowSeries struct {
 	UpdatedAt             pgtype.Timestamptz `json:"updated_at"`
 }
 
+type ManagementScope struct {
+	UserID       uuid.UUID   `json:"user_id"`
+	DepartmentID pgtype.UUID `json:"department_id"`
+	AreaID       pgtype.UUID `json:"area_id"`
+}
+
 type ManagementSetting struct {
 	ID        bool               `json:"id"`
 	SlaTarget int32              `json:"sla_target"`
@@ -2290,6 +2305,7 @@ type PermissionGroup struct {
 	CreatedAt    pgtype.Timestamptz `json:"created_at"`
 	Profile      string             `json:"profile"`
 	LevelID      pgtype.UUID        `json:"level_id"`
+	DepartmentID pgtype.UUID        `json:"department_id"`
 }
 
 type PermissionGroupArea struct {

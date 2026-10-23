@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/agenda"
+	"github.com/athomo001/BitacoraSOC/backend-go/internal/quality"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/repository/db"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -93,5 +94,37 @@ func TestComputeMonthly_MetasCumplidas(t *testing.T) {
 	d := computeMonthly(in)
 	if len(d.People) != 1 || d.People[0].GoalsDone != 2 || d.Total.GoalsDone != 2 {
 		t.Fatalf("las metas de alguien de otra área no suman: %+v %+v", d.People, d.Total)
+	}
+}
+
+// 10f: las entradas y la calidad del mes por persona; el total suma las
+// entradas y promedia los puntajes de quienes se evaluaron.
+func TestComputeMonthly_Bitacora(t *testing.T) {
+	ana, beto, ida := uuid.New(), uuid.New(), uuid.New()
+	in := monthlyInput{
+		month: time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC), loc: time.UTC, cal: agenda.DefaultCalendar(), now: time.Date(2026, 10, 5, 9, 0, 0, 0, time.UTC),
+		people: []monthlyPersonDTO{{ID: ana, Name: "Ana"}, {ID: beto, Name: "Beto"}, {ID: ida, Name: "Ida"}},
+		quality: map[uuid.UUID]quality.Result{
+			ana:  {Entries: 40, Evaluated: true, Score: 80},
+			beto: {Entries: 30, Evaluated: true, Score: 61},
+			ida:  {Entries: 4},
+		},
+		areaName: "SOC",
+	}
+	d := computeMonthly(in)
+	got := map[string][2]int{}
+	for _, p := range d.People {
+		got[p.Name] = [2]int{p.Entries, p.Quality}
+	}
+	if got["Ana"] != [2]int{40, 80} || got["Beto"] != [2]int{30, 61} || got["Ida"] != [2]int{4, -1} {
+		t.Fatalf("por persona: %v", got)
+	}
+	if d.Total.Entries != 74 || d.Total.Quality != 71 || d.Version != monthlyVersion {
+		t.Fatalf("total: %+v", d.Total)
+	}
+	// Sin Bitácora (área que no la usa): sin puntajes.
+	in.quality = nil
+	if d := computeMonthly(in); d.Total.Quality != -1 || d.People[0].Quality != -1 || d.Total.Entries != 0 {
+		t.Fatalf("sin Bitácora: %+v", d.Total)
 	}
 }

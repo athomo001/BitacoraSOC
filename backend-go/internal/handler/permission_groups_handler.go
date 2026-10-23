@@ -112,7 +112,7 @@ func (h *PermissionGroupsHandler) List(w http.ResponseWriter, r *http.Request) {
 // realmente revisa (middleware.RequireCapability). Un grupo solo puede
 // llevar estas: antes se escribían a mano y un error de tipeo ("directory:wirte")
 // se guardaba sin aviso y no otorgaba nada. La pantalla las muestra como casillas.
-var KnownCapabilities = []string{"directory:write", "directory:delete", "tickets:change_client", CapNoticesSend, CapAreaLead}
+var KnownCapabilities = []string{"directory:write", "directory:delete", "tickets:change_client", CapNoticesSend, CapAreaLead, CapCSM}
 
 func validCapabilities(capabilities []string) (string, bool) {
 	for _, capability := range capabilities {

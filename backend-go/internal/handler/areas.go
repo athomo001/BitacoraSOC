@@ -12,6 +12,7 @@ import (
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/problemdetails"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/repository/db"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"golang.org/x/text/unicode/norm"
 )
@@ -31,7 +32,11 @@ func setModuleFlags(ctx context.Context, q *db.Queries, soc, noc bool) error {
 // jefaturas, permisos); apagarla no apaga funciones: los módulos SOC y NOC
 // se encienden en Módulos (000036, dueño 2026-10-14).
 type AreasHandler struct {
-	Queries  *db.Queries
+	Queries *db.Queries
+	// Pool abre las transacciones de borrar y unir áreas.
+	Pool interface {
+		Begin(ctx context.Context) (pgx.Tx, error)
+	}
 	AuditLog *audit.Logger
 }
 
@@ -45,6 +50,10 @@ type areaDTO struct {
 	// persona en esta área (SOC/NOC Operativo; las demás, Resolutor).
 	Profile    string `json:"profile"`
 	GroupCount int32  `json:"groupCount"`
+	// DepartmentID y SharesTeam: su departamento (nil = ninguno) y si
+	// comparte equipo con las otras áreas marcadas de él (spec/16 §3.5.1).
+	DepartmentID *uuid.UUID `json:"departmentId"`
+	SharesTeam   bool       `json:"sharesTeam"`
 	// TicketSeries: cómo numera los tickets que pide (solo vista; se
 	// configura en Administración → Ticketera).
 	TicketSeries *areaTicketSeriesDTO `json:"ticketSeries,omitempty"`
@@ -95,6 +104,10 @@ func (h *AreasHandler) List(w http.ResponseWriter, r *http.Request) {
 	out := make([]areaDTO, 0, len(rows))
 	for _, a := range rows {
 		dto := areaDTO{ID: a.ID, Code: a.Code, Name: a.Name, Active: a.Active, System: a.IsSystem, Profile: a.DefaultProfile, GroupCount: a.GroupCount}
+		if a.DepartmentID.Valid {
+			id := uuid.UUID(a.DepartmentID.Bytes)
+			dto.DepartmentID, dto.SharesTeam = &id, a.SharesTeam
+		}
 		if s, ok := series[a.TicketSeriesID.Bytes]; ok && a.TicketSeriesID.Valid {
 			dto.TicketSeries = &areaTicketSeriesDTO{Name: s.Name, Preview: s.Preview, General: s.IsDefault}
 		} else if general != nil {
