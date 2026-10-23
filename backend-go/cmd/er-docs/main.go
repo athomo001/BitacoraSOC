@@ -52,7 +52,7 @@ var domains = []domain{
 	{"Usuarios, acceso y permisos", "Cuentas, sesiones revocadas, llaves de API y los grupos de permisos que acotan qué módulos y capacidades tiene cada usuario.",
 		[]string{"users", "login_rate_limits", "token_denylist", "permission_groups", "permission_group_areas", "areas", "departments", "levels", "user_permission_groups"}},
 	{"Territorio, organizaciones y activos", "Árbol territorial genérico (país → región → zona → sitio), organizaciones con tipos configurables, sus servicios y los activos (el Inventario: tipos con sus campos, IP, responsables, historial y solicitudes de baja), más la importación desde GLPI (conexión, reglas y cada corrida).",
-		[]string{"territorial_units", "organization_types", "organizations", "services", "catalog_log_sources", "assets", "asset_kinds", "responsibility_types", "asset_ips", "asset_responsibles", "asset_events", "asset_requests", "glpi_config", "glpi_import_runs", "glpi_ticket_runs", "glpi_outbox"}},
+		[]string{"territorial_units", "organization_types", "organizations", "services", "catalog_log_sources", "assets", "asset_kinds", "asset_groups", "responsibility_types", "asset_ips", "asset_responsibles", "asset_events", "asset_requests", "glpi_config", "glpi_import_runs", "glpi_ticket_runs", "glpi_outbox"}},
 	{"Directorio de contactos", "Personas externas e internas a las que se avisa, con sus canales.",
 		[]string{"contacts", "contact_channels"}},
 	{"Ticketera", "Tickets con SLA, comentarios, tareas con tiempo, resolutores, imágenes, padre/hijo y unidos.",

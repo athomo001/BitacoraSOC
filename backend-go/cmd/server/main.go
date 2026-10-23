@@ -484,6 +484,7 @@ func run(logger *slog.Logger) error {
 	// Mapa (#24): localidades y sectores a revisar; el fondo lo elige el admin.
 	mux.Handle("GET /api/map/points", nocAuthed(mapHandler.Points))
 	mux.Handle("GET /api/map/units/{id}", nocAuthed(mapHandler.Unit))
+	mux.Handle("GET /api/map/assets", nocAuthed(mapHandler.Assets))
 	mux.Handle("GET /api/config/map-tiles", nocAuthed(mapHandler.GetTiles))
 	mux.Handle("PUT /api/config/map-tiles", nocAdmin(mapHandler.PutTiles))
 	// Inventario (spec/16 §4.2, 9.2): por área; el handler decide quién ve, edita y da de baja.
@@ -496,6 +497,10 @@ func run(logger *slog.Logger) error {
 	mux.Handle("GET /api/inventory/export", authed(inventoryHandler.Export))
 	mux.Handle("PUT /api/inventory/kinds/{code}", admin(inventoryHandler.PutKind))
 	mux.Handle("PUT /api/inventory/responsibility-types/{code}", admin(inventoryHandler.PutResponsibilityType))
+	mux.Handle("GET /api/inventory/groups", authed(inventoryHandler.Groups))
+	mux.Handle("POST /api/inventory/groups", authed(inventoryHandler.CreateGroup))
+	mux.Handle("PUT /api/inventory/groups/{id}", authed(inventoryHandler.UpdateGroup))
+	mux.Handle("DELETE /api/inventory/groups/{id}", authed(inventoryHandler.DeleteGroup))
 	mux.Handle("POST /api/inventory", authed(inventoryHandler.Create))
 	mux.Handle("GET /api/inventory/{id}", authed(inventoryHandler.Get))
 	mux.Handle("PUT /api/inventory/{id}", authed(inventoryHandler.Update))

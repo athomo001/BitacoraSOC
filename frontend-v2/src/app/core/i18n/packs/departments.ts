@@ -71,6 +71,7 @@ const ES = {
   'team.dep.people': 'Personas del departamento {v}',
   'team.dep.areas': 'Áreas',
   'team.dep.readOnly': 'Para agregar o cambiar a alguien, elige un área.',
+  'team.dep.guardsArea': 'Área de la guardia',
 };
 
 export type DepartmentsKey = keyof typeof ES;
@@ -145,6 +146,7 @@ const EN: Record<DepartmentsKey, string> = {
   'team.dep.people': 'People in the {v} department',
   'team.dep.areas': 'Areas',
   'team.dep.readOnly': 'To add or change someone, pick an area.',
+  'team.dep.guardsArea': 'On-call area',
 };
 
 registerTexts(ES, EN);

@@ -92,8 +92,44 @@ describe('TeamComponent (Mi equipo, jefatura de área, spec/16 9d)', () => {
     expect(el.querySelector('tbody tr')?.textContent).toContain('NOC');
     expect(el.textContent).toContain('Para agregar o cambiar a alguien, elige un área.');
     expect(button(el, 'Agregar persona')).toBeUndefined();
-    expect(button(el, 'Guardias')).toBeUndefined();
+    expect(button(el, 'Escalamiento')).toBeUndefined();
     http.expectNone((r) => r.url.includes('/tickets'));
+  });
+
+  it('en el departamento, Guardias se configuran eligiendo una de sus áreas', async () => {
+    const fixture = TestBed.createComponent(TeamComponent);
+    fixture.detectChanges();
+    http.expectOne('/api/team/areas').flush({ data: [] });
+    http.expectOne('/api/team/departments').flush({
+      data: [{ id: 'd1', name: 'CDC', lead: true, quality: false, areas: [{ code: 'soc', name: 'SOC', lead: true }, { code: 'noc', name: 'NOC', lead: true }] }],
+    });
+    await settle();
+    http.expectOne((r) => r.url === '/api/team').flush({
+      data: { ...VIEW, area: { code: '', name: 'CDC' }, groups: [], people: [
+        { ...VIEW.people[0], areas: ['SOC'], editable: false, removable: false },
+        { ...VIEW.people[1], areas: ['NOC'], editable: false, removable: false },
+      ] },
+    });
+    await settle();
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    button(el, 'Guardias').click();
+    fixture.detectChanges();
+    await settle();
+    expect(el.textContent).toContain('Área de la guardia');
+    let guards = http.match((r) => r.url === '/api/guards');
+    expect(guards.length).toBeGreaterThan(0);
+    expect(guards.every((r) => r.request.params.get('area') === 'soc')).toBe(true);
+
+    button(el, 'NOC').click();
+    fixture.detectChanges();
+    await settle();
+    guards = http.match((r) => r.url === '/api/guards');
+    expect(guards.length).toBeGreaterThan(0);
+    expect(guards.every((r) => r.request.params.get('area') === 'noc')).toBe(true);
+    // A la guardia de NOC solo se suma gente de NOC.
+    const team = fixture.debugElement.query((d) => d.name === 'app-team-guards');
+    expect((team.componentInstance as { people: () => { id: string }[] }).people().map((p) => p.id)).toEqual(['p2']);
   });
 
   it('sin áreas a cargo lo dice', async () => {

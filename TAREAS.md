@@ -31,6 +31,7 @@ Lo hecho, lo que está en revisión y lo que falta hasta el corte. Marca con `[x
 - [ ] Probar los enlaces públicos (10h): `migrate … up` para la 000059; en Administración → Enlaces públicos crear uno de cada tipo y abrirlo en otra pestaña o en la TV. El de teletrabajo ya no está en Turnos: créalo de nuevo aquí y cambia el de la TV — Dueño
 - [ ] Probar las cargas por CSV (10g): «Cargar CSV» en Usuarios y grupos, Organizaciones, Ventanas de mantenimiento y la Bitácora (solo admin). Bajar la plantilla, subirla y revisar antes de «Cargar»; los usuarios nuevos muestran su contraseña temporal una sola vez — Dueño
 - [ ] Revisar en la app los Departamentos: `migrate … up` para la 000060; en Administración → Departamentos y áreas crear CDC, agregarle SOC y NOC (arrastrándolas), ponerle jefe y marcar que comparten equipo; marcar a alguien como CSM en Usuarios y grupos y asignarla en la pestaña CSM del departamento; en Mi equipo elegir «Departamento CDC» — Dueño
+- [ ] Revisar en la app guardias del departamento, ubicación y grupos de equipos (2026-10-23): `migrate … up` para la 000061; en Mi equipo → «Departamento CDC» → Guardias, elegir SOC o NOC; en el Inventario crear un grupo en Grupos (pegar coordenadas de Google Maps), elegirlo en dos equipos, editar el grupo y ver que se mueven; en el Mapa, la capa Equipos y «Ver en el mapa» desde la ficha; ponerle cliente a un grupo, elegir ese cliente en el Mapa y abrir un ticket o una entrada de incidente sobre uno de sus equipos para verlo en rojo con su tarjetita — Dueño
 - [ ] Revisar en la app la Calidad (10f): Mi equipo → Calidad en SOC o NOC; elegir a una persona y abrir «Cómo se calcula el puntaje». Con un usuario auditor, Mi equipo muestra solo esa pestaña — Dueño
 - [ ] Revisar en la app la Gestión CSM (9.4, con las notas internas): antes correr `migrate … up` hasta la 000057; ponerle a cada cliente su CSM, inicio del servicio y renovación (Gestión → ficha → Datos de la cuenta) — Dueño y CSM
 
@@ -65,6 +66,9 @@ Lo hecho, lo que está en revisión y lo que falta hasta el corte. Marca con `[x
 
 ### Áreas y departamentos
 - [x] Departamentos (agrupar áreas, jefatura del departamento, áreas que comparten equipo, qué ve cada CSM): construido el 2026-10-22
+- [x] Guardias configurables desde el departamento (Mi equipo): construido el 2026-10-23
+- [x] Inventario: dirección y coordenadas en el equipo, capa Equipos en el Mapa y grupos de equipos (rack o sala) con la ubicación compartida: construido el 2026-10-23
+- [x] Mapa: equipos de clientes en verde/rojo/ámbar según tickets, incidentes y Bitácora, con filtro por cliente y tarjetita al pasar el mouse: construido el 2026-10-23
 
 ### Backlog
 - [x] 10a RACI por cliente (hecho el 2026-10-20; ver «En curso»)

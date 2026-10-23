@@ -137,6 +137,120 @@ describe('Inventario (9.2)', () => {
     expect(button(lead.el, 'Pedir baja')).toBeUndefined();
   });
 
+  const GROUP = { id: 'g1', name: 'Rack A', area: 'infra', areaName: 'Infraestructura', territorialUnitId: 'u1', placeName: 'DC Santiago', address: 'Av. Ejemplo 1234', latitude: -33.4489, longitude: -70.6693, rack: 'R-A', assetCount: 50, canEdit: true };
+  /** Lo que piden los formularios al abrirse: grupos, localidades y el resto vacío. */
+  const flushForm = () => httpMock.match(() => true).forEach((r) => r.flush(
+    r.request.url === '/api/inventory/groups' ? { data: [GROUP] }
+      : r.request.url === '/api/territorial-units' ? { data: [{ id: 'u1', kind: 'site', name: 'DC Santiago', active: true }], meta: {} }
+        : { data: [] }));
+
+  it('editar con grupo: la ubicación viene del grupo, sin editarla, y se manda el grupo', async () => {
+    const { fixture, el } = await render();
+    button(el, 'Editar').click();
+    fixture.detectChanges();
+    flushForm();
+    await settle();
+    fixture.detectChanges();
+    const group = el.querySelector<HTMLSelectElement>('select[name="group"]')!;
+    group.value = 'g1';
+    group.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    expect(el.querySelector<HTMLInputElement>('input[name="address"]')!.disabled).toBe(true);
+    expect(el.querySelector<HTMLInputElement>('input[name="coords"]')!.value).toBe('-33.4489, -70.6693');
+    expect(el.querySelector<HTMLInputElement>('input[name="rack"]')!.value).toBe('R-A');
+    expect(el.textContent).toContain('vienen del grupo «Rack A»');
+    button(el, 'Guardar').click();
+    const req = httpMock.expectOne({ method: 'PUT', url: '/api/inventory/s1' });
+    expect(req.request.body).toEqual(expect.objectContaining({ groupId: 'g1', territorialUnitId: 'u1', address: 'Av. Ejemplo 1234', latitude: -33.4489, longitude: -70.6693, rack: 'R-A' }));
+  });
+
+  it('coordenadas pegadas que no se entienden: lo dice y no deja guardar', async () => {
+    const { fixture, el } = await render();
+    button(el, 'Editar').click();
+    fixture.detectChanges();
+    flushForm();
+    await settle();
+    fixture.detectChanges();
+    const coords = el.querySelector<HTMLInputElement>('input[name="coords"]')!;
+    coords.value = 'Santiago';
+    coords.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    expect(el.textContent).toContain('Escribe latitud y longitud separadas por coma');
+    expect(button(el, 'Guardar').disabled).toBe(true);
+    coords.value = '-33.4489, -70.6693';
+    coords.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    expect(button(el, 'Guardar').disabled).toBe(false);
+  });
+
+  it('la ficha muestra la ubicación con «Ver en el mapa»', async () => {
+    const { el } = await render(asset({ groupId: 'g1', groupName: 'Rack A', placeName: 'DC Santiago', address: 'Av. Ejemplo 1234', latitude: -33.4489, longitude: -70.6693, rack: 'R-A', rackPosition: 'U10' }));
+    const panel = el.querySelector('.iv__panel')!;
+    expect(panel.textContent).toContain('Ubicación');
+    expect(panel.textContent).toContain('Rack A');
+    expect(panel.textContent).toContain('Av. Ejemplo 1234');
+    expect(panel.querySelector('a[href="/map?assetId=s1"]')).not.toBeNull();
+  });
+
+  it('Grupos: se crea uno con coordenadas pegadas y «Ver sus equipos» filtra la lista', async () => {
+    const { fixture, el } = await render();
+    button(el, 'Grupos').click();
+    fixture.detectChanges();
+    flushForm();
+    await settle();
+    fixture.detectChanges();
+    expect(el.textContent).toContain('50 equipos');
+    expect(el.textContent).toContain('DC Santiago · Av. Ejemplo 1234 · Rack R-A');
+    button(el, 'Nuevo grupo').click();
+    fixture.detectChanges();
+    const name = el.querySelector<HTMLInputElement>('input[name="groupName"]')!;
+    name.value = 'Rack B';
+    name.dispatchEvent(new Event('input'));
+    const coords = el.querySelector<HTMLInputElement>('input[name="coords"]')!;
+    coords.value = '-23.65, -70.4';
+    coords.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    button(el, 'Crear grupo').click();
+    const create = httpMock.expectOne({ method: 'POST', url: '/api/inventory/groups' });
+    expect(create.request.body).toEqual(expect.objectContaining({ name: 'Rack B', area: 'infra', latitude: -23.65, longitude: -70.4 }));
+    create.flush({ data: { id: 'g2' } });
+    await settle();
+    httpMock.expectOne('/api/inventory/groups').flush({ data: [GROUP] });
+    await settle();
+    httpMock.match((r) => r.url === '/api/inventory' || r.url.startsWith('/api/inventory/s1')).forEach((r) => r.flush({ data: r.request.url === '/api/inventory' ? [] : asset() }));
+    await settle();
+    fixture.detectChanges();
+    button(el, 'Ver sus equipos').click();
+    const list = httpMock.expectOne((r) => r.url === '/api/inventory');
+    expect(list.request.params.get('group')).toBe('g1');
+  });
+
+  it('filtro Cliente: los equipos de un cliente o los internos', async () => {
+    const fixture = TestBed.createComponent(InventoryComponent);
+    fixture.detectChanges();
+    httpMock.expectOne('/api/inventory/meta').flush({ data: META });
+    await settle();
+    const row = (id: string, name: string, client?: string) => ({ id, name, code: id, kind: 'server', areaId: 'a-infra', areaName: 'Infraestructura', attributes: {}, active: true, firstIp: '', ipCount: 0,
+      ...(client ? { clientId: 'c1', clientName: client } : {}) });
+    httpMock.expectOne((r) => r.url === '/api/inventory').flush({ data: [row('s1', 'RT-MINA-01', 'Minera Norte'), row('s2', 'SRV-INT-01')] });
+    await settle();
+    httpMock.expectOne('/api/inventory/s1').flush({ data: asset() });
+    await settle();
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    const names = () => [...el.querySelectorAll('.iv__row:not(.iv__row--head) b')].map((b) => b.textContent);
+    expect(el.querySelector('.iv__row[aria-current="true"]')?.textContent).toContain('Minera Norte');
+    const select = el.querySelector<HTMLSelectElement>('select[name="invClient"]')!;
+    select.value = 'internal';
+    select.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    expect(names()).toEqual(['SRV-INT-01']);
+    select.value = 'c1';
+    select.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    expect(names()).toEqual(['RT-MINA-01']);
+  });
+
   it('CSV: revisa sin guardar y después carga el mismo archivo', async () => {
     const { fixture, el } = await render();
     button(el, 'Cargar CSV').click();

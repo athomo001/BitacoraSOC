@@ -7,6 +7,7 @@
         <button type="button" class="adm-btn" (click)="openRequests()"><mat-icon>inbox</mat-icon>{{ i18n.t('inv.requests') }}
           @if (api.pending() > 0) { <span class="pill tone-warn mono">{{ api.pending() }}</span> }</button>
       }
+      <button type="button" class="adm-btn" [attr.aria-pressed]="panel() === 'groups'" (click)="panel.set('groups')"><mat-icon>view_module</mat-icon>{{ i18n.t('inv.g.title') }}</button>
       @if (meta()?.canCreate) {
         <button type="button" class="adm-btn" (click)="panel.set('csv')"><mat-icon>upload_file</mat-icon>{{ i18n.t('inv.csv') }}</button>
         <button type="button" class="adm-btn adm-btn--primary" (click)="openNew()"><mat-icon>add</mat-icon>{{ i18n.t('inv.new') }}</button>
@@ -26,6 +27,16 @@
         @for (k of kindsInList(); track k.code) {
           <button type="button" class="seg" [attr.aria-pressed]="kindFilter() === k.code" (click)="setKind(k.code)"><mat-icon>{{ k.icon }}</mat-icon>{{ k.name }}</button>
         }
+        @if (clientsInList().length) {
+          <select class="adm-input iv__client" name="invClient" [attr.aria-label]="i18n.t('inv.f.client')" (change)="clientFilter.set($any($event.target).value)">
+            <option value="" [selected]="!clientFilter()">{{ i18n.t('inv.clients.all') }}</option>
+            <option value="internal" [selected]="clientFilter() === 'internal'">{{ i18n.t('inv.g.internal') }}</option>
+            @for (c of clientsInList(); track c.id) { <option [value]="c.id" [selected]="clientFilter() === c.id">{{ c.name }}</option> }
+          </select>
+        }
+        @if (groupFilter(); as gf) {
+          <button type="button" class="seg" aria-pressed="true" [attr.aria-label]="i18n.tf('inv.g.clear', gf.name)" (click)="filterGroup(null)"><mat-icon>view_module</mat-icon>{{ gf.name }}<mat-icon>close</mat-icon></button>
+        }
         @if (glpiOn()) {
           <button type="button" class="seg" [attr.aria-pressed]="glpiOnly()" (click)="toggleGlpi()"><mat-icon>cloud_download</mat-icon>{{ i18n.t('inv.glpi.only') }}</button>
         }
@@ -44,7 +55,7 @@
           <span><span class="pill tone-neutral"><mat-icon>{{ kindIcon(r.kind) }}</mat-icon>{{ kindName(r.kind) }}</span></span>
           <span class="iv__cell">{{ system(r) }}</span>
           <span class="iv__cell mono">{{ r.firstIp || '—' }}@if (r.ipCount > 1) { <span class="iv__sub">{{ i18n.tf('inv.moreIps', r.ipCount - 1) }}</span> }</span>
-          <span class="iv__cell">{{ r.placeName ?? '—' }}<span class="iv__sub">{{ r.areaName }}</span></span>
+          <span class="iv__cell">{{ r.placeName ?? '—' }}<span class="iv__sub">@if (r.clientName) { {{ r.clientName }} · }@if (r.groupName) { {{ r.groupName }} · }{{ r.areaName }}</span></span>
         </button>
       } @empty {
         @if (loaded()) { <p class="adm-empty">{{ i18n.t('inv.empty') }}</p> }
@@ -58,6 +69,9 @@
         }
         @case ('edit') {
           @if (meta(); as m) { <app-asset-form [meta]="m" [asset]="asset()" (saved)="onSaved($event)" (cancelled)="panel.set('detail')" /> }
+        }
+        @case ('groups') {
+          @if (meta(); as m) { <app-asset-groups [meta]="m" (show)="filterGroup($event)" (changed)="groupsChanged()" (closed)="panel.set('detail')" /> }
         }
         @case ('csv') {
           @if (meta(); as m) { <app-asset-csv [meta]="m" (loaded)="load()" (closed)="panel.set('detail')" /> }
@@ -154,9 +168,21 @@
                 @if (a.model) { <dt>{{ i18n.t('inv.f.model') }}</dt><dd>{{ a.model }}@if (a.glpi) { <mat-icon class="iv__cloud" [attr.title]="i18n.t('inv.glpi.field')">cloud</mat-icon> }</dd> }
                 @if (a.serial) { <dt>{{ i18n.t('inv.f.serial') }}</dt><dd><span class="mono">{{ a.serial }}</span>@if (a.glpi) { <mat-icon class="iv__cloud" [attr.title]="i18n.t('inv.glpi.field')">cloud</mat-icon> }</dd> }
                 @if (a.clientName) { <dt>{{ i18n.t('inv.f.client') }}</dt><dd>{{ a.clientName }}@if (a.glpi) { <mat-icon class="iv__cloud" [attr.title]="i18n.t('inv.glpi.field')">cloud</mat-icon> }</dd> }
-                @if (a.placeName) { <dt>{{ i18n.t('inv.f.place') }}</dt><dd>{{ a.placeName }}@if (a.glpi) { <mat-icon class="iv__cloud" [attr.title]="i18n.t('inv.glpi.field')">cloud</mat-icon> }</dd> }
-                @if (a.rack || a.rackPosition) { <dt>{{ i18n.t('inv.f.rack') }}</dt><dd>{{ a.rack }}@if (a.rackPosition) { · {{ a.rackPosition }} }</dd> }
               </dl>
+              @if (a.groupName || a.placeName || a.address || a.latitude != null || a.rack || a.rackPosition) {
+                <span class="adm-label">{{ i18n.t('inv.sec.location') }}</span>
+                <dl class="iv__facts">
+                  @if (a.groupName) { <dt>{{ i18n.t('inv.f.group') }}</dt><dd><mat-icon class="iv__who">view_module</mat-icon>{{ a.groupName }}</dd> }
+                  @if (a.placeName) { <dt>{{ i18n.t('inv.f.place') }}</dt><dd>{{ a.placeName }}@if (a.glpi) { <mat-icon class="iv__cloud" [attr.title]="i18n.t('inv.glpi.field')">cloud</mat-icon> }</dd> }
+                  @if (a.address) { <dt>{{ i18n.t('inv.f.address') }}</dt><dd>{{ a.address }}</dd> }
+                  @if (a.latitude != null) {
+                    <dt>{{ i18n.t('inv.f.coords') }}</dt>
+                    <dd><span class="mono">{{ coordsLabel(a.latitude, a.longitude) }}</span>
+                      @if (mapOn()) { · <a routerLink="/map" [queryParams]="{ assetId: a.id }">{{ i18n.t('inv.onMap') }}</a> }</dd>
+                  }
+                  @if (a.rack || a.rackPosition) { <dt>{{ i18n.t('inv.f.rack') }}</dt><dd>{{ a.rack }}@if (a.rackPosition) { · {{ a.rackPosition }} }</dd> }
+                </dl>
+              }
               @if (extraList().length) {
                 <span class="adm-label">{{ i18n.t('inv.sec.extra') }}</span>
                 <dl class="iv__facts">@for (e of extraList(); track e[0]) { <dt>{{ e[0] }}</dt><dd>{{ e[1] }}</dd> }</dl>

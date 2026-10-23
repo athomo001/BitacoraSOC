@@ -556,7 +556,7 @@ Quién: ve un equipo quien es del área dueña o de un área responsable (admin,
 
 | Método | Ruta | Acceso |
 | --- | --- | --- |
-| `GET` | `/api/inventory` | Sesión — `?scope=mine\|all&kind=&q=&inactive=true&source=glpi` |
+| `GET` | `/api/inventory` | Sesión — `?scope=mine\|all&kind=&q=&inactive=true&source=glpi&group=` |
 | `GET` | `/api/inventory/meta` | Sesión — tipos con sus campos, tipos de responsabilidad, áreas y lo que el usuario puede hacer |
 | `POST` | `/api/inventory` | Sesión (áreas del equipo o admin) |
 | `GET` | `/api/inventory/{id}` | Sesión — ficha con IP, responsables, historial, tickets y solicitud pendiente |
@@ -572,6 +572,10 @@ Quién: ve un equipo quien es del área dueña o de un área responsable (admin,
 | `GET` | `/api/inventory/export` | Sesión — `?kind=` |
 | `PUT` | `/api/inventory/kinds/{code}` | Admin — tipo y sus campos |
 | `PUT` | `/api/inventory/responsibility-types/{code}` | Admin |
+| `GET` | `/api/inventory/groups` | Sesión — grupos de equipos con su ubicación (localidad, dirección, coordenadas, rack) y cuántos equipos tienen |
+| `POST` | `/api/inventory/groups` | Sesión (área dueña del grupo o admin) — `{name, area, territorialUnitId, address, latitude, longitude, rack, clientId}`; los equipos sin cliente toman el del grupo |
+| `PUT` | `/api/inventory/groups/{id}` | Área dueña del grupo o admin — sus equipos toman la ubicación nueva (queda en el historial de cada uno) |
+| `DELETE` | `/api/inventory/groups/{id}` | Área dueña del grupo o admin — los equipos quedan sin grupo, con la ubicación que tenían |
 
 ### GLPI
 
@@ -728,6 +732,7 @@ Tipos de notificación: `agenda.assigned`, `agenda.warn`, `agenda.due`, `agenda.
 | `GET` | `/api/territorial-units/import/template` | Sesión · módulo NOC |
 | `GET` | `/api/map/points` | Sesión · módulo NOC — localidades con coordenadas, incidentes abiertos, mantenimiento activo y tickets abiertos con lugar (estos solo con la Ticketera encendida) |
 | `GET` | `/api/map/units/{id}` | Sesión · módulo NOC — incidentes abiertos, mantenimientos activos, tickets abiertos y equipos que cubren la localidad (sin contactos) |
+| `GET` | `/api/map/assets` | Sesión · módulo NOC — capa «Equipos»: equipos activos con coordenadas (propias o de su grupo) que el usuario ve en el Inventario, con su cliente y `status` `ok`/`warn`/`bad`: el último ticket abierto (Ticketera encendida, los que ve), incidente de escalamiento abierto, entrada de incidente de la Bitácora (seguimiento abierto o últimas 24 h) y mantenimiento activo |
 | `GET` | `/api/config/map-tiles` | Sesión · módulo NOC — fondo del Mapa: `{mode: osm\|custom\|none, url}` |
 | `PUT` | `/api/config/map-tiles` | Admin · módulo NOC — `url` obligatoria con `custom` (http/https con `{z}`, `{x}` e `{y}`) |
 | `GET` | `/api/assets` | Sesión · módulo NOC, o persona de un área propia |

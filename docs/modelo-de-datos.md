@@ -2,7 +2,7 @@
 
 > Generado por `backend-go/cmd/er-docs` desde `backend-go/sql/schema/0001_init_schema.sql`, el esquema que usa sqlc, con todas las migraciones aplicadas. **No se edita a mano**: si cambia el esquema, se regenera con `go run ./cmd/er-docs` desde `backend-go/`.
 
-123 tablas en PostgreSQL, agrupadas en 17 dominios. Notación pata de gallo: `||` uno, `|o` / `o|` cero o uno, `o{` cero o muchos. La etiqueta de cada línea es la columna que hace la referencia.
+124 tablas en PostgreSQL, agrupadas en 17 dominios. Notación pata de gallo: `||` uno, `|o` / `o|` cero o uno, `o{` cero o muchos. La etiqueta de cada línea es la columna que hace la referencia.
 
 - Cada entidad muestra todas sus columnas salvo `created_at` y `updated_at`. `PK` clave primaria, `FK` referencia a otra tabla, `UK` valor único.
 - Las tablas de otros dominios aparecen como cajas sin columnas: son la misma tabla, dibujada donde se une.
@@ -14,7 +14,7 @@ Correspondencia con el legacy (MongoDB): [modelo-er-legacy-2.0.md](modelo-er-leg
 ## Índice
 
 1. [Usuarios, acceso y permisos](#1-usuarios-acceso-y-permisos) — 9 tablas
-2. [Territorio, organizaciones y activos](#2-territorio-organizaciones-y-activos) — 16 tablas
+2. [Territorio, organizaciones y activos](#2-territorio-organizaciones-y-activos) — 17 tablas
 3. [Directorio de contactos](#3-directorio-de-contactos) — 2 tablas
 4. [Ticketera](#4-ticketera) — 8 tablas
 5. [Equipos y escalamiento](#5-equipos-y-escalamiento) — 15 tablas
@@ -210,6 +210,7 @@ erDiagram
         text glpi_itemtype
         int glpi_id
         timestamptz glpi_removed_at
+        uuid group_id FK
     }
     ASSET_KINDS {
         text code PK
@@ -219,6 +220,17 @@ erDiagram
         jsonb fields
         int sort_order
         boolean active
+    }
+    ASSET_GROUPS {
+        uuid id PK
+        text name
+        uuid area_id FK
+        uuid territorial_unit_id FK
+        text address
+        numeric latitude
+        numeric longitude
+        text rack
+        uuid client_id FK
     }
     RESPONSIBILITY_TYPES {
         text code PK
@@ -350,23 +362,27 @@ erDiagram
     AREAS |o--o{ ASSET_RESPONSIBLES : "area_id"
     AREAS |o--o{ GLPI_CONFIG : "area_id"
     AREAS ||--o{ ASSETS : "area_id"
+    AREAS ||--o{ ASSET_GROUPS : "area_id"
     ASSETS |o--o{ ASSETS : "parent_asset_id"
     ASSETS ||--o{ ASSET_EVENTS : "asset_id"
     ASSETS ||--o{ ASSET_IPS : "asset_id"
     ASSETS ||--o{ ASSET_REQUESTS : "asset_id"
     ASSETS ||--o{ ASSET_RESPONSIBLES : "asset_id"
+    ASSET_GROUPS |o--o{ ASSETS : "group_id"
     ASSET_KINDS |o--o{ ASSETS : "kind_code"
     CATALOG_LOG_SOURCES |o--o{ ASSETS : "log_source_id"
     ENTRIES |o--o{ GLPI_OUTBOX : "entry_id"
     ENTRY_COMMENTS |o--o{ GLPI_OUTBOX : "entry_comment_id"
     ORGANIZATIONS |o--o{ ASSETS : "client_id"
     ORGANIZATIONS |o--o{ ASSETS : "contractor_id"
+    ORGANIZATIONS |o--o{ ASSET_GROUPS : "client_id"
     ORGANIZATIONS |o--o{ ASSET_RESPONSIBLES : "organization_id"
     ORGANIZATIONS |o--o{ ORGANIZATIONS : "via_organization_id"
     ORGANIZATIONS ||--o{ SERVICES : "organization_id"
     ORGANIZATION_TYPES ||--o{ ORGANIZATIONS : "type"
     RESPONSIBILITY_TYPES ||--o{ ASSET_RESPONSIBLES : "type_code"
     TERRITORIAL_UNITS |o--o{ ASSETS : "territorial_unit_id"
+    TERRITORIAL_UNITS |o--o{ ASSET_GROUPS : "territorial_unit_id"
     TERRITORIAL_UNITS |o--o{ TERRITORIAL_UNITS : "parent_id"
     TICKETS |o--o{ ASSET_EVENTS : "ticket_id"
     TICKETS |o--o{ GLPI_OUTBOX : "ticket_id"

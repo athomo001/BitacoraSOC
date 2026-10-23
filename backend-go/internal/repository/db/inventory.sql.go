@@ -88,6 +88,39 @@ func (q *Queries) AddAssetResponsible(ctx context.Context, arg AddAssetResponsib
 	return err
 }
 
+const applyAssetGroupLocation = `-- name: ApplyAssetGroupLocation :many
+UPDATE assets a SET territorial_unit_id = g.territorial_unit_id, address = g.address, latitude = g.latitude,
+  longitude = g.longitude, rack = g.rack, client_id = COALESCE(a.client_id, g.client_id), updated_at = now()
+FROM asset_groups g
+WHERE g.id = $1::uuid AND a.group_id = g.id
+  AND (a.territorial_unit_id IS DISTINCT FROM g.territorial_unit_id OR a.address IS DISTINCT FROM g.address
+       OR a.latitude IS DISTINCT FROM g.latitude OR a.longitude IS DISTINCT FROM g.longitude OR a.rack IS DISTINCT FROM g.rack
+       OR (a.client_id IS NULL AND g.client_id IS NOT NULL))
+RETURNING a.id
+`
+
+// El grupo cambió de lugar: sus equipos lo siguen (y los que no tienen
+// cliente toman el del grupo). Devuelve los que cambiaron.
+func (q *Queries) ApplyAssetGroupLocation(ctx context.Context, groupID uuid.UUID) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, applyAssetGroupLocation, groupID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []uuid.UUID
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const clearAssetIPs = `-- name: ClearAssetIPs :exec
 DELETE FROM asset_ips WHERE asset_id = $1
 `
@@ -104,6 +137,40 @@ DELETE FROM asset_responsibles WHERE asset_id = $1
 func (q *Queries) ClearAssetResponsibles(ctx context.Context, assetID uuid.UUID) error {
 	_, err := q.db.Exec(ctx, clearAssetResponsibles, assetID)
 	return err
+}
+
+const createAssetGroup = `-- name: CreateAssetGroup :one
+INSERT INTO asset_groups (name, area_id, territorial_unit_id, address, latitude, longitude, rack, client_id)
+VALUES ($1, $2, $3, $4, $5, $6, $7,
+  $8)
+RETURNING id
+`
+
+type CreateAssetGroupParams struct {
+	Name              string      `json:"name"`
+	AreaID            uuid.UUID   `json:"area_id"`
+	TerritorialUnitID pgtype.UUID `json:"territorial_unit_id"`
+	Address           pgtype.Text `json:"address"`
+	Latitude          *float64    `json:"latitude"`
+	Longitude         *float64    `json:"longitude"`
+	Rack              pgtype.Text `json:"rack"`
+	ClientID          pgtype.UUID `json:"client_id"`
+}
+
+func (q *Queries) CreateAssetGroup(ctx context.Context, arg CreateAssetGroupParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, createAssetGroup,
+		arg.Name,
+		arg.AreaID,
+		arg.TerritorialUnitID,
+		arg.Address,
+		arg.Latitude,
+		arg.Longitude,
+		arg.Rack,
+		arg.ClientID,
+	)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
 }
 
 const createAssetRequest = `-- name: CreateAssetRequest :one
@@ -132,9 +199,11 @@ func (q *Queries) CreateAssetRequest(ctx context.Context, arg CreateAssetRequest
 }
 
 const createInventoryAsset = `-- name: CreateInventoryAsset :one
-INSERT INTO assets (type, kind_code, name, code, area_id, territorial_unit_id, client_id, model, serial, rack, rack_position, attributes, metadata)
+INSERT INTO assets (type, kind_code, name, code, area_id, territorial_unit_id, client_id, model, serial, rack, rack_position, attributes, metadata,
+  address, latitude, longitude, group_id)
 VALUES ($1, $2, $3, $4, $5, $6,
-  $7, $8, $9, $10, $11, $12, $13)
+  $7, $8, $9, $10, $11, $12, $13,
+  $14, $15, $16, $17)
 RETURNING id
 `
 
@@ -152,6 +221,10 @@ type CreateInventoryAssetParams struct {
 	RackPosition      pgtype.Text `json:"rack_position"`
 	Attributes        []byte      `json:"attributes"`
 	Metadata          []byte      `json:"metadata"`
+	Address           pgtype.Text `json:"address"`
+	Latitude          *float64    `json:"latitude"`
+	Longitude         *float64    `json:"longitude"`
+	GroupID           pgtype.UUID `json:"group_id"`
 }
 
 func (q *Queries) CreateInventoryAsset(ctx context.Context, arg CreateInventoryAssetParams) (uuid.UUID, error) {
@@ -169,6 +242,10 @@ func (q *Queries) CreateInventoryAsset(ctx context.Context, arg CreateInventoryA
 		arg.RackPosition,
 		arg.Attributes,
 		arg.Metadata,
+		arg.Address,
+		arg.Latitude,
+		arg.Longitude,
+		arg.GroupID,
 	)
 	var id uuid.UUID
 	err := row.Scan(&id)
@@ -204,6 +281,39 @@ DELETE FROM assets WHERE id = $1
 func (q *Queries) DeleteAsset(ctx context.Context, id uuid.UUID) error {
 	_, err := q.db.Exec(ctx, deleteAsset, id)
 	return err
+}
+
+const deleteAssetGroup = `-- name: DeleteAssetGroup :exec
+DELETE FROM asset_groups WHERE id = $1
+`
+
+// Sus equipos quedan sin grupo y con la ubicación que tenían.
+func (q *Queries) DeleteAssetGroup(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteAssetGroup, id)
+	return err
+}
+
+const getAssetGroup = `-- name: GetAssetGroup :one
+SELECT id, name, area_id, territorial_unit_id, address, latitude, longitude, rack, client_id, created_at, updated_at FROM asset_groups WHERE id = $1
+`
+
+func (q *Queries) GetAssetGroup(ctx context.Context, id uuid.UUID) (AssetGroup, error) {
+	row := q.db.QueryRow(ctx, getAssetGroup, id)
+	var i AssetGroup
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.AreaID,
+		&i.TerritorialUnitID,
+		&i.Address,
+		&i.Latitude,
+		&i.Longitude,
+		&i.Rack,
+		&i.ClientID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
 
 const getAssetIDByCode = `-- name: GetAssetIDByCode :one
@@ -262,11 +372,12 @@ const getInventoryAsset = `-- name: GetInventoryAsset :one
 SELECT a.id, a.name, a.code, a.kind_code, a.type, a.area_id, ar.name AS area_name, ar.code AS area_code,
   a.serial, a.model, a.rack, a.rack_position, a.attributes, a.metadata, a.active,
   a.territorial_unit_id, tu.name AS place_name, a.client_id, o.name AS client_name, a.created_at, a.updated_at,
-  a.glpi_itemtype, a.glpi_id
+  a.glpi_itemtype, a.glpi_id, a.address, a.latitude, a.longitude, a.group_id, g.name AS group_name
 FROM assets a
 JOIN areas ar ON ar.id = a.area_id
 LEFT JOIN territorial_units tu ON tu.id = a.territorial_unit_id
 LEFT JOIN organizations o ON o.id = a.client_id
+LEFT JOIN asset_groups g ON g.id = a.group_id
 WHERE a.id = $1
 `
 
@@ -294,6 +405,11 @@ type GetInventoryAssetRow struct {
 	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
 	GlpiItemtype      pgtype.Text        `json:"glpi_itemtype"`
 	GlpiID            pgtype.Int4        `json:"glpi_id"`
+	Address           pgtype.Text        `json:"address"`
+	Latitude          *float64           `json:"latitude"`
+	Longitude         *float64           `json:"longitude"`
+	GroupID           pgtype.UUID        `json:"group_id"`
+	GroupName         pgtype.Text        `json:"group_name"`
 }
 
 func (q *Queries) GetInventoryAsset(ctx context.Context, id uuid.UUID) (GetInventoryAssetRow, error) {
@@ -323,6 +439,11 @@ func (q *Queries) GetInventoryAsset(ctx context.Context, id uuid.UUID) (GetInven
 		&i.UpdatedAt,
 		&i.GlpiItemtype,
 		&i.GlpiID,
+		&i.Address,
+		&i.Latitude,
+		&i.Longitude,
+		&i.GroupID,
+		&i.GroupName,
 	)
 	return i, err
 }
@@ -365,6 +486,124 @@ func (q *Queries) ListAssetEvents(ctx context.Context, assetID uuid.UUID) ([]Lis
 			&i.TicketID,
 			&i.TicketNumber,
 			&i.UserName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listAssetGroupAreas = `-- name: ListAssetGroupAreas :many
+SELECT DISTINCT a.area_id FROM assets a WHERE a.group_id = $1::uuid
+UNION
+SELECT r.area_id FROM asset_responsibles r JOIN assets a ON a.id = r.asset_id
+WHERE a.group_id = $1::uuid AND r.area_id IS NOT NULL
+`
+
+// Las áreas de los equipos de un grupo (dueñas y responsables).
+func (q *Queries) ListAssetGroupAreas(ctx context.Context, groupID uuid.UUID) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, listAssetGroupAreas, groupID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []uuid.UUID
+	for rows.Next() {
+		var area_id uuid.UUID
+		if err := rows.Scan(&area_id); err != nil {
+			return nil, err
+		}
+		items = append(items, area_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listAssetGroupAssetIDs = `-- name: ListAssetGroupAssetIDs :many
+SELECT id FROM assets WHERE group_id = $1
+`
+
+func (q *Queries) ListAssetGroupAssetIDs(ctx context.Context, groupID pgtype.UUID) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, listAssetGroupAssetIDs, groupID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []uuid.UUID
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listAssetGroups = `-- name: ListAssetGroups :many
+
+SELECT g.id, g.name, g.area_id, ar.code AS area_code, ar.name AS area_name, g.territorial_unit_id, tu.name AS place_name,
+  g.address, g.latitude, g.longitude, g.rack, g.client_id, o.name AS client_name,
+  (SELECT count(*) FROM assets a WHERE a.group_id = g.id AND a.active)::int AS asset_count
+FROM asset_groups g
+JOIN areas ar ON ar.id = g.area_id
+LEFT JOIN territorial_units tu ON tu.id = g.territorial_unit_id
+LEFT JOIN organizations o ON o.id = g.client_id
+ORDER BY lower(g.name)
+`
+
+type ListAssetGroupsRow struct {
+	ID                uuid.UUID   `json:"id"`
+	Name              string      `json:"name"`
+	AreaID            uuid.UUID   `json:"area_id"`
+	AreaCode          string      `json:"area_code"`
+	AreaName          string      `json:"area_name"`
+	TerritorialUnitID pgtype.UUID `json:"territorial_unit_id"`
+	PlaceName         pgtype.Text `json:"place_name"`
+	Address           pgtype.Text `json:"address"`
+	Latitude          *float64    `json:"latitude"`
+	Longitude         *float64    `json:"longitude"`
+	Rack              pgtype.Text `json:"rack"`
+	ClientID          pgtype.UUID `json:"client_id"`
+	ClientName        pgtype.Text `json:"client_name"`
+	AssetCount        int32       `json:"asset_count"`
+}
+
+// ===== Grupos de equipos (000061) =====
+// Los grupos con su ubicación y cuántos equipos activos tienen.
+func (q *Queries) ListAssetGroups(ctx context.Context) ([]ListAssetGroupsRow, error) {
+	rows, err := q.db.Query(ctx, listAssetGroups)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListAssetGroupsRow
+	for rows.Next() {
+		var i ListAssetGroupsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.AreaID,
+			&i.AreaCode,
+			&i.AreaName,
+			&i.TerritorialUnitID,
+			&i.PlaceName,
+			&i.Address,
+			&i.Latitude,
+			&i.Longitude,
+			&i.Rack,
+			&i.ClientID,
+			&i.ClientName,
+			&i.AssetCount,
 		); err != nil {
 			return nil, err
 		}
@@ -577,21 +816,24 @@ func (q *Queries) ListAssetTickets(ctx context.Context, assetID uuid.UUID) ([]Li
 
 const listInventory = `-- name: ListInventory :many
 SELECT a.id, a.name, a.code, a.kind_code, a.type, a.area_id, ar.name AS area_name, a.serial, a.model,
-  a.attributes, a.active, tu.name AS place_name, a.glpi_id,
+  a.attributes, a.active, tu.name AS place_name, a.glpi_id, g.name AS group_name, a.client_id, o.name AS client_name,
   COALESCE((SELECT host(i.address) FROM asset_ips i WHERE i.asset_id = a.id ORDER BY i.sort_order LIMIT 1), '')::text AS first_ip,
   (SELECT count(*) FROM asset_ips i WHERE i.asset_id = a.id)::int AS ip_count
 FROM assets a
 JOIN areas ar ON ar.id = a.area_id
 LEFT JOIN territorial_units tu ON tu.id = a.territorial_unit_id
+LEFT JOIN asset_groups g ON g.id = a.group_id
+LEFT JOIN organizations o ON o.id = a.client_id
 WHERE ($1::uuid[] IS NULL OR a.area_id = ANY($1::uuid[])
        OR EXISTS (SELECT 1 FROM asset_responsibles r WHERE r.asset_id = a.id AND r.area_id = ANY($1::uuid[])))
   AND ($2::text IS NULL OR a.kind_code = $2::text)
   AND ($3::bool OR a.active)
   AND (NOT $4::bool OR a.glpi_id IS NOT NULL)
-  AND ($5::text IS NULL
-       OR a.name ILIKE '%' || $5::text || '%' OR a.code ILIKE '%' || $5::text || '%'
-       OR a.serial ILIKE '%' || $5::text || '%'
-       OR EXISTS (SELECT 1 FROM asset_ips i WHERE i.asset_id = a.id AND host(i.address) LIKE $5::text || '%'))
+  AND ($5::uuid IS NULL OR a.group_id = $5::uuid)
+  AND ($6::text IS NULL
+       OR a.name ILIKE '%' || $6::text || '%' OR a.code ILIKE '%' || $6::text || '%'
+       OR a.serial ILIKE '%' || $6::text || '%' OR g.name ILIKE '%' || $6::text || '%'
+       OR EXISTS (SELECT 1 FROM asset_ips i WHERE i.asset_id = a.id AND host(i.address) LIKE $6::text || '%'))
 ORDER BY a.active DESC, a.name
 LIMIT 1000
 `
@@ -601,6 +843,7 @@ type ListInventoryParams struct {
 	Kind            pgtype.Text `json:"kind"`
 	IncludeInactive bool        `json:"include_inactive"`
 	OnlyGlpi        bool        `json:"only_glpi"`
+	GroupID         pgtype.UUID `json:"group_id"`
 	Q               pgtype.Text `json:"q"`
 }
 
@@ -618,6 +861,9 @@ type ListInventoryRow struct {
 	Active     bool        `json:"active"`
 	PlaceName  pgtype.Text `json:"place_name"`
 	GlpiID     pgtype.Int4 `json:"glpi_id"`
+	GroupName  pgtype.Text `json:"group_name"`
+	ClientID   pgtype.UUID `json:"client_id"`
+	ClientName pgtype.Text `json:"client_name"`
 	FirstIp    string      `json:"first_ip"`
 	IpCount    int32       `json:"ip_count"`
 }
@@ -629,6 +875,7 @@ func (q *Queries) ListInventory(ctx context.Context, arg ListInventoryParams) ([
 		arg.Kind,
 		arg.IncludeInactive,
 		arg.OnlyGlpi,
+		arg.GroupID,
 		arg.Q,
 	)
 	if err != nil {
@@ -652,8 +899,154 @@ func (q *Queries) ListInventory(ctx context.Context, arg ListInventoryParams) ([
 			&i.Active,
 			&i.PlaceName,
 			&i.GlpiID,
+			&i.GroupName,
+			&i.ClientID,
+			&i.ClientName,
 			&i.FirstIp,
 			&i.IpCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listMapAssets = `-- name: ListMapAssets :many
+SELECT a.id, a.name, a.code, a.kind_code, a.type, a.latitude, a.longitude, a.address, g.name AS group_name, tu.name AS place_name,
+  a.client_id, o.name AS client_name,
+  tk.total AS open_tickets, tk.last_id AS ticket_id, tk.last_number AS ticket_number, tk.last_title AS ticket_title,
+  tk.last_status AS ticket_status, tk.last_priority AS ticket_priority,
+  inc.total AS open_incidents, inc.last_title AS incident_title, inc.last_opened AS incident_opened_at,
+  en.total AS incident_entries, en.last_id AS entry_id, en.last_content AS entry_content, en.last_at AS entry_at, en.last_author AS entry_author,
+  COALESCE(mw.title, '')::text AS maintenance_title, mw.ends_at AS maintenance_until
+FROM assets a
+LEFT JOIN asset_groups g ON g.id = a.group_id
+LEFT JOIN territorial_units tu ON tu.id = a.territorial_unit_id
+LEFT JOIN organizations o ON o.id = a.client_id
+CROSS JOIN LATERAL (
+  SELECT count(*)::int AS total,
+    COALESCE((array_agg(t.id ORDER BY t.created_at DESC))[1], '00000000-0000-0000-0000-000000000000')::uuid AS last_id,
+    COALESCE((array_agg(t.ticket_number ORDER BY t.created_at DESC))[1], '')::text AS last_number,
+    COALESCE((array_agg(t.title ORDER BY t.created_at DESC))[1], '')::text AS last_title,
+    COALESCE((array_agg(t.status::text ORDER BY t.created_at DESC))[1], '')::text AS last_status,
+    COALESCE((array_agg(t.priority::text ORDER BY t.created_at DESC))[1], '')::text AS last_priority
+  FROM tickets t
+  WHERE $1::bool AND t.asset_id = a.id AND t.merged_into_id IS NULL
+    AND t.status NOT IN ('resolved', 'closed', 'cancelled')
+    AND ($2::uuid[] IS NULL OR t.area_id = ANY($2::uuid[]) OR t.requested_area_id = ANY($2::uuid[]))
+) tk
+CROSS JOIN LATERAL (
+  SELECT count(*)::int AS total,
+    COALESCE((array_agg(i.title ORDER BY i.opened_at DESC))[1], '')::text AS last_title,
+    max(i.opened_at)::timestamptz AS last_opened
+  FROM escalation_incidents i WHERE i.asset_id = a.id AND i.closed_at IS NULL
+) inc
+CROSS JOIN LATERAL (
+  SELECT count(*)::int AS total,
+    COALESCE((array_agg(e.id ORDER BY e.created_at DESC))[1], '00000000-0000-0000-0000-000000000000')::uuid AS last_id,
+    COALESCE((array_agg(left(e.content, 240) ORDER BY e.created_at DESC))[1], '')::text AS last_content,
+    max(e.created_at)::timestamptz AS last_at,
+    COALESCE((array_agg(COALESCE(NULLIF(u.full_name, ''), u.username) ORDER BY e.created_at DESC))[1], '')::text AS last_author
+  FROM entries e JOIN users u ON u.id = e.user_id
+  WHERE e.asset_id = a.id AND e.entry_type = 'incidente'
+    AND (e.follow_up_open OR e.created_at > now() - interval '24 hours')
+) en
+LEFT JOIN LATERAL (
+  SELECT m.title, m.ends_at FROM maintenance_windows m
+  WHERE m.asset_id = a.id AND m.active AND m.starts_at <= now() AND m.ends_at > now()
+  ORDER BY m.ends_at DESC LIMIT 1
+) mw ON true
+WHERE a.active AND a.latitude IS NOT NULL AND a.longitude IS NOT NULL
+  AND ($3::uuid[] IS NULL OR a.area_id = ANY($3::uuid[])
+       OR EXISTS (SELECT 1 FROM asset_responsibles r WHERE r.asset_id = a.id AND r.area_id = ANY($3::uuid[])))
+ORDER BY a.name
+LIMIT 5000
+`
+
+type ListMapAssetsParams struct {
+	WithTickets  bool        `json:"with_tickets"`
+	VisibleAreas []uuid.UUID `json:"visible_areas"`
+	Areas        []uuid.UUID `json:"areas"`
+}
+
+type ListMapAssetsRow struct {
+	ID               uuid.UUID          `json:"id"`
+	Name             string             `json:"name"`
+	Code             string             `json:"code"`
+	KindCode         pgtype.Text        `json:"kind_code"`
+	Type             AssetType          `json:"type"`
+	Latitude         *float64           `json:"latitude"`
+	Longitude        *float64           `json:"longitude"`
+	Address          pgtype.Text        `json:"address"`
+	GroupName        pgtype.Text        `json:"group_name"`
+	PlaceName        pgtype.Text        `json:"place_name"`
+	ClientID         pgtype.UUID        `json:"client_id"`
+	ClientName       pgtype.Text        `json:"client_name"`
+	OpenTickets      int32              `json:"open_tickets"`
+	TicketID         uuid.UUID          `json:"ticket_id"`
+	TicketNumber     string             `json:"ticket_number"`
+	TicketTitle      string             `json:"ticket_title"`
+	TicketStatus     string             `json:"ticket_status"`
+	TicketPriority   string             `json:"ticket_priority"`
+	OpenIncidents    int32              `json:"open_incidents"`
+	IncidentTitle    string             `json:"incident_title"`
+	IncidentOpenedAt pgtype.Timestamptz `json:"incident_opened_at"`
+	IncidentEntries  int32              `json:"incident_entries"`
+	EntryID          uuid.UUID          `json:"entry_id"`
+	EntryContent     string             `json:"entry_content"`
+	EntryAt          pgtype.Timestamptz `json:"entry_at"`
+	EntryAuthor      string             `json:"entry_author"`
+	MaintenanceTitle string             `json:"maintenance_title"`
+	MaintenanceUntil pgtype.Timestamptz `json:"maintenance_until"`
+}
+
+// Mapa: los equipos activos con coordenadas propias (o de su grupo), de las
+// áreas dadas (dueña o responsable); nil = todos. Con lo que los afecta:
+// tickets abiertos (si la Ticketera está encendida y el usuario los ve),
+// incidentes de escalamiento abiertos, entradas de incidente de la Bitácora
+// (con seguimiento abierto o de las últimas 24 h) y mantenimiento activo.
+func (q *Queries) ListMapAssets(ctx context.Context, arg ListMapAssetsParams) ([]ListMapAssetsRow, error) {
+	rows, err := q.db.Query(ctx, listMapAssets, arg.WithTickets, arg.VisibleAreas, arg.Areas)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListMapAssetsRow
+	for rows.Next() {
+		var i ListMapAssetsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Code,
+			&i.KindCode,
+			&i.Type,
+			&i.Latitude,
+			&i.Longitude,
+			&i.Address,
+			&i.GroupName,
+			&i.PlaceName,
+			&i.ClientID,
+			&i.ClientName,
+			&i.OpenTickets,
+			&i.TicketID,
+			&i.TicketNumber,
+			&i.TicketTitle,
+			&i.TicketStatus,
+			&i.TicketPriority,
+			&i.OpenIncidents,
+			&i.IncidentTitle,
+			&i.IncidentOpenedAt,
+			&i.IncidentEntries,
+			&i.EntryID,
+			&i.EntryContent,
+			&i.EntryAt,
+			&i.EntryAuthor,
+			&i.MaintenanceTitle,
+			&i.MaintenanceUntil,
 		); err != nil {
 			return nil, err
 		}
@@ -773,12 +1166,47 @@ func (q *Queries) SetAssetActive(ctx context.Context, arg SetAssetActiveParams) 
 	return err
 }
 
+const updateAssetGroup = `-- name: UpdateAssetGroup :exec
+UPDATE asset_groups SET name = $1, area_id = $2, territorial_unit_id = $3,
+  address = $4, latitude = $5, longitude = $6, rack = $7,
+  client_id = $8, updated_at = now()
+WHERE id = $9
+`
+
+type UpdateAssetGroupParams struct {
+	Name              string      `json:"name"`
+	AreaID            uuid.UUID   `json:"area_id"`
+	TerritorialUnitID pgtype.UUID `json:"territorial_unit_id"`
+	Address           pgtype.Text `json:"address"`
+	Latitude          *float64    `json:"latitude"`
+	Longitude         *float64    `json:"longitude"`
+	Rack              pgtype.Text `json:"rack"`
+	ClientID          pgtype.UUID `json:"client_id"`
+	ID                uuid.UUID   `json:"id"`
+}
+
+func (q *Queries) UpdateAssetGroup(ctx context.Context, arg UpdateAssetGroupParams) error {
+	_, err := q.db.Exec(ctx, updateAssetGroup,
+		arg.Name,
+		arg.AreaID,
+		arg.TerritorialUnitID,
+		arg.Address,
+		arg.Latitude,
+		arg.Longitude,
+		arg.Rack,
+		arg.ClientID,
+		arg.ID,
+	)
+	return err
+}
+
 const updateInventoryAsset = `-- name: UpdateInventoryAsset :exec
 UPDATE assets SET type = $1, kind_code = $2, name = $3, area_id = $4,
   territorial_unit_id = $5, client_id = $6, model = $7,
   serial = $8, rack = $9, rack_position = $10,
-  attributes = $11, metadata = $12, updated_at = now()
-WHERE id = $13
+  attributes = $11, metadata = $12, address = $13,
+  latitude = $14, longitude = $15, group_id = $16, updated_at = now()
+WHERE id = $17
 `
 
 type UpdateInventoryAssetParams struct {
@@ -794,6 +1222,10 @@ type UpdateInventoryAssetParams struct {
 	RackPosition      pgtype.Text `json:"rack_position"`
 	Attributes        []byte      `json:"attributes"`
 	Metadata          []byte      `json:"metadata"`
+	Address           pgtype.Text `json:"address"`
+	Latitude          *float64    `json:"latitude"`
+	Longitude         *float64    `json:"longitude"`
+	GroupID           pgtype.UUID `json:"group_id"`
 	ID                uuid.UUID   `json:"id"`
 }
 
@@ -811,6 +1243,10 @@ func (q *Queries) UpdateInventoryAsset(ctx context.Context, arg UpdateInventoryA
 		arg.RackPosition,
 		arg.Attributes,
 		arg.Metadata,
+		arg.Address,
+		arg.Latitude,
+		arg.Longitude,
+		arg.GroupID,
 		arg.ID,
 	)
 	return err

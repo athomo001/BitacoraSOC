@@ -41,11 +41,12 @@ describe('MapComponent (#24)', () => {
 
   afterEach(() => httpMock.verify());
 
-  async function render(data: unknown[] = points, mode = 'osm') {
+  async function render(data: unknown[] = points, mode = 'osm', assetData: unknown[] = []) {
     const fixture = TestBed.createComponent(MapComponent);
     fixture.detectChanges();
     httpMock.expectOne('/api/config/map-tiles').flush({ data: { mode, url: '' } });
     httpMock.expectOne('/api/map/points').flush({ data });
+    httpMock.expectOne('/api/map/assets').flush({ data: assetData });
     await new Promise((resolve) => setTimeout(resolve));
     await fixture.whenStable();
     fixture.detectChanges();
@@ -121,6 +122,55 @@ describe('MapComponent (#24)', () => {
     httpMock.expectOne('/api/map/units/u3').flush({ data: { incidents: [], windows: [], teams: [], tickets: [] } });
     await new Promise((resolve) => setTimeout(resolve));
     expect(el.querySelector('.mp__detail')?.textContent).toContain('Arica');
+  });
+
+  it('los equipos del mismo punto (un rack) son un solo pin; desde el Inventario abre ese punto', async () => {
+    linkParams = { assetId: 'a2' };
+    const rack = { latitude: -33.4489, longitude: -70.6693, groupName: 'Rack A', placeName: 'DC Santiago', address: 'Av. Ejemplo 1234' };
+    const { el } = await render(points, 'osm', [
+      { id: 'a1', name: 'SW-CORE-01', code: 'sw-core-01', kind: 'switch', status: 'ok', ...rack },
+      { id: 'a2', name: 'SRV-DB-01', code: 'srv-db-01', kind: 'server', status: 'ok', ...rack },
+      { id: 'a3', name: 'RT-CAL-06', code: 'rt-cal-06', kind: 'router', status: 'ok', latitude: -22.45, longitude: -68.9 },
+    ]);
+    expect(button(el, 'dnsEquipos')).toBeTruthy();
+    const detail = el.querySelector('.mp__detail')!;
+    const card = detail.closest('.adm-card')!;
+    expect(card.querySelector('.adm-card__title')?.textContent).toContain('Rack A');
+    expect(card.textContent).toContain('2 equipos');
+    expect(detail.textContent).toContain('Av. Ejemplo 1234');
+    expect([...detail.querySelectorAll('.mp__asset-link')].map((a) => a.getAttribute('href'))).toEqual(['/inventory?id=a2', '/inventory?id=a1']);
+  });
+
+  it('un equipo de un cliente con ticket o entrada de incidente va a revisar, en rojo, con qué pasó', async () => {
+    const minera = { clientId: 'c1', clientName: 'Minera Norte' };
+    const { fixture, el } = await render([points[2]], 'osm', [
+      { id: 'a1', name: 'RT-MINA-01', code: 'rt-mina-01', kind: 'router', status: 'bad', latitude: -22.3, longitude: -68.9, ...minera,
+        ticket: { id: 'k9', number: 'TKT-2026-00009', title: 'Sin enlace', status: 'assigned', priority: 'p2_high', count: 1 },
+        entry: { id: 'e5', content: '**Corte** de fibra en el tramo norte', at: new Date().toISOString(), author: 'Ana Rojas', count: 1 } },
+      { id: 'a2', name: 'SW-MINA-02', code: 'sw-mina-02', kind: 'switch', status: 'ok', latitude: -22.5, longitude: -68.95, ...minera },
+      { id: 'a3', name: 'SRV-INT-01', code: 'srv-int-01', kind: 'server', status: 'ok', latitude: -33.4, longitude: -70.6 },
+    ]);
+    expect(rows(el).map((r) => r.querySelector('.mp__row-name')?.textContent?.trim())).toEqual(['RT-MINA-01']);
+    expect(rows(el)[0].textContent).toContain('Minera Norte');
+    expect(rows(el)[0].textContent).toContain('TKT-2026-00009 · Sin enlace (P2)');
+    rows(el)[0].click();
+    fixture.detectChanges();
+    const detail = el.querySelector('.mp__detail')!;
+    expect(detail.textContent).toContain('Afectado');
+    expect(detail.textContent).toContain('«Corte de fibra en el tramo norte»');
+    expect(detail.querySelector('a[href="/tickets?id=k9"]')).not.toBeNull();
+    expect(detail.querySelector('a[href="/entries?entry=e5"]')).not.toBeNull();
+
+    // Elegir el cliente deja solo sus equipos; «Internos», los sin cliente.
+    const select = el.querySelector<HTMLSelectElement>('select[name="mapClient"]')!;
+    expect([...select.options].map((o) => o.textContent?.trim())).toEqual(['Todos los clientes', 'Internos (sin cliente)', 'Minera Norte']);
+    const comp = fixture.componentInstance as unknown as { spots: () => { assets: { id: string }[] }[] };
+    select.value = 'internal';
+    select.dispatchEvent(new Event('change'));
+    expect(comp.spots().flatMap((s) => s.assets.map((a) => a.id))).toEqual(['a3']);
+    select.value = 'c1';
+    select.dispatchEvent(new Event('change'));
+    expect(comp.spots().flatMap((s) => s.assets.map((a) => a.id)).sort()).toEqual(['a1', 'a2']);
   });
 
   it('sin nada que revisar lo dice', async () => {

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -30,7 +31,12 @@ import (
 
 const maxInventoryCSVBytes = 5 << 20
 
-var inventoryCommonColumns = []string{"codigo", "nombre", "area", "localidad", "cliente", "marca_modelo", "serie", "rack", "posicion", "ips", "responsables"}
+var inventoryCommonColumns = []string{"codigo", "nombre", "area", "localidad", "cliente", "marca_modelo", "serie", "rack", "posicion", "ips", "responsables",
+	"grupo", "direccion", "latitud", "longitud"}
+
+// locationColumns: si el archivo no las trae, el equipo que ya existe conserva
+// su grupo, dirección y coordenadas (columnas que se sumaron después, 000061).
+var locationColumns = []string{"grupo", "direccion", "latitud", "longitud"}
 
 // ipKindAlias: lo que se escribe en la columna ips antes del «=».
 var ipKindAlias = map[string]string{
@@ -88,10 +94,11 @@ type csvLookups struct {
 	users     map[string]uuid.UUID
 	areaName  map[string]string // nombre o código (minúsculas) → código
 	respType  map[string]string // nombre o código (minúsculas) → código
+	groups    map[string]uuid.UUID
 }
 
 func (h *InventoryHandler) lookups(ctx context.Context) (csvLookups, error) {
-	l := csvLookups{units: map[string]uuid.UUID{}, ambiguous: map[string]bool{}, orgs: map[string]uuid.UUID{}, users: map[string]uuid.UUID{}, areaName: map[string]string{}, respType: map[string]string{}}
+	l := csvLookups{units: map[string]uuid.UUID{}, ambiguous: map[string]bool{}, orgs: map[string]uuid.UUID{}, users: map[string]uuid.UUID{}, areaName: map[string]string{}, respType: map[string]string{}, groups: map[string]uuid.UUID{}}
 	units, err := h.Queries.ListTerritorialUnits(ctx, db.ListTerritorialUnitsParams{PageSize: 100000})
 	if err != nil {
 		return l, err
@@ -136,6 +143,13 @@ func (h *InventoryHandler) lookups(ctx context.Context) (csvLookups, error) {
 		l.respType[strings.ToLower(t.Code)] = t.Code
 		l.respType[strings.ToLower(t.Name)] = t.Code
 	}
+	groups, err := h.Queries.ListAssetGroups(ctx)
+	if err != nil {
+		return l, err
+	}
+	for _, g := range groups {
+		l.groups[strings.ToLower(g.Name)] = g.ID
+	}
 	return l, nil
 }
 
@@ -150,10 +164,36 @@ func splitList(s string) []string {
 	return out
 }
 
+// parseCoord: «-33.4489» o «-33,4489» (Excel en español); vacío = sin coordenada.
+func parseCoord(s string) (*float64, bool) {
+	if s = strings.TrimSpace(s); s == "" {
+		return nil, true
+	}
+	v, err := strconv.ParseFloat(strings.ReplaceAll(s, ",", "."), 64)
+	if err != nil {
+		return nil, false
+	}
+	return &v, true
+}
+
 // rowInput convierte una fila en la misma entrada que usa el formulario.
 func rowInput(kind string, cols map[string]string, l csvLookups) (inventoryInput, string) {
 	in := inventoryInput{Kind: kind, Code: cols["codigo"], Name: cols["nombre"], Model: cols["marca_modelo"], Serial: cols["serie"],
-		Rack: cols["rack"], RackPosition: cols["posicion"], Attributes: map[string]string{}, Extra: map[string]string{}, IPs: []assetIPDTO{}, Responsibles: []assetResponsibleDTO{}}
+		Rack: cols["rack"], RackPosition: cols["posicion"], Address: cols["direccion"], Attributes: map[string]string{}, Extra: map[string]string{}, IPs: []assetIPDTO{}, Responsibles: []assetResponsibleDTO{}}
+	var ok bool
+	if in.Latitude, ok = parseCoord(cols["latitud"]); !ok {
+		return in, fmt.Sprintf("latitud «%s» no es un número", cols["latitud"])
+	}
+	if in.Longitude, ok = parseCoord(cols["longitud"]); !ok {
+		return in, fmt.Sprintf("longitud «%s» no es un número", cols["longitud"])
+	}
+	if v := strings.ToLower(cols["grupo"]); v != "" {
+		id, ok := l.groups[v]
+		if !ok {
+			return in, fmt.Sprintf("grupo «%s» no existe: créalo en Inventario → Grupos", cols["grupo"])
+		}
+		in.GroupID = &id
+	}
 	if in.Name == "" {
 		in.Name = in.Code
 	}
@@ -330,6 +370,7 @@ func (h *InventoryHandler) Import(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		in.Attributes, in.Extra = attrs, extra
+		h.keepLocation(ctx, &in, header)
 		ri, msg := h.resolve(ctx, in)
 		if msg != "" {
 			fail(msg)
@@ -402,6 +443,37 @@ func (h *InventoryHandler) Import(w http.ResponseWriter, r *http.Request) {
 	writeData(w, http.StatusOK, res)
 }
 
+// keepLocation: un archivo sin las columnas de ubicación nuevas (plantillas
+// de antes) no le borra el grupo, la dirección ni las coordenadas al equipo.
+func (h *InventoryHandler) keepLocation(ctx context.Context, in *inventoryInput, header []string) {
+	missing := false
+	for _, c := range locationColumns {
+		if !contains(header, c) {
+			missing = true
+		}
+	}
+	if !missing {
+		return
+	}
+	id, err := h.Queries.GetAssetIDByCode(ctx, strings.TrimSpace(in.Code))
+	if err != nil {
+		return
+	}
+	a, err := h.Queries.GetInventoryAsset(ctx, id)
+	if err != nil {
+		return
+	}
+	if !contains(header, "grupo") {
+		in.GroupID = uuidPtr(a.GroupID)
+	}
+	if !contains(header, "direccion") {
+		in.Address = a.Address.String
+	}
+	if !contains(header, "latitud") && !contains(header, "longitud") {
+		in.Latitude, in.Longitude = a.Latitude, a.Longitude
+	}
+}
+
 func (h *InventoryHandler) createFromImport(ctx context.Context, ri resolvedInput) error {
 	tx, err := h.Pool.Begin(ctx)
 	if err != nil {
@@ -460,7 +532,8 @@ func (h *InventoryHandler) Template(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	example := []string{"srv-ejemplo-01", "SRV-EJEMPLO-01", "Infraestructura", "", "", "Dell PowerEdge R650", "7HXK2T3", "DC1-R04", "U22-U23",
-		"Red=10.10.4.22; Red=10.10.4.32; iLO=10.10.99.22", "Configuración y sistema=área:TI; Hardware=área:Infraestructura"}
+		"Red=10.10.4.22; Red=10.10.4.32; iLO=10.10.99.22", "Configuración y sistema=área:TI; Hardware=área:Infraestructura",
+		"", "Av. Ejemplo 1234, Santiago", "-33.4489", "-70.6693"}
 	for _, f := range fields {
 		switch f.Kind {
 		case "list":
@@ -528,7 +601,12 @@ func (h *InventoryHandler) Export(w http.ResponseWriter, r *http.Request) {
 			}
 			return *p
 		}
-		row := []string{d.Code, d.Name, d.AreaName, deref(d.PlaceName), deref(d.ClientName), deref(d.Model), deref(d.Serial), deref(d.Rack), deref(d.RackPosition), strings.Join(ips, "; "), strings.Join(resp, "; ")}
+		lat, lng := "", ""
+		if d.Latitude != nil && d.Longitude != nil {
+			lat, lng = strconv.FormatFloat(*d.Latitude, 'f', -1, 64), strconv.FormatFloat(*d.Longitude, 'f', -1, 64)
+		}
+		row := []string{d.Code, d.Name, d.AreaName, deref(d.PlaceName), deref(d.ClientName), deref(d.Model), deref(d.Serial), deref(d.Rack), deref(d.RackPosition), strings.Join(ips, "; "), strings.Join(resp, "; "),
+			deref(d.GroupName), deref(d.Address), lat, lng}
 		for _, f := range fields {
 			row = append(row, d.Attributes[f.Key])
 		}

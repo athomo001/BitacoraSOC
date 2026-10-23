@@ -256,3 +256,114 @@ func ticketScopeVisible(ctx context.Context, q *db.Queries) []uuid.UUID {
 	}
 	return scope.visible()
 }
+
+type mapAssetDTO struct {
+	ID         uuid.UUID  `json:"id"`
+	Name       string     `json:"name"`
+	Code       string     `json:"code"`
+	Kind       string     `json:"kind"`
+	Latitude   float64    `json:"latitude"`
+	Longitude  float64    `json:"longitude"`
+	Address    *string    `json:"address,omitempty"`
+	GroupName  *string    `json:"groupName,omitempty"`
+	PlaceName  *string    `json:"placeName,omitempty"`
+	ClientID   *uuid.UUID `json:"clientId,omitempty"`
+	ClientName *string    `json:"clientName,omitempty"`
+	// Status: ok (verde), warn (mantenimiento activo) o bad (ticket abierto,
+	// incidente abierto o entrada de incidente en la Bitácora).
+	Status      string               `json:"status"`
+	Ticket      *mapAssetTicketDTO   `json:"ticket,omitempty"`
+	Incident    *mapAssetIncidentDTO `json:"incident,omitempty"`
+	Entry       *mapAssetEntryDTO    `json:"entry,omitempty"`
+	Maintenance *mapAssetMaintenance `json:"maintenance,omitempty"`
+}
+
+// El último de cada cosa que afecta al equipo, con cuántos hay.
+type mapAssetTicketDTO struct {
+	ID       uuid.UUID `json:"id"`
+	Number   string    `json:"number"`
+	Title    string    `json:"title"`
+	Status   string    `json:"status"`
+	Priority string    `json:"priority"`
+	Count    int32     `json:"count"`
+}
+
+type mapAssetIncidentDTO struct {
+	Title    string    `json:"title"`
+	OpenedAt time.Time `json:"openedAt"`
+	Count    int32     `json:"count"`
+}
+
+type mapAssetEntryDTO struct {
+	ID      uuid.UUID `json:"id"`
+	Content string    `json:"content"`
+	At      time.Time `json:"at"`
+	Author  string    `json:"author"`
+	Count   int32     `json:"count"`
+}
+
+type mapAssetMaintenance struct {
+	Title string    `json:"title"`
+	Until time.Time `json:"until"`
+}
+
+// toMapAsset arma el equipo con lo que lo afecta y su color.
+func toMapAsset(a db.ListMapAssetsRow) mapAssetDTO {
+	out := mapAssetDTO{ID: a.ID, Name: a.Name, Code: a.Code, Kind: kindOf(a.KindCode, a.Type), Latitude: *a.Latitude, Longitude: *a.Longitude,
+		Address: textPtr(a.Address), GroupName: textPtr(a.GroupName), PlaceName: textPtr(a.PlaceName),
+		ClientID: uuidPtr(a.ClientID), ClientName: textPtr(a.ClientName), Status: "ok"}
+	if a.OpenTickets > 0 {
+		out.Ticket = &mapAssetTicketDTO{ID: a.TicketID, Number: a.TicketNumber, Title: a.TicketTitle, Status: a.TicketStatus, Priority: a.TicketPriority, Count: a.OpenTickets}
+	}
+	if a.OpenIncidents > 0 {
+		out.Incident = &mapAssetIncidentDTO{Title: a.IncidentTitle, OpenedAt: a.IncidentOpenedAt.Time, Count: a.OpenIncidents}
+	}
+	if a.IncidentEntries > 0 {
+		out.Entry = &mapAssetEntryDTO{ID: a.EntryID, Content: a.EntryContent, At: a.EntryAt.Time, Author: a.EntryAuthor, Count: a.IncidentEntries}
+	}
+	if a.MaintenanceUntil.Valid {
+		out.Maintenance = &mapAssetMaintenance{Title: a.MaintenanceTitle, Until: a.MaintenanceUntil.Time}
+		out.Status = "warn"
+	}
+	if out.Ticket != nil || out.Incident != nil || out.Entry != nil {
+		out.Status = "bad"
+	}
+	return out
+}
+
+// Assets es GET /api/map/assets: la capa «Equipos» del mapa, los equipos
+// activos con coordenadas (propias o de su grupo) que el usuario ve en el
+// Inventario, con lo que los afecta. Los tickets, solo los que ve en la
+// Ticketera y con la Ticketera encendida.
+func (h *MapHandler) Assets(w http.ResponseWriter, r *http.Request) {
+	scope, err := loadTicketScope(r.Context(), h.Queries)
+	if err != nil {
+		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudieron leer los equipos")
+		return
+	}
+	acc, err := loadInvAccess(r.Context(), h.Queries)
+	if err != nil {
+		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudieron leer tus áreas")
+		return
+	}
+	var areas []uuid.UUID
+	if !acc.viewAll {
+		if areas = acc.list(); len(areas) == 0 {
+			writeData(w, http.StatusOK, []mapAssetDTO{})
+			return
+		}
+	}
+	rows, err := h.Queries.ListMapAssets(r.Context(), db.ListMapAssetsParams{Areas: areas, WithTickets: h.ticketsOn(r.Context()), VisibleAreas: scope.visible()})
+	if err != nil {
+		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudieron leer los equipos")
+		return
+	}
+	out := make([]mapAssetDTO, 0, len(rows))
+	for _, a := range rows {
+		if a.Latitude == nil || a.Longitude == nil {
+			continue
+		}
+		out = append(out, toMapAsset(a))
+	}
+	writeData(w, http.StatusOK, out)
+}

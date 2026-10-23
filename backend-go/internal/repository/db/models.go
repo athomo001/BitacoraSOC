@@ -1470,6 +1470,7 @@ type Asset struct {
 	GlpiItemtype      pgtype.Text        `json:"glpi_itemtype"`
 	GlpiID            pgtype.Int4        `json:"glpi_id"`
 	GlpiRemovedAt     pgtype.Timestamptz `json:"glpi_removed_at"`
+	GroupID           pgtype.UUID        `json:"group_id"`
 }
 
 type AssetEvent struct {
@@ -1481,6 +1482,20 @@ type AssetEvent struct {
 	UserID      pgtype.UUID        `json:"user_id"`
 	TicketID    pgtype.UUID        `json:"ticket_id"`
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+}
+
+type AssetGroup struct {
+	ID                uuid.UUID          `json:"id"`
+	Name              string             `json:"name"`
+	AreaID            uuid.UUID          `json:"area_id"`
+	TerritorialUnitID pgtype.UUID        `json:"territorial_unit_id"`
+	Address           pgtype.Text        `json:"address"`
+	Latitude          *float64           `json:"latitude"`
+	Longitude         *float64           `json:"longitude"`
+	Rack              pgtype.Text        `json:"rack"`
+	ClientID          pgtype.UUID        `json:"client_id"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
 }
 
 type AssetIp struct {

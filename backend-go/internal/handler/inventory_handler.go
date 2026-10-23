@@ -320,6 +320,11 @@ type inventoryRowDTO struct {
 	IPCount    int32             `json:"ipCount"`
 	// GlpiID: el equipo viene de GLPI (9.6).
 	GlpiID *int32 `json:"glpiId,omitempty"`
+	// GroupName: el grupo del que toma la ubicación (000061).
+	GroupName *string `json:"groupName,omitempty"`
+	// ClientID/ClientName: el cliente dueño del equipo (sin él, es interno).
+	ClientID   *uuid.UUID `json:"clientId,omitempty"`
+	ClientName *string    `json:"clientName,omitempty"`
 }
 
 func attrs(raw []byte) map[string]string {
@@ -351,6 +356,9 @@ func (h *InventoryHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 	params := db.ListInventoryParams{Areas: areas, Kind: queryText(q.Get("kind")), Q: queryText(strings.TrimSpace(q.Get("q"))), IncludeInactive: q.Get("inactive") == "true",
 		OnlyGlpi: q.Get("source") == "glpi"}
+	if g, err := uuid.Parse(q.Get("group")); err == nil {
+		params.GroupID = pgtype.UUID{Bytes: g, Valid: true}
+	}
 	if !acc.viewAll && len(areas) == 0 {
 		writeData(w, http.StatusOK, []inventoryRowDTO{})
 		return
@@ -363,7 +371,8 @@ func (h *InventoryHandler) List(w http.ResponseWriter, r *http.Request) {
 	out := make([]inventoryRowDTO, 0, len(rows))
 	for _, a := range rows {
 		out = append(out, inventoryRowDTO{ID: a.ID, Name: a.Name, Code: a.Code, Kind: kindOf(a.KindCode, a.Type), AreaID: a.AreaID, AreaName: a.AreaName,
-			Serial: textPtr(a.Serial), Model: textPtr(a.Model), Attributes: attrs(a.Attributes), Active: a.Active, PlaceName: textPtr(a.PlaceName), FirstIP: a.FirstIp, IPCount: a.IpCount, GlpiID: int4Ptr(a.GlpiID)})
+			Serial: textPtr(a.Serial), Model: textPtr(a.Model), Attributes: attrs(a.Attributes), Active: a.Active, PlaceName: textPtr(a.PlaceName), FirstIP: a.FirstIp, IPCount: a.IpCount, GlpiID: int4Ptr(a.GlpiID),
+			GroupName: textPtr(a.GroupName), ClientID: uuidPtr(a.ClientID), ClientName: textPtr(a.ClientName)})
 	}
 	writeData(w, http.StatusOK, out)
 }
@@ -431,6 +440,11 @@ type inventoryDetailDTO struct {
 	Serial            *string               `json:"serial,omitempty"`
 	Rack              *string               `json:"rack,omitempty"`
 	RackPosition      *string               `json:"rackPosition,omitempty"`
+	Address           *string               `json:"address,omitempty"`
+	Latitude          *float64              `json:"latitude,omitempty"`
+	Longitude         *float64              `json:"longitude,omitempty"`
+	GroupID           *uuid.UUID            `json:"groupId,omitempty"`
+	GroupName         *string               `json:"groupName,omitempty"`
 	Attributes        map[string]string     `json:"attributes"`
 	Extra             map[string]string     `json:"extra"`
 	Active            bool                  `json:"active"`
@@ -483,6 +497,7 @@ func (h *InventoryHandler) detail(ctx context.Context, a db.GetInventoryAssetRow
 	d := inventoryDetailDTO{ID: a.ID, Name: a.Name, Code: a.Code, Kind: kindOf(a.KindCode, a.Type), Area: a.AreaCode, AreaName: a.AreaName,
 		TerritorialUnitID: uuidPtr(a.TerritorialUnitID), PlaceName: textPtr(a.PlaceName), ClientID: uuidPtr(a.ClientID), ClientName: textPtr(a.ClientName),
 		Model: textPtr(a.Model), Serial: textPtr(a.Serial), Rack: textPtr(a.Rack), RackPosition: textPtr(a.RackPosition),
+		Address: textPtr(a.Address), Latitude: a.Latitude, Longitude: a.Longitude, GroupID: uuidPtr(a.GroupID), GroupName: textPtr(a.GroupName),
 		Attributes: attrs(a.Attributes), Extra: attrs(a.Metadata), Active: a.Active,
 		IPs: []assetIPDTO{}, Responsibles: []assetResponsibleDTO{}, Events: []assetEventDTO{}, Tickets: []assetTicketDTO{},
 		CanEdit: acc.canEdit(areas), CanDecide: acc.canDecide(a.AreaID)}
@@ -579,20 +594,25 @@ func (h *InventoryHandler) reload(w http.ResponseWriter, r *http.Request, id uui
 // ===== Alta y edición =====
 
 type inventoryInput struct {
-	Kind              string                `json:"kind"`
-	Name              string                `json:"name"`
-	Code              string                `json:"code"`
-	Area              string                `json:"area"`
-	TerritorialUnitID *uuid.UUID            `json:"territorialUnitId"`
-	ClientID          *uuid.UUID            `json:"clientId"`
-	Model             string                `json:"model"`
-	Serial            string                `json:"serial"`
-	Rack              string                `json:"rack"`
-	RackPosition      string                `json:"rackPosition"`
-	Attributes        map[string]string     `json:"attributes"`
-	Extra             map[string]string     `json:"extra"`
-	IPs               []assetIPDTO          `json:"ips"`
-	Responsibles      []assetResponsibleDTO `json:"responsibles"`
+	Kind              string     `json:"kind"`
+	Name              string     `json:"name"`
+	Code              string     `json:"code"`
+	Area              string     `json:"area"`
+	TerritorialUnitID *uuid.UUID `json:"territorialUnitId"`
+	ClientID          *uuid.UUID `json:"clientId"`
+	Model             string     `json:"model"`
+	Serial            string     `json:"serial"`
+	Rack              string     `json:"rack"`
+	RackPosition      string     `json:"rackPosition"`
+	Address           string     `json:"address"`
+	Latitude          *float64   `json:"latitude"`
+	Longitude         *float64   `json:"longitude"`
+	// GroupID: el equipo toma del grupo localidad, dirección, coordenadas y rack.
+	GroupID      *uuid.UUID            `json:"groupId"`
+	Attributes   map[string]string     `json:"attributes"`
+	Extra        map[string]string     `json:"extra"`
+	IPs          []assetIPDTO          `json:"ips"`
+	Responsibles []assetResponsibleDTO `json:"responsibles"`
 }
 
 var ipKinds = map[string]string{"network": "Red", "vip": "Balanceo (VIP)", "management": "Administración (iLO / iDRAC)", "other": "Otra"}
@@ -672,6 +692,9 @@ func (h *InventoryHandler) resolve(ctx context.Context, in inventoryInput) (reso
 		}
 	}
 	in.Extra = extra
+	if msg := h.resolveLocation(ctx, &in); msg != "" {
+		return out, msg
+	}
 	for i, ip := range in.IPs {
 		ip.Address, ip.Note = strings.TrimSpace(ip.Address), strings.TrimSpace(ip.Note)
 		if _, ok := ipKinds[ip.Kind]; !ok {
@@ -716,6 +739,35 @@ func (h *InventoryHandler) resolve(ctx context.Context, in inventoryInput) (reso
 	return out, ""
 }
 
+// checkCoords: latitud y longitud van juntas y dentro de rango (o ninguna).
+func checkCoords(lat, lng *float64) string {
+	if (lat == nil) != (lng == nil) {
+		return "las coordenadas necesitan latitud y longitud"
+	}
+	if lat != nil && (*lat < -90 || *lat > 90 || *lng < -180 || *lng > 180) {
+		return "coordenadas fuera de rango (latitud entre -90 y 90, longitud entre -180 y 180)"
+	}
+	return ""
+}
+
+// resolveLocation valida dirección y coordenadas; con grupo, la ubicación es
+// la del grupo (lo que venga en el formulario o el CSV no cuenta).
+func (h *InventoryHandler) resolveLocation(ctx context.Context, in *inventoryInput) string {
+	in.Address = strings.TrimSpace(in.Address)
+	if in.GroupID == nil {
+		return checkCoords(in.Latitude, in.Longitude)
+	}
+	g, err := h.Queries.GetAssetGroup(ctx, *in.GroupID)
+	if err != nil {
+		return "el grupo no existe"
+	}
+	in.TerritorialUnitID, in.Address, in.Latitude, in.Longitude, in.Rack = uuidPtr(g.TerritorialUnitID), g.Address.String, g.Latitude, g.Longitude, g.Rack.String
+	if in.ClientID == nil {
+		in.ClientID = uuidPtr(g.ClientID) // el equipo sin cliente toma el del grupo
+	}
+	return ""
+}
+
 func optString(s string) pgtype.Text {
 	s = strings.TrimSpace(s)
 	return pgtype.Text{String: s, Valid: s != ""}
@@ -726,16 +778,18 @@ func save(ctx context.Context, q *db.Queries, id uuid.UUID, ri resolvedInput) (u
 	in := ri.in
 	attrsRaw, _ := json.Marshal(in.Attributes)
 	extraRaw, _ := json.Marshal(in.Extra)
-	unit, client := optionalUUID(in.TerritorialUnitID), optionalUUID(in.ClientID)
+	unit, client, group := optionalUUID(in.TerritorialUnitID), optionalUUID(in.ClientID), optionalUUID(in.GroupID)
 	var err error
 	if id == uuid.Nil {
 		id, err = q.CreateInventoryAsset(ctx, db.CreateInventoryAssetParams{Type: ri.kind.BaseType, KindCode: pgtype.Text{String: ri.kind.Code, Valid: true},
 			Name: in.Name, Code: in.Code, AreaID: ri.areaID, TerritorialUnitID: unit, ClientID: client, Model: optString(in.Model), Serial: optString(in.Serial),
-			Rack: optString(in.Rack), RackPosition: optString(in.RackPosition), Attributes: attrsRaw, Metadata: extraRaw})
+			Rack: optString(in.Rack), RackPosition: optString(in.RackPosition), Attributes: attrsRaw, Metadata: extraRaw,
+			Address: optString(in.Address), Latitude: in.Latitude, Longitude: in.Longitude, GroupID: group})
 	} else {
 		err = q.UpdateInventoryAsset(ctx, db.UpdateInventoryAssetParams{ID: id, Type: ri.kind.BaseType, KindCode: pgtype.Text{String: ri.kind.Code, Valid: true},
 			Name: in.Name, AreaID: ri.areaID, TerritorialUnitID: unit, ClientID: client, Model: optString(in.Model), Serial: optString(in.Serial),
-			Rack: optString(in.Rack), RackPosition: optString(in.RackPosition), Attributes: attrsRaw, Metadata: extraRaw})
+			Rack: optString(in.Rack), RackPosition: optString(in.RackPosition), Attributes: attrsRaw, Metadata: extraRaw,
+			Address: optString(in.Address), Latitude: in.Latitude, Longitude: in.Longitude, GroupID: group})
 	}
 	if err != nil {
 		return id, err
@@ -792,8 +846,20 @@ func changes(before inventoryDetailDTO, after inventoryInput, fields []kindField
 	}
 	diff("Marca y modelo", deref(before.Model), after.Model)
 	diff("N.º de serie", deref(before.Serial), after.Serial)
+	if (before.GroupID == nil) != (after.GroupID == nil) || (before.GroupID != nil && *before.GroupID != *after.GroupID) {
+		var was, now string
+		if before.GroupID != nil {
+			was = names["group:"+before.GroupID.String()]
+		}
+		if after.GroupID != nil {
+			now = names["group:"+after.GroupID.String()]
+		}
+		diff("Grupo", was, now)
+	}
 	diff("Rack", deref(before.Rack), after.Rack)
 	diff("Posición", deref(before.RackPosition), after.RackPosition)
+	diff("Dirección", deref(before.Address), after.Address)
+	diff("Coordenadas", coordsText(before.Latitude, before.Longitude), coordsText(after.Latitude, after.Longitude))
 	if (before.TerritorialUnitID == nil) != (after.TerritorialUnitID == nil) || (before.TerritorialUnitID != nil && *before.TerritorialUnitID != *after.TerritorialUnitID) {
 		out = append(out, "Localidad cambiada")
 	}
@@ -867,6 +933,14 @@ func changes(before inventoryDetailDTO, after inventoryInput, fields []kindField
 	return out
 }
 
+// coordsText: «-33.4489, -70.6693» para el historial (vacío sin coordenadas).
+func coordsText(lat, lng *float64) string {
+	if lat == nil || lng == nil {
+		return ""
+	}
+	return strconv.FormatFloat(*lat, 'f', -1, 64) + ", " + strconv.FormatFloat(*lng, 'f', -1, 64)
+}
+
 func (h *InventoryHandler) names(ctx context.Context) map[string]string {
 	m := map[string]string{}
 	if kinds, err := h.Queries.ListAssetKinds(ctx); err == nil {
@@ -877,6 +951,11 @@ func (h *InventoryHandler) names(ctx context.Context) map[string]string {
 	if areas, err := h.Queries.ListTicketAreas(ctx); err == nil {
 		for _, a := range areas {
 			m["area:"+a.Code] = a.Name
+		}
+	}
+	if groups, err := h.Queries.ListAssetGroups(ctx); err == nil {
+		for _, g := range groups {
+			m["group:"+g.ID.String()] = g.Name
 		}
 	}
 	return m

@@ -100,7 +100,7 @@ export class MapCanvasComponent {
     // El fondo va en su propio panel, debajo de los puntos aunque se vuelva a pintar después.
     map.createPane('land').style.zIndex = '250';
     this.landRenderer = L.canvas({ pane: 'land' });
-    this.state = { L, map, renderer: L.canvas({ padding: 0.5 }) };
+    this.state = { L, map, renderer: L.canvas({ padding: 0.5, tolerance: 6 }) };
     const resize = new ResizeObserver(() => map.invalidateSize());
     resize.observe(host);
     destroyRef.onDestroy(() => {

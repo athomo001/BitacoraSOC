@@ -23,6 +23,18 @@
             <mat-icon class="mp__tk">confirmation_number</mat-icon>{{ i18n.t('map.layer.tickets') }}
           </button>
         }
+        @if (assets().length) {
+          <button type="button" class="seg" [attr.aria-pressed]="showAssets()" (click)="showAssets.set(!showAssets())">
+            <mat-icon class="mp__as">dns</mat-icon>{{ i18n.t('map.layer.assets') }}
+          </button>
+          @if (clientOptions().length && showAssets()) {
+            <select class="adm-input mp__client" name="mapClient" [attr.aria-label]="i18n.t('map.client')" (change)="setClient($any($event.target).value)">
+              <option value="" [selected]="!clientFilter()">{{ i18n.t('map.client.all') }}</option>
+              <option value="internal" [selected]="clientFilter() === 'internal'">{{ i18n.t('map.client.internal') }}</option>
+              @for (c of clientOptions(); track c.id) { <option [value]="c.id" [selected]="clientFilter() === c.id">{{ c.name }}</option> }
+            </select>
+          }
+        }
         <span class="mono adm-small adm-secondary adm-push">{{ i18n.tf('map.count', shownCount()) }}</span>
       </div>
       <app-map-canvas class="mp__map" [tiles]="tiles()" [label]="i18n.t('nav.map')" (ready)="onReady($event)" />
@@ -30,6 +42,10 @@
         <span><i class="mp__dot mp__dot--bad"></i>{{ i18n.t('map.legend.incident') }}</span>
         <span><i class="mp__dot mp__dot--warn"></i>{{ i18n.t('map.legend.maintenance') }}</span>
         @if (ticketsOn()) { <span><i class="mp__dot mp__dot--tk"></i>{{ i18n.t('map.legend.ticket') }}</span> }
+        @if (showAssets() && assets().length) {
+          <span><i class="mp__dot mp__dot--ok"></i>{{ i18n.t('map.legend.assetOk') }}</span>
+          <span><i class="mp__dot mp__dot--bad"></i>{{ i18n.t('map.legend.assetBad') }}</span>
+        }
         <span><i class="mp__dot"></i>{{ i18n.t('map.legend.quiet') }}</span>
       </div>
     </section>
@@ -38,7 +54,7 @@
       <section class="adm-card">
         <div class="adm-card__head">
           <h2 class="adm-card__title"><mat-icon class="mp__bad">crisis_alert</mat-icon>{{ i18n.t('map.review') }}</h2>
-          <span class="pill mono" [class.tone-bad]="review().length > 0">{{ review().length }}</span>
+          <span class="pill mono" [class.tone-bad]="review().length + reviewSpots().length > 0">{{ review().length + reviewSpots().length }}</span>
         </div>
         @for (p of review(); track p.id) {
           <button type="button" class="mp__row" [attr.aria-current]="p.id === selectedId()" (click)="select(p, true)">
@@ -52,10 +68,20 @@
               @for (m of marks(p); track m.tone) { <span class="pill" [class]="'tone-' + pillTone(m.tone)">{{ m.text }}</span> }
             </span>
           </button>
-        } @empty {
-          @if (loaded()) {
-            <p class="mp__empty"><mat-icon class="mp__ok">check_circle</mat-icon>{{ i18n.t('map.nothing') }}</p>
-          }
+        }
+        @for (s of reviewSpots(); track s.key) {
+          <button type="button" class="mp__row" [attr.aria-current]="s.key === selectedSpot()" (click)="selectSpot(s, true)">
+            <span class="mp__bar-tone" [class.mp__bar-tone--warn]="spotTone(s) === 'warn'"></span>
+            <span class="mp__row-text">
+              <span class="mp__row-name">{{ spotTitle(s) }}</span>
+              <span class="mp__row-sub">{{ s.assets[0].clientName ?? i18n.t('map.client.internal') }}@if (s.assets[0].placeName) { · {{ s.assets[0].placeName }} }</span>
+              <span class="mp__row-what">{{ spotWhat(s) }}</span>
+            </span>
+            <span class="mp__marks"><span class="pill" [class]="'tone-' + spotTone(s)"><mat-icon>dns</mat-icon>{{ spotCount(s) }}</span></span>
+          </button>
+        }
+        @if (loaded() && !review().length && !reviewSpots().length) {
+          <p class="mp__empty"><mat-icon class="mp__ok">check_circle</mat-icon>{{ i18n.t('map.nothing') }}</p>
         }
       </section>
 
@@ -128,6 +154,40 @@
             <a class="adm-btn adm-btn--primary mp__go" routerLink="/escalation" [queryParams]="{ territorialUnitId: p.id }">
               <mat-icon>phone_in_talk</mat-icon>{{ i18n.t('map.openEscalation') }}
             </a>
+          </div>
+        } @else if (spot(); as s) {
+          <div class="adm-card__head">
+            <h2 class="adm-card__title"><mat-icon class="mp__as">dns</mat-icon>{{ spotTitle(s) }}</h2>
+            <span class="pill mono" [class]="'pill mono tone-' + spotTone(s)">{{ spotCount(s) }}</span>
+            <button type="button" class="adm-icon-btn adm-push" [attr.aria-label]="i18n.t('map.close')" (click)="clearSelection()"><mat-icon>close</mat-icon></button>
+          </div>
+          <div class="adm-card__body mp__detail">
+            <dl class="mp__kv">
+              <dt>{{ i18n.t('map.client') }}</dt><dd>{{ s.assets[0].clientName ?? i18n.t('map.client.internal') }}</dd>
+              @if (s.assets[0].placeName; as place) { <dt>{{ i18n.t('map.territory') }}</dt><dd>{{ place }}</dd> }
+              @if (s.assets[0].address; as address) { <dt>{{ i18n.t('map.address') }}</dt><dd>{{ address }}</dd> }
+              <dt>{{ i18n.t('map.coords') }}</dt>
+              <dd class="mono">{{ s.latitude.toFixed(4) }}, {{ s.longitude.toFixed(4) }}</dd>
+            </dl>
+            <div class="mp__list">
+              <span class="adm-label">{{ i18n.t('map.assetsHere') }}</span>
+              @for (a of s.assets; track a.id) {
+                <div class="mp__item">
+                  <a class="mp__asset-link" routerLink="/inventory" [queryParams]="{ id: a.id }">
+                    <span class="mp__ticket-title">{{ a.name }}</span>
+                    <span class="pill" [class]="'pill tone-' + a.status">{{ i18n.t(a.status === 'bad' ? 'map.status.bad' : a.status === 'warn' ? 'map.status.warn' : 'map.status.ok') }}</span>
+                  </a>
+                  @if (a.status !== 'ok') {
+                    <ul class="mp__reasons">
+                      @for (r of reasonsOf(a); track r.text) {
+                        <li class="mp__reason"><mat-icon [class.mp__bad]="r.tone === 'bad'" [class.mp__warn]="r.tone === 'warn'">{{ r.icon }}</mat-icon>
+                          @if (r.link; as l) { <a [routerLink]="l.path" [queryParams]="l.query">{{ r.text }}</a> } @else { <span>{{ r.text }}</span> }</li>
+                      }
+                    </ul>
+                  }
+                </div>
+              }
+            </div>
           </div>
         } @else {
           <div class="adm-card__head"><h2 class="adm-card__title"><mat-icon>place</mat-icon>{{ i18n.t('map.unit') }}</h2></div>

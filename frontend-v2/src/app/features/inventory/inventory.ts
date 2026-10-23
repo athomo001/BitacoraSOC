@@ -1,19 +1,23 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
-import { AssetEvent, AssetRequest, InventoryAsset, InventoryMeta, InventoryRow, InventoryService, IpKind } from '../../core/inventory/inventory.service';
+import { AssetEvent, AssetGroup, AssetRequest, InventoryAsset, InventoryMeta, InventoryRow, InventoryService, IpKind } from '../../core/inventory/inventory.service';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { MessageKey } from '../../core/i18n/messages';
 import { problemDetail } from '../../core/http-error';
 import { SseService } from '../../core/sse/sse.service';
 import { SystemFeaturesService } from '../../core/system-features/system-features.service';
+import { SetupService } from '../../core/setup/setup.service';
+import { PermissionsService } from '../../core/auth/permissions.service';
 import { AssetFormComponent } from './asset-form';
 import { AssetCsvComponent } from './asset-csv';
+import { AssetGroupsComponent } from './asset-groups';
+import { coordsLabel } from './location-fields';
 
 import '../../core/i18n/packs/inventory';
 
-type Panel = 'detail' | 'new' | 'edit' | 'csv' | 'requests';
+type Panel = 'detail' | 'new' | 'edit' | 'csv' | 'requests' | 'groups';
 
 /** Campos que trae GLPI (9.6): en un equipo importado, cada importación los actualiza. */
 const GLPI_ATTRIBUTES = new Set(['os', 'os_version', 'cpu', 'ram_gb', 'disk', 'equipment']);
@@ -31,7 +35,7 @@ const EVENT_ICON: Record<AssetEvent['kind'], string> = {
 @Component({
   selector: 'app-inventory',
   standalone: true,
-  imports: [MatIconModule, DatePipe, RouterLink, AssetFormComponent, AssetCsvComponent],
+  imports: [MatIconModule, DatePipe, RouterLink, AssetFormComponent, AssetCsvComponent, AssetGroupsComponent],
   templateUrl: './inventory.html',
   styleUrl: './inventory.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -44,6 +48,21 @@ export class InventoryComponent implements OnInit {
   private readonly features = inject(SystemFeaturesService);
   /** «De GLPI» solo existe con la importación desde GLPI prendida. */
   protected readonly glpiOn = computed(() => this.features.isEnabled('glpi_sync'));
+  private readonly setup = inject(SetupService);
+  private readonly perms = inject(PermissionsService);
+  private readonly route = inject(ActivatedRoute);
+  /** «Ver en el mapa»: el Mapa es del módulo NOC y del perfil Operativo. */
+  protected readonly mapOn = computed(() => this.setup.status()?.nocEnabled !== false && this.perms.operational());
+  protected readonly coordsLabel = coordsLabel;
+  /** «Ver sus equipos» desde Grupos: la lista muestra solo ese grupo. */
+  protected readonly groupFilter = signal<{ id: string; name: string } | null>(null);
+  /** Cliente: '' todos, 'internal' los sin cliente, o el id del cliente. */
+  protected readonly clientFilter = signal('');
+  protected readonly clientsInList = computed(() => {
+    const byId = new Map<string, string>();
+    for (const r of this.rows()) if (r.clientId) byId.set(r.clientId, r.clientName ?? '');
+    return [...byId].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+  });
 
   protected readonly meta = signal<InventoryMeta | null>(null);
   protected readonly rows = signal<InventoryRow[]>([]);
@@ -74,7 +93,11 @@ export class InventoryComponent implements OnInit {
     const codes = new Set(this.rows().map((r) => r.kind));
     return (this.meta()?.kinds ?? []).filter((k) => codes.has(k.code) || this.kindFilter() === k.code);
   });
-  protected readonly visibleRows = computed(() => this.rows().filter((r) => !this.kindFilter() || r.kind === this.kindFilter()));
+  protected readonly visibleRows = computed(() => {
+    const c = this.clientFilter();
+    return this.rows().filter((r) => (!this.kindFilter() || r.kind === this.kindFilter())
+      && (!c || (c === 'internal' ? !r.clientId : r.clientId === c)));
+  });
   protected readonly fields = computed(() => {
     const a = this.asset();
     return (a && this.kindOf().get(a.kind)?.fields.filter((f) => a.attributes[f.key])) ?? [];
@@ -89,7 +112,11 @@ export class InventoryComponent implements OnInit {
     } catch (e) {
       this.error.set(problemDetail(e, this.i18n.t('inv.loadError')));
     }
+    // Desde el Mapa («Abrir en el Inventario»): esa ficha.
+    const linked = this.route.snapshot.queryParamMap.get('id');
+    if (linked) this.selectedId.set(linked);
     await this.load();
+    if (linked && this.asset()?.id !== linked) await this.select(linked);
     const stop = this.sse.connect((type) => {
       if (type === 'inventory.request') {
         void this.api.refreshPending();
@@ -101,7 +128,7 @@ export class InventoryComponent implements OnInit {
 
   protected async load(): Promise<void> {
     try {
-      this.rows.set(await this.api.list({ scope: this.scope(), q: this.query, inactive: this.showInactive(), glpi: this.glpiOnly() }));
+      this.rows.set(await this.api.list({ scope: this.scope(), q: this.query, inactive: this.showInactive(), glpi: this.glpiOnly(), group: this.groupFilter()?.id }));
       this.error.set(null);
       const sel = this.selectedId();
       if (!sel || !this.rows().some((r) => r.id === sel)) {
@@ -133,6 +160,19 @@ export class InventoryComponent implements OnInit {
   /** El dato lo trae GLPI: se marca con la nube en la ficha. */
   protected fromGlpi(field: string): boolean {
     return !!this.asset()?.glpi && GLPI_ATTRIBUTES.has(field);
+  }
+
+  protected filterGroup(g: AssetGroup | null): void {
+    this.groupFilter.set(g ? { id: g.id, name: g.name } : null);
+    if (g) this.panel.set('detail');
+    void this.load();
+  }
+
+  /** Un grupo cambió de lugar: la lista y la ficha abierta lo reflejan. */
+  protected async groupsChanged(): Promise<void> {
+    await this.load();
+    const id = this.selectedId();
+    if (id) this.asset.set(await this.api.get(id).catch(() => this.asset()));
   }
 
   protected toggleInactive(): void {

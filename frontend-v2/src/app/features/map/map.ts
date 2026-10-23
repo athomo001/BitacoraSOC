@@ -3,7 +3,8 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import type * as Leaflet from 'leaflet';
 import { MapService } from '../../core/map/map.service';
-import { MapPoint, MapTiles, MapUnitDetail } from '../../core/map/map.models';
+import { MapAsset, MapAssetStatus, MapPoint, MapSpot, MapTiles, MapUnitDetail } from '../../core/map/map.models';
+import { affected, groupSpots, reasons, spotTitle, spotTone, tipElement } from './asset-layer';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { PreferencesService } from '../../core/preferences/preferences.service';
 import { SystemFeaturesService } from '../../core/system-features/system-features.service';
@@ -53,6 +54,19 @@ export class MapComponent implements OnInit {
   protected readonly showIncidents = signal(true);
   protected readonly showMaintenance = signal(true);
   protected readonly showTickets = signal(true);
+  /** Capa «Equipos»: los del Inventario con coordenadas, agrupados por punto. */
+  protected readonly assets = signal<MapAsset[]>([]);
+  protected readonly showAssets = signal(true);
+  /** Cliente: '' todos, 'internal' los sin cliente, o el id del cliente. */
+  protected readonly clientFilter = signal('');
+  protected readonly clientOptions = computed(() => {
+    const byId = new Map<string, string>();
+    for (const a of this.assets()) if (a.clientId) byId.set(a.clientId, a.clientName ?? '');
+    return [...byId].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+  });
+  protected readonly spotTitle = spotTitle;
+  protected readonly spotTone = spotTone;
+  protected readonly selectedSpot = signal<string | null>(null);
   protected readonly selectedId = signal<string | null>(null);
   protected readonly detail = signal<MapUnitDetail | null>(null);
   protected readonly error = signal('');
@@ -96,6 +110,17 @@ export class MapComponent implements OnInit {
       .sort((a, b) => TONE_ORDER[this.tone(a) as Tone] - TONE_ORDER[this.tone(b) as Tone] || a.name.localeCompare(b.name)),
   );
   protected readonly selected = computed(() => this.points().find((p) => p.id === this.selectedId()) ?? null);
+  protected readonly spots = computed<MapSpot[]>(() => {
+    const c = this.clientFilter();
+    return groupSpots(this.assets().filter((a) => !c || (c === 'internal' ? !a.clientId : a.clientId === c)));
+  });
+  /** Los puntos con equipos afectados o en mantenimiento también van a «revisar». */
+  protected readonly reviewSpots = computed(() =>
+    this.showAssets()
+      ? this.spots().filter((s) => spotTone(s) !== 'ok').sort((a, b) => (spotTone(a) === 'bad' ? 0 : 1) - (spotTone(b) === 'bad' ? 0 : 1) || spotTitle(a).localeCompare(spotTitle(b)))
+      : [],
+  );
+  protected readonly spot = computed(() => this.spots().find((s) => s.key === this.selectedSpot()) ?? null);
   protected readonly shownCount = computed(() => (this.showAll() ? this.points().length : this.review().length));
 
   constructor() {
@@ -105,6 +130,9 @@ export class MapComponent implements OnInit {
       this.showAll();
       this.review();
       this.selectedId();
+      this.spots();
+      this.showAssets();
+      this.selectedSpot();
       this.prefs.theme();
       this.draw();
     });
@@ -117,6 +145,10 @@ export class MapComponent implements OnInit {
     const fromLink = this.route.snapshot.queryParamMap.get('unitId');
     const linked = fromLink ? this.points().find((p) => p.id === fromLink) : undefined;
     if (linked) this.select(linked, true);
+    // Desde el Inventario («Ver en el mapa»): el punto de ese equipo.
+    const assetLink = this.route.snapshot.queryParamMap.get('assetId');
+    const spot = assetLink ? this.spots().find((s) => s.assets.some((a) => a.id === assetLink)) : undefined;
+    if (spot) this.selectSpot(spot, true);
     const timer = setInterval(() => {
       if (document.visibilityState === 'visible') void this.refresh();
     }, REFRESH_MS);
@@ -132,7 +164,9 @@ export class MapComponent implements OnInit {
 
   protected async refresh(): Promise<void> {
     try {
-      this.points.set(await this.api.points());
+      const [points, assets] = await Promise.all([this.api.points(), this.api.assets().catch(() => [])]);
+      this.points.set(points);
+      this.assets.set(assets);
       this.error.set('');
       const id = this.selectedId();
       if (id) void this.loadDetail(id);
@@ -146,15 +180,16 @@ export class MapComponent implements OnInit {
   protected onReady(ready: MapReady): void {
     this.layer = ready.L.layerGroup().addTo(ready.map);
     // Llegó desde un ticket con la localidad ya elegida: el mapa abre ahí.
-    const p = this.selected();
+    const p = this.selected() ?? this.spot();
     if (p) {
       this.fitted = true;
-      ready.map.setView([p.latitude, p.longitude], 8);
+      ready.map.setView([p.latitude, p.longitude], this.spot() ? 14 : 8);
     }
     this.ready.set(ready);
   }
 
   protected select(p: MapPoint, fly: boolean): void {
+    this.selectedSpot.set(null);
     this.selectedId.set(p.id);
     this.detail.set(null);
     void this.loadDetail(p.id);
@@ -165,7 +200,45 @@ export class MapComponent implements OnInit {
     }
   }
 
+  /** Un punto con equipos: la lista de lo que hay ahí, con su enlace al Inventario. */
+  protected selectSpot(s: MapSpot, fly: boolean): void {
+    this.selectedId.set(null);
+    this.detail.set(null);
+    this.selectedSpot.set(s.key);
+    const ready = this.ready();
+    if (fly && ready) {
+      const instant = matchMedia('(prefers-reduced-motion: reduce)').matches;
+      ready.map.flyTo([s.latitude, s.longitude], Math.max(ready.map.getZoom(), 14), { duration: instant ? 0 : 0.8, animate: !instant });
+    }
+  }
+
+  /** Elegir un cliente: solo sus equipos, y el mapa se acerca a ellos. */
+  protected setClient(value: string): void {
+    this.clientFilter.set(value);
+    this.selectedSpot.set(null);
+    const ready = this.ready();
+    const spots = this.spots();
+    if (ready && spots.length) {
+      ready.map.fitBounds(ready.L.latLngBounds(spots.map((s) => [s.latitude, s.longitude] as [number, number])), { padding: [32, 32], maxZoom: 14 });
+    }
+  }
+
+  protected reasonsOf(a: MapAsset) {
+    return reasons(a, this.i18n, (iso) => this.when(iso));
+  }
+
+  /** «2 de 5 equipos afectados» o el primer motivo, para la fila de «revisar». */
+  protected spotWhat(s: MapSpot): string {
+    const hit = affected(s);
+    return hit.length === 1 ? this.reasonsOf(hit[0])[0]?.text ?? '' : this.i18n.tf('map.assetsAffected', hit.length);
+  }
+
+  protected spotCount(s: MapSpot): string {
+    return this.i18n.tf(s.assets.length === 1 ? 'map.assetOne' : 'map.assetMany', s.assets.length);
+  }
+
   protected clearSelection(): void {
+    this.selectedSpot.set(null);
     this.selectedId.set(null);
     this.detail.set(null);
   }
@@ -185,7 +258,7 @@ export class MapComponent implements OnInit {
     if (!ready || !layer) return;
     const { L, map, renderer } = ready;
     layer.clearLayers();
-    const colors = { bad: cssVar('--status-critical'), warn: cssVar('--status-warning'), ticket: cssVar('--status-carrier'), dot: cssVar('--text-muted'), ring: cssVar('--bg-surface'), accent: cssVar('--accent') };
+    const colors = { bad: cssVar('--status-critical'), warn: cssVar('--status-warning'), ticket: cssVar('--status-carrier'), ok: cssVar('--status-ok'), dot: cssVar('--text-muted'), ring: cssVar('--bg-surface'), accent: cssVar('--accent') };
     const flagged: MapPoint[] = [];
     for (const p of this.points()) {
       if (this.tone(p)) {
@@ -194,6 +267,23 @@ export class MapComponent implements OnInit {
         L.circleMarker([p.latitude, p.longitude], { renderer, radius: 3.5, color: colors.dot, weight: 1, fillColor: colors.dot, fillOpacity: 0.55 })
           .bindTooltip(p.name, { direction: 'top', offset: [0, -4] })
           .on('click', () => this.select(p, false))
+          .addTo(layer);
+      }
+    }
+    // Los equipos: verdes encima de las localidades tranquilas, los afectados
+    // con un halo como las localidades marcadas.
+    if (this.showAssets()) {
+      const tones: Record<MapAssetStatus, string> = { ok: colors.ok, warn: colors.warn, bad: colors.bad };
+      const spots = [...this.spots()].sort((a, b) => (spotTone(a) === 'ok' ? 0 : 1) - (spotTone(b) === 'ok' ? 0 : 1));
+      for (const s of spots) {
+        const tone = spotTone(s);
+        const isSelected = s.key === this.selectedSpot();
+        if (tone !== 'ok') {
+          L.circleMarker([s.latitude, s.longitude], { renderer, radius: isSelected ? 14 : 11, stroke: false, fillColor: tones[tone], fillOpacity: 0.18, interactive: false }).addTo(layer);
+        }
+        L.circleMarker([s.latitude, s.longitude], { renderer, radius: isSelected ? 7 : tone === 'ok' ? 5 : 6, color: isSelected ? colors.accent : colors.ring, weight: isSelected ? 3 : 1.5, fillColor: tones[tone], fillOpacity: 1 })
+          .bindTooltip(() => tipElement(s, this.i18n, (iso) => this.when(iso)), { direction: 'top', offset: [0, -6], className: 'mp-tip' })
+          .on('click', () => this.selectSpot(s, false))
           .addTo(layer);
       }
     }
@@ -207,9 +297,10 @@ export class MapComponent implements OnInit {
         .on('click', () => this.select(p, false))
         .addTo(layer);
     }
-    if (!this.fitted && this.points().length && !this.selectedId()) {
+    const all = [...this.points(), ...(this.showAssets() ? this.spots() : [])];
+    if (!this.fitted && all.length && !this.selectedId() && !this.selectedSpot()) {
       this.fitted = true;
-      map.fitBounds(L.latLngBounds(this.points().map((p) => [p.latitude, p.longitude] as [number, number])), { padding: [24, 24], maxZoom: 9 });
+      map.fitBounds(L.latLngBounds(all.map((p) => [p.latitude, p.longitude] as [number, number])), { padding: [24, 24], maxZoom: 9 });
     }
   }
 

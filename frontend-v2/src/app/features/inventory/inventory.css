@@ -61,6 +61,12 @@ mat-icon {
   overflow: auto;
 }
 
+.iv__client {
+  width: auto;
+  max-width: 200px;
+  padding: 4px 8px;
+}
+
 .iv__filters {
   display: flex;
   flex-wrap: wrap;

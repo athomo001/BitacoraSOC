@@ -655,6 +655,7 @@ func (h *GlpiHandler) plan(ctx context.Context, cfg db.GlpiConfig, snap glpi.Sna
 			}
 			in := inventoryInput{Kind: kind, Name: item.Name, Code: before.Code, Area: before.Area, TerritorialUnitID: before.TerritorialUnitID,
 				ClientID: before.ClientID, Model: deref(before.Model), Serial: deref(before.Serial), Rack: deref(before.Rack), RackPosition: deref(before.RackPosition),
+				Address: deref(before.Address), Latitude: before.Latitude, Longitude: before.Longitude, GroupID: before.GroupID,
 				Attributes: map[string]string{}, Extra: before.Extra, IPs: mergeIPs(before.IPs, item.IPs), Responsibles: before.Responsibles}
 			for k, v := range before.Attributes {
 				in.Attributes[k] = v

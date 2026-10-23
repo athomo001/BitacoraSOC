@@ -33,3 +33,11 @@ sql:
             go_type:
               type: "float64"
               pointer: true
+          - column: "asset_groups.latitude"
+            go_type:
+              type: "float64"
+              pointer: true
+          - column: "asset_groups.longitude"
+            go_type:
+              type: "float64"
+              pointer: true

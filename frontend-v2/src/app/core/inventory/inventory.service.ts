@@ -49,6 +49,11 @@ export interface InventoryRow {
   ipCount: number;
   /** Viene de GLPI (9.6). */
   glpiId?: number;
+  /** El grupo del que toma la ubicación. */
+  groupName?: string;
+  /** Cliente dueño del equipo; sin él, es interno. */
+  clientId?: string;
+  clientName?: string;
 }
 
 export type IpKind = 'network' | 'vip' | 'management' | 'other';
@@ -103,6 +108,11 @@ export interface InventoryAsset {
   serial?: string;
   rack?: string;
   rackPosition?: string;
+  address?: string;
+  latitude?: number;
+  longitude?: number;
+  groupId?: string;
+  groupName?: string;
   attributes: Record<string, string>;
   extra: Record<string, string>;
   active: boolean;
@@ -129,10 +139,45 @@ export interface InventoryInput {
   serial?: string;
   rack?: string;
   rackPosition?: string;
+  address?: string;
+  latitude?: number;
+  longitude?: number;
+  /** Con grupo, localidad, dirección, coordenadas y rack los pone el grupo. */
+  groupId?: string;
   attributes: Record<string, string>;
   extra: Record<string, string>;
   ips: AssetIp[];
   responsibles: AssetResponsible[];
+}
+
+/** Un grupo de equipos en el mismo lugar (un rack, una sala): sus equipos toman su ubicación. */
+export interface AssetGroup {
+  id: string;
+  name: string;
+  area: string;
+  areaName: string;
+  territorialUnitId?: string;
+  placeName?: string;
+  address?: string;
+  latitude?: number;
+  longitude?: number;
+  rack?: string;
+  /** Cliente del grupo: sus equipos sin cliente lo toman. */
+  clientId?: string;
+  clientName?: string;
+  assetCount: number;
+  canEdit: boolean;
+}
+
+export interface AssetGroupInput {
+  name: string;
+  area: string;
+  territorialUnitId?: string;
+  address?: string;
+  latitude?: number;
+  longitude?: number;
+  rack?: string;
+  clientId?: string;
 }
 
 export interface CsvRow { line: number; code: string; name: string; action: 'create' | 'update' | 'unchanged' | 'error'; detail?: string; error?: string; }
@@ -158,13 +203,14 @@ export class InventoryService {
     return (await firstValueFrom(this.http.get<ApiEnvelope<InventoryMeta>>('/api/inventory/meta'))).data;
   }
 
-  async list(filters: { scope?: 'mine' | 'all'; kind?: string; q?: string; inactive?: boolean; glpi?: boolean } = {}): Promise<InventoryRow[]> {
+  async list(filters: { scope?: 'mine' | 'all'; kind?: string; q?: string; inactive?: boolean; glpi?: boolean; group?: string } = {}): Promise<InventoryRow[]> {
     let params = new HttpParams();
     if (filters.scope) params = params.set('scope', filters.scope);
     if (filters.kind) params = params.set('kind', filters.kind);
     if (filters.q?.trim()) params = params.set('q', filters.q.trim());
     if (filters.inactive) params = params.set('inactive', 'true');
     if (filters.glpi) params = params.set('source', 'glpi');
+    if (filters.group) params = params.set('group', filters.group);
     return (await firstValueFrom(this.http.get<ApiEnvelope<InventoryRow[]>>('/api/inventory', { params }))).data;
   }
 
@@ -217,6 +263,23 @@ export class InventoryService {
 
   downloadExport(kind: string): Promise<void> {
     return downloadFile(this.http, '/api/inventory/export', `inventario-${kind}-exportado.csv`, new HttpParams().set('kind', kind));
+  }
+
+  async groups(): Promise<AssetGroup[]> {
+    return (await firstValueFrom(this.http.get<ApiEnvelope<AssetGroup[]>>('/api/inventory/groups'))).data;
+  }
+
+  async createGroup(input: AssetGroupInput): Promise<void> {
+    await firstValueFrom(this.http.post('/api/inventory/groups', input));
+  }
+
+  /** Devuelve cuántos equipos tomaron la ubicación nueva. */
+  async updateGroup(id: string, input: AssetGroupInput): Promise<number> {
+    return (await firstValueFrom(this.http.put<ApiEnvelope<{ assetsMoved: number }>>(`/api/inventory/groups/${id}`, input))).data.assetsMoved;
+  }
+
+  async deleteGroup(id: string): Promise<void> {
+    await firstValueFrom(this.http.delete(`/api/inventory/groups/${id}`));
   }
 
   async saveKind(kind: Partial<AssetKind> & { code: string }): Promise<AssetKind> {

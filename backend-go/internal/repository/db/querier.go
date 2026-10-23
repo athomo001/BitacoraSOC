@@ -35,6 +35,9 @@ type Querier interface {
 	AddUserPermissionGroup(ctx context.Context, arg AddUserPermissionGroupParams) error
 	AdvanceForwardCursor(ctx context.Context, arg AdvanceForwardCursorParams) error
 	AppendWaitingComment(ctx context.Context, arg AppendWaitingCommentParams) (int64, error)
+	// El grupo cambió de lugar: sus equipos lo siguen (y los que no tienen
+	// cliente toman el del grupo). Devuelve los que cambiaron.
+	ApplyAssetGroupLocation(ctx context.Context, groupID uuid.UUID) ([]uuid.UUID, error)
 	// Solo si ya no tiene servicios, equipos ni activos; el código queda libre.
 	ArchiveOrganization(ctx context.Context, id uuid.UUID) (int64, error)
 	// Borrar y unir áreas (pedido del dueño 2026-10-22, spec/16 §3.3.3): un área
@@ -142,6 +145,7 @@ type Querier interface {
 	CreateAgendaTask(ctx context.Context, arg CreateAgendaTaskParams) (uuid.UUID, error)
 	CreateArea(ctx context.Context, arg CreateAreaParams) (Area, error)
 	CreateAsset(ctx context.Context, arg CreateAssetParams) (uuid.UUID, error)
+	CreateAssetGroup(ctx context.Context, arg CreateAssetGroupParams) (uuid.UUID, error)
 	CreateAssetRequest(ctx context.Context, arg CreateAssetRequestParams) (uuid.UUID, error)
 	CreateBackupRun(ctx context.Context, arg CreateBackupRunParams) (BackupRun, error)
 	CreateBackupRunWithSource(ctx context.Context, arg CreateBackupRunWithSourceParams) (BackupRun, error)
@@ -256,6 +260,8 @@ type Querier interface {
 	// Un área que deja su departamento deja también sus CSM.
 	DeleteAreaScopes(ctx context.Context, areaIds []uuid.UUID) error
 	DeleteAsset(ctx context.Context, id uuid.UUID) error
+	// Sus equipos quedan sin grupo y con la ubicación que tenían.
+	DeleteAssetGroup(ctx context.Context, id uuid.UUID) error
 	DeleteAssetPolicies(ctx context.Context, assetID pgtype.UUID) error
 	DeleteAssetWithoutHistory(ctx context.Context, arg DeleteAssetWithoutHistoryParams) (int64, error)
 	DeleteBackupRun(ctx context.Context, id uuid.UUID) (BackupRun, error)
@@ -418,6 +424,7 @@ type Querier interface {
 	GetAppConfig(ctx context.Context) (AppConfig, error)
 	GetAsset(ctx context.Context, id uuid.UUID) (GetAssetRow, error)
 	GetAssetForResolve(ctx context.Context, id uuid.UUID) (GetAssetForResolveRow, error)
+	GetAssetGroup(ctx context.Context, id uuid.UUID) (AssetGroup, error)
 	GetAssetIDByCode(ctx context.Context, code string) (uuid.UUID, error)
 	GetAssetKind(ctx context.Context, code string) (AssetKind, error)
 	GetAssetRequest(ctx context.Context, id uuid.UUID) (AssetRequest, error)
@@ -647,6 +654,12 @@ type Querier interface {
 	// La jefatura de un departamento no cuenta como grupo del área.
 	ListAreasWithUsage(ctx context.Context) ([]ListAreasWithUsageRow, error)
 	ListAssetEvents(ctx context.Context, assetID uuid.UUID) ([]ListAssetEventsRow, error)
+	// Las áreas de los equipos de un grupo (dueñas y responsables).
+	ListAssetGroupAreas(ctx context.Context, groupID uuid.UUID) ([]uuid.UUID, error)
+	ListAssetGroupAssetIDs(ctx context.Context, groupID pgtype.UUID) ([]uuid.UUID, error)
+	// ===== Grupos de equipos (000061) =====
+	// Los grupos con su ubicación y cuántos equipos activos tienen.
+	ListAssetGroups(ctx context.Context) ([]ListAssetGroupsRow, error)
 	ListAssetIPs(ctx context.Context, assetID uuid.UUID) ([]ListAssetIPsRow, error)
 	// Inventario (spec/16 §4.2, 9.2, 000040).
 	ListAssetKinds(ctx context.Context) ([]AssetKind, error)
@@ -850,6 +863,12 @@ type Querier interface {
 	// Las áreas que ve una CSM con alcance (por sus departamentos o áreas).
 	ListManagementScopeAreas(ctx context.Context, userID uuid.UUID) ([]uuid.UUID, error)
 	ListManagementScopes(ctx context.Context) ([]ManagementScope, error)
+	// Mapa: los equipos activos con coordenadas propias (o de su grupo), de las
+	// áreas dadas (dueña o responsable); nil = todos. Con lo que los afecta:
+	// tickets abiertos (si la Ticketera está encendida y el usuario los ve),
+	// incidentes de escalamiento abiertos, entradas de incidente de la Bitácora
+	// (con seguimiento abierto o de las últimas 24 h) y mantenimiento activo.
+	ListMapAssets(ctx context.Context, arg ListMapAssetsParams) ([]ListMapAssetsRow, error)
 	// Mapa (#24): cada localidad con coordenadas y lo que hay que revisar en
 	// ella. Un incidente o una ventana sobre un activo cuenta para la localidad
 	// del activo; un ticket, por su lugar (000038). El país solo aparece si
@@ -1392,6 +1411,7 @@ type Querier interface {
 	UpdateAgendaTask(ctx context.Context, arg UpdateAgendaTaskParams) error
 	UpdateArea(ctx context.Context, arg UpdateAreaParams) (Area, error)
 	UpdateAsset(ctx context.Context, arg UpdateAssetParams) (int64, error)
+	UpdateAssetGroup(ctx context.Context, arg UpdateAssetGroupParams) error
 	UpdateBackupConfig(ctx context.Context, arg UpdateBackupConfigParams) (BackupConfig, error)
 	// Cambiar la hora o volver a encenderlo permite enviar de nuevo hoy (como el legacy).
 	UpdateBirthdayConfig(ctx context.Context, arg UpdateBirthdayConfigParams) (UpdateBirthdayConfigRow, error)

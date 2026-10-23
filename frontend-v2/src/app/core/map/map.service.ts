@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { ApiEnvelope } from '../auth/auth.models';
-import { MapPoint, MapTiles, MapUnitDetail } from './map.models';
+import { MapAsset, MapPoint, MapTiles, MapUnitDetail } from './map.models';
 
 /** Mapa (#24): GET /api/map/* y el fondo en /api/config/map-tiles. */
 @Injectable({ providedIn: 'root' })
@@ -11,6 +11,10 @@ export class MapService {
 
   async points(): Promise<MapPoint[]> {
     return (await firstValueFrom(this.http.get<ApiEnvelope<MapPoint[]>>('/api/map/points'))).data;
+  }
+
+  async assets(): Promise<MapAsset[]> {
+    return (await firstValueFrom(this.http.get<ApiEnvelope<MapAsset[]>>('/api/map/assets'))).data;
   }
 
   async unit(id: string): Promise<MapUnitDetail> {

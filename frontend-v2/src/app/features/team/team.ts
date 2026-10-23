@@ -59,8 +59,8 @@ const CONDITION_STYLE: Record<TeamCondition, { icon: string; tone: string }> = {
       <div class="tm__tabs no-print" role="tablist">
         @if (a.lead) {
           <button type="button" role="tab" class="seg" [attr.aria-pressed]="tab() === 'people'" [attr.aria-selected]="tab() === 'people'" (click)="tab.set('people')"><mat-icon>badge</mat-icon>{{ i18n.t('team.tab.people') }}</button>
+          <button type="button" role="tab" class="seg" [attr.aria-pressed]="tab() === 'guards'" [attr.aria-selected]="tab() === 'guards'" (click)="tab.set('guards')"><mat-icon>shield</mat-icon>{{ i18n.t('team.tab.guards') }}</button>
           @if (!a.department) {
-            <button type="button" role="tab" class="seg" [attr.aria-pressed]="tab() === 'guards'" [attr.aria-selected]="tab() === 'guards'" (click)="tab.set('guards')"><mat-icon>shield</mat-icon>{{ i18n.t('team.tab.guards') }}</button>
             <button type="button" role="tab" class="seg" [attr.aria-pressed]="tab() === 'escalation'" [attr.aria-selected]="tab() === 'escalation'" (click)="tab.set('escalation')"><mat-icon>call_split</mat-icon>{{ i18n.t('team.tab.escalation') }}</button>
           }
           <button type="button" role="tab" class="seg" [attr.aria-pressed]="tab() === 'monthly'" [attr.aria-selected]="tab() === 'monthly'" (click)="tab.set('monthly')"><mat-icon>insights</mat-icon>{{ i18n.t('team.tab.monthly') }}</button>
@@ -76,9 +76,20 @@ const CONDITION_STYLE: Record<TeamCondition, { icon: string; tone: string }> = {
     @if (view(); as v) {
       <!-- Cada área monta sus propias guardias y políticas (el @for las recrea al cambiar de área). -->
       @if (tab() === 'guards') {
-        @for (code of [v.area.code]; track code) {
-          <app-team-guards [area]="code" [areaName]="v.area.name" [people]="v.people" (changed)="guardsTimeline()?.reload()" />
-          <app-admin-guards [area]="code" />
+        <!-- En un departamento, las guardias siguen siendo de un área: se elige cuál. -->
+        @if (isDept()) {
+          <div class="tm__areas tm__sub" role="group" [attr.aria-label]="i18n.t('team.dep.guardsArea')">
+            <span class="adm-label">{{ i18n.t('team.dep.guardsArea') }}</span>
+            @for (d of deptAreas(); track d.code) {
+              <button type="button" class="seg" [attr.aria-pressed]="guardArea()?.code === d.code" (click)="guardAreaCode.set(d.code)">{{ d.name }}</button>
+            }
+          </div>
+        }
+        @if (guardArea(); as g) {
+          @for (code of [g.code]; track code) {
+            <app-team-guards [area]="code" [areaName]="g.name" [people]="guardPeople()" (changed)="guardsTimeline()?.reload()" />
+            <app-admin-guards [area]="code" />
+          }
         }
       }
       @if (tab() === 'escalation') {
@@ -272,6 +283,7 @@ const CONDITION_STYLE: Record<TeamCondition, { icon: string; tone: string }> = {
     .tm__title { margin: 0; font-size: 18px; font-weight: 600; }
     .tm__lead { margin: 2px 0 0; }
     .tm__areas { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-left: auto; }
+    .tm__sub { margin-left: 0; }
     .tm__tabs { display: flex; flex-wrap: wrap; gap: 6px; padding-bottom: 8px; border-bottom: 1px solid var(--border-subtle); }
     .tm__tabs mat-icon { width: 14px; height: 14px; font-size: 14px; vertical-align: -2px; margin-right: 4px; }
     .tm__stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
@@ -325,6 +337,24 @@ export class TeamComponent implements OnInit {
   protected readonly areaInfo = computed(() => this.areas().find((a) => a.code === this.area()) ?? null);
   /** Está mirando un departamento completo (solo para mirar). */
   protected readonly isDept = computed(() => !!this.areaInfo()?.department);
+  /** Las áreas de cada departamento («dep:<id>» → áreas), para sus guardias. */
+  private readonly departmentAreas = signal(new Map<string, TeamArea[]>());
+  protected readonly deptAreas = computed(() => this.departmentAreas().get(this.area()) ?? []);
+  /** Guardias: el área elegida dentro del departamento (o el área misma). */
+  protected readonly guardAreaCode = signal('');
+  protected readonly guardArea = computed<TeamArea | null>(() => {
+    const v = this.view();
+    if (!v) return null;
+    if (!this.isDept()) return v.area;
+    const areas = this.deptAreas();
+    return areas.find((a) => a.code === this.guardAreaCode()) ?? areas[0] ?? null;
+  });
+  /** Quién se puede sumar a la guardia: en un departamento, la gente de esa área. */
+  protected readonly guardPeople = computed(() => {
+    const people = this.view()?.people ?? [];
+    const area = this.guardArea();
+    return this.isDept() && area ? people.filter((p) => p.areas?.includes(area.name)) : people;
+  });
   protected readonly selected = computed(() => {
     const people = this.view()?.people ?? [];
     return people.find((p) => p.id === this.selectedId()) ?? null;
@@ -348,6 +378,7 @@ export class TeamComponent implements OnInit {
         ...areas,
       ];
       this.areas.set(all);
+      this.departmentAreas.set(new Map(departments.map((d) => ['dep:' + d.id, d.areas])));
       if (all.length) await this.pickArea(all[0].code);
     });
     this.loaded.set(true);
@@ -382,7 +413,8 @@ export class TeamComponent implements OnInit {
       return;
     }
     if (this.tab() === 'quality' && !info.quality) this.tab.set('people');
-    if (info.department && (this.tab() === 'guards' || this.tab() === 'escalation')) this.tab.set('people');
+    if (info.department && this.tab() === 'escalation') this.tab.set('people');
+    this.guardAreaCode.set('');
     await this.run(() => this.load());
   }
 

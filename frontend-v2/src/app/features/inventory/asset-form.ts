@@ -1,12 +1,13 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, input, output, signal } from '@angular/core';
 import { MatIconModule } from '@angular/material/icon';
-import { AssetIp, AssetResponsible, InventoryAsset, InventoryInput, InventoryMeta, InventoryService, IpKind } from '../../core/inventory/inventory.service';
+import { AssetGroup, AssetIp, AssetResponsible, InventoryAsset, InventoryInput, InventoryMeta, InventoryService, IpKind } from '../../core/inventory/inventory.service';
 import { TerritoryService } from '../../core/territory/territory.service';
 import { OrganizationsService, Organization } from '../../core/organizations/organizations.service';
 import { TicketsService, TicketPerson } from '../../core/tickets/tickets.service';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { MessageKey } from '../../core/i18n/messages';
 import { problemDetail } from '../../core/http-error';
+import { LocationFieldsComponent, PlaceOption, PlaceValue } from './location-fields';
 
 import '../../core/i18n/packs/inventory';
 
@@ -22,7 +23,7 @@ type WhoKind = 'area' | 'person' | 'org';
 @Component({
   selector: 'app-asset-form',
   standalone: true,
-  imports: [MatIconModule],
+  imports: [MatIconModule, LocationFieldsComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <form class="af" (submit)="$event.preventDefault(); save()">
@@ -126,12 +127,21 @@ type WhoKind = 'area' | 'person' | 'org';
               <option value="" [selected]="!draft().clientId">{{ i18n.t('inv.f.none') }}</option>
               @for (o of orgs(); track o.id) { <option [value]="o.id" [selected]="draft().clientId === o.id">{{ o.name }}</option> }
             </select></label>
-          <label class="adm-field"><span class="adm-label">{{ i18n.t('inv.f.place') }}</span>
-            <input class="adm-input" name="place" list="inv-places" [value]="placeText()" (change)="setPlace(val($event))" [placeholder]="i18n.t('inv.f.placeHint')" />
-            <datalist id="inv-places">@for (u of units(); track u.id) { <option [value]="u.label"></option> }</datalist></label>
-          <label class="adm-field"><span class="adm-label">{{ i18n.t('inv.f.rack') }}</span><input class="adm-input" name="rack" [value]="draft().rack ?? ''" (input)="set('rack', val($event))" /></label>
+        </div>
+
+        <!-- Ubicación: con grupo, localidad, dirección, coordenadas y rack los pone el grupo. -->
+        <span class="adm-label af__sec">{{ i18n.t('inv.sec.location') }}</span>
+        <div class="af__grid">
+          <label class="adm-field"><span class="adm-label">{{ i18n.t('inv.f.group') }}</span>
+            <select class="adm-input" name="group" (change)="pickGroup(val($event))">
+              <option value="" [selected]="!draft().groupId">{{ i18n.t('inv.f.noGroup') }}</option>
+              @for (g of groups(); track g.id) { <option [value]="g.id" [selected]="draft().groupId === g.id">{{ g.name }}</option> }
+            </select></label>
+          <app-location-fields [value]="place()" [units]="units()" [locked]="!!draft().groupId" (valueChange)="setPlace($event)" (validChange)="coordsOk.set($event)" />
+          <label class="adm-field"><span class="adm-label">{{ i18n.t('inv.f.rack') }}</span><input class="adm-input" name="rack" [disabled]="!!draft().groupId" [value]="draft().rack ?? ''" (input)="set('rack', val($event))" /></label>
           <label class="adm-field"><span class="adm-label">{{ i18n.t('inv.f.position') }}</span><input class="adm-input" name="rackPosition" [value]="draft().rackPosition ?? ''" (input)="set('rackPosition', val($event))" /></label>
         </div>
+        @if (group(); as g) { <p class="adm-hint af__hint"><mat-icon>link</mat-icon>{{ i18n.tf('inv.f.fromGroup', g.name) }}</p> }
 
         <span class="adm-label af__sec">{{ i18n.t('inv.sec.extra') }}</span>
         @for (e of extra(); track $index; let i = $index) {
@@ -146,7 +156,7 @@ type WhoKind = 'area' | 'person' | 'org';
         @if (error(); as e) { <p class="adm-error" role="alert">{{ e }}</p> }
         <div class="af__actions">
           <button type="button" class="adm-btn" (click)="cancelled.emit()">{{ i18n.t('inv.cancel') }}</button>
-          <button type="submit" class="adm-btn adm-btn--primary" [disabled]="busy() || !draft().name.trim()"><mat-icon>save</mat-icon>{{ i18n.t(asset() ? 'inv.save' : 'inv.create') }}</button>
+          <button type="submit" class="adm-btn adm-btn--primary" [disabled]="busy() || !draft().name.trim() || !coordsOk()"><mat-icon>save</mat-icon>{{ i18n.t(asset() ? 'inv.save' : 'inv.create') }}</button>
         </div>
       </div>
     </form>
@@ -156,6 +166,7 @@ type WhoKind = 'area' | 'person' | 'org';
     .af__head { padding: 12px 16px; border-bottom: 1px solid var(--border-subtle); }
     .af__body { display: flex; flex-direction: column; gap: 10px; padding: 12px 16px 16px; }
     .af__sec { margin-top: 6px; }
+    .af__hint { display: flex; gap: 6px; align-items: center; margin: 0; }
     .af__glpi { display: flex; gap: 6px; align-items: flex-start; margin: 0; }
     .af__glpi mat-icon { flex: none; width: 15px; height: 15px; font-size: 15px; color: var(--status-carrier); }
     .af__kinds { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 6px; }
@@ -188,7 +199,9 @@ export class AssetFormComponent implements OnInit {
   protected readonly ipKinds = IP_KINDS;
   protected readonly draft = signal<InventoryInput>({ kind: 'server', name: '', area: '', attributes: {}, extra: {}, ips: [], responsibles: [] });
   protected readonly extra = signal<[string, string][]>([]);
-  protected readonly units = signal<{ id: string; label: string }[]>([]);
+  protected readonly units = signal<PlaceOption[]>([]);
+  protected readonly groups = signal<AssetGroup[]>([]);
+  protected readonly coordsOk = signal(true);
   protected readonly orgs = signal<Organization[]>([]);
   protected readonly people = signal<TicketPerson[]>([]);
   protected readonly busy = signal(false);
@@ -203,7 +216,11 @@ export class AssetFormComponent implements OnInit {
     const m = this.meta();
     return m.admin ? m.areas : m.areas.filter((a) => m.myAreas.includes(a.code) || a.code === this.asset()?.area);
   });
-  protected readonly placeText = computed(() => this.units().find((u) => u.id === this.draft().territorialUnitId)?.label ?? this.asset()?.placeName ?? '');
+  protected readonly group = computed(() => this.groups().find((g) => g.id === this.draft().groupId) ?? null);
+  protected readonly place = computed<PlaceValue>(() => {
+    const d = this.draft();
+    return { territorialUnitId: d.territorialUnitId, address: d.address, latitude: d.latitude, longitude: d.longitude };
+  });
 
   async ngOnInit(): Promise<void> {
     const a = this.asset();
@@ -211,6 +228,7 @@ export class AssetFormComponent implements OnInit {
       this.draft.set({
         kind: a.kind, name: a.name, code: a.code, area: a.area, territorialUnitId: a.territorialUnitId, clientId: a.clientId,
         model: a.model, serial: a.serial, rack: a.rack, rackPosition: a.rackPosition, attributes: { ...a.attributes }, extra: { ...a.extra },
+        address: a.address, latitude: a.latitude, longitude: a.longitude, groupId: a.groupId,
         ips: a.ips.map((ip) => ({ ...ip })), responsibles: a.responsibles.map((r) => ({ type: r.type, area: r.area, userId: r.userId, organizationId: r.organizationId })),
       });
       this.extra.set(Object.entries(a.extra));
@@ -218,11 +236,13 @@ export class AssetFormComponent implements OnInit {
       const m = this.meta();
       this.draft.update((d) => ({ ...d, kind: m.kinds.find((k) => k.active)?.code ?? 'server', area: this.ownableAreas()[0]?.code ?? '' }));
     }
-    const [units, orgs, people] = await Promise.all([
+    const [units, orgs, people, groups] = await Promise.all([
       this.territory.list(1, 5000).then((r) => r.units).catch(() => []),
       this.orgsApi.list({ active: true }).catch(() => []),
       this.tickets.assignees().catch(() => []),
+      this.api.groups().catch(() => []),
     ]);
+    this.groups.set(groups);
     const nameOf = new Map(units.map((u) => [u.id, u.name]));
     this.units.set(units.filter((u) => u.active && u.kind !== 'country').map((u) => ({ id: u.id, label: u.parentId ? `${u.name} · ${nameOf.get(u.parentId) ?? ''}` : u.name })));
     this.orgs.set(orgs);
@@ -249,9 +269,17 @@ export class AssetFormComponent implements OnInit {
     this.draft.update((d) => ({ ...d, attributes: { ...d.attributes, [key]: value } }));
   }
 
-  protected setPlace(label: string): void {
-    const u = this.units().find((x) => x.label === label.trim());
-    this.set('territorialUnitId', label.trim() ? u?.id : undefined);
+  protected setPlace(v: Partial<PlaceValue>): void {
+    this.draft.update((d) => ({ ...d, ...v }));
+  }
+
+  /** Al elegir un grupo, el equipo toma su ubicación (el servidor la vuelve a tomar al guardar). */
+  protected pickGroup(id: string): void {
+    const g = this.groups().find((x) => x.id === id);
+    this.coordsOk.set(true);
+    this.draft.update((d) => g
+      ? { ...d, groupId: g.id, territorialUnitId: g.territorialUnitId, address: g.address, latitude: g.latitude, longitude: g.longitude, rack: g.rack, clientId: d.clientId ?? g.clientId }
+      : { ...d, groupId: undefined });
   }
 
   protected addIp(): void {

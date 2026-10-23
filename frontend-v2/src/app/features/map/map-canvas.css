@@ -147,3 +147,35 @@
 @media (prefers-reduced-motion: reduce) {
   .map-canvas .leaflet-zoom-anim .leaflet-zoom-animated { transition: none; }
 }
+
+/* La tarjetita de un punto con equipos (capa Equipos): qué pasó y por qué. */
+.map-canvas .leaflet-tooltip.mp-tip {
+  width: max-content;
+  max-width: 320px;
+  padding: 8px 10px;
+  white-space: normal;
+}
+
+.mp-tip__box {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.mp-tip__title { font-size: 13px; }
+.mp-tip__sub { color: var(--text-secondary); }
+
+.mp-tip__asset {
+  margin-top: 4px;
+  font-weight: 600;
+}
+
+.mp-tip__line {
+  padding-left: 8px;
+  border-left: 3px solid var(--status-ok);
+}
+
+.mp-tip__line--bad { border-left-color: var(--status-critical); }
+.mp-tip__line--warn { border-left-color: var(--status-warning); }
