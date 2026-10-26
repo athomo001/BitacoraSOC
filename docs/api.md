@@ -876,6 +876,13 @@ Los tickets traídos de GLPI (spec/18) llevan `source: "glpi"` y `glpi: {id, url
 | `POST` | `/api/complements/{slug}/test` | Admin · Complementos encendidos |
 | `POST` | `/api/complements/{slug}/embed` | Sesión · Complementos encendidos |
 | `POST` | `/api/complements/{slug}/entries` | Sesión · Complementos encendidos |
+| `GET` | `/api/complements/slots` | Sesión · Complementos encendidos — páginas, pestañas, acciones y barra aprobadas que la persona ve (10i) |
+| `PUT` | `/api/complements/{slug}/approvals` | Admin · Complementos encendidos — `{approved, house}`: lo aprobado de su `complement.json` y si es «de la casa» |
+| `POST` | `/api/complements/{slug}/manifest` | Admin · Complementos encendidos — vuelve a leer el `complement.json` de un servicio |
+| `GET` | `/api/complements/{slug}/settings` | Admin · Complementos encendidos — campos, valores y de los secretos solo si están guardados |
+| `PUT` | `/api/complements/{slug}/settings` | Admin · Complementos encendidos — `{values, secrets, clear}`; un secreto vacío queda como estaba |
+| `POST` | `/api/complements/{slug}/api` | Sesión · Complementos encendidos — `API_REQUEST` del iframe: `{method: "GET", path}` de `/api/v1`, como la persona y con los datos aprobados |
+| `POST` | `/api/complements/{slug}/note` | Sesión · Complementos encendidos — `ADD_NOTE`: `{target: entry\|ticket, id, content}`, solo donde el complemento tiene una pestaña o acción aprobada |
 
 ### Integraciones
 
@@ -904,6 +911,8 @@ Spec/19 §4: para n8n, un SIEM o un SOAR. Llave `bop_…` en `X-API-Key` o `Auth
 | `GET` | `/api/v1/entries` | Llave (`entries:read`) — `?limit=&cursor=&client=&since=` |
 | `GET` | `/api/v1/entries/{id}` | Llave (`entries:read`) |
 | `POST` | `/api/v1/entries` | Llave (`entries:write`) — `{content, entryType, scope, client, tags}` |
+| `POST` | `/api/v1/entries/{id}/comments` | Llave (`entries:write`) — `{content}`; un seguimiento firmado «creador, con <llave>» |
+| `GET` | `/api/v1/clients` | Llave (`clients:read`) — los clientes activos de la llave |
 | `GET` | `/api/v1/oncall` | Llave (`oncall:read`) — guardias con quién está ahora y sus contactos descifrados |
 | `GET` | `/api/v1/tickets` | Llave (`tickets:read`) — `?limit=&cursor=&client=&status=&since=` |
 | `GET` | `/api/v1/tickets/{ref}` | Llave (`tickets:read`) — `ref`: id, `TKT-…` o `GLPI-…`; con los comentarios visibles al cliente |
@@ -922,3 +931,5 @@ Spec/19 §4: para n8n, un SIEM o un SOAR. Llave `bop_…` en `X-API-Key` o `Auth
 | `GET` | `/api/internal/v1/storage` | Token de complemento (`READ_STORAGE`) |
 | `POST` | `/api/internal/v1/storage` | Token de complemento (`WRITE_STORAGE`) |
 | `POST` | `/api/internal/v1/log` | Token de complemento (`WRITE_LOGS`) |
+| `GET` | `/api/internal/v1/settings` | Token de complemento — su configuración aprobada, con los secretos (10i) |
+| `GET` | `/api/internal/v1/credentials` | Token de complemento — su llave de `/api/v1` y el secreto que firma sus ganchos (10i) |

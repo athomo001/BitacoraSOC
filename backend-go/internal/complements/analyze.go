@@ -111,6 +111,8 @@ type Analysis struct {
 	SuggestedName string   `json:"suggestedName"`
 	ConnectHosts  []string `json:"connectHosts"`
 	SHA256        string   `json:"sha256"`
+	// Manifest es su complement.json, si trae uno (spec/11 §12.2).
+	Manifest *Manifest `json:"manifest,omitempty"`
 }
 
 var (
@@ -274,6 +276,20 @@ func Analyze(filename string, data []byte) (Analysis, []File, error) {
 			a.Publishable, a.Reason = false, "falta index.html en la raíz del ZIP (o en su única carpeta)"
 		}
 	}
+	if mf, ok := byPath[ManifestFile]; ok && a.Publishable {
+		m, err := ParseManifest(mf.Content, false)
+		if err != nil {
+			a.Publishable, a.Reason = false, err.Error()
+		} else {
+			a.Manifest = &m
+			for _, p := range manifestPaths(m) {
+				if _, ok := byPath[p]; !ok {
+					a.Publishable, a.Reason = false, ManifestFile+" apunta a "+p+", que no viene en el ZIP"
+					break
+				}
+			}
+		}
+	}
 	if a.SuggestedName == "" {
 		a.SuggestedName = a.SuggestedSlug
 	}
@@ -347,4 +363,24 @@ func detectStack(byPath map[string]*File) (string, string) {
 	default:
 		return StackNode, "es un servicio Node.js: regístralo como servicio con su dirección"
 	}
+}
+
+// manifestPaths son los archivos a los que apunta complement.json (sin la
+// consulta ?…).
+func manifestPaths(m Manifest) []string {
+	var out []string
+	add := func(p string) {
+		if p = strings.SplitN(p, "?", 2)[0]; p != "" {
+			out = append(out, path.Clean(p))
+		}
+	}
+	for _, list := range [][]Slot{m.Pages, m.Panels, m.Actions} {
+		for _, s := range list {
+			add(s.Path)
+		}
+	}
+	if m.Topbar != nil {
+		add(m.Topbar.Path)
+	}
+	return out
 }

@@ -16,7 +16,7 @@ const acquireForwardLease = `-- name: AcquireForwardLease :one
 UPDATE forward_destinations SET lease_until = now() + interval '30 seconds', lease_owner = $1
 WHERE id = $2 AND enabled AND (next_attempt_at IS NULL OR next_attempt_at <= now())
   AND (lease_until IS NULL OR lease_until < now() OR lease_owner = $1)
-RETURNING id, name, enabled, transport, host, port, url, format, batch, send_audit, audit_level, send_entries, send_escalation, send_tickets, ca_cert, client_cert, client_key_encrypted, header_names, headers_encrypted, cursor_id, lease_until, lease_owner, next_attempt_at, failures, failing_since, down_alerted, last_sent_at, last_error, last_error_at, created_by, created_at, updated_at
+RETURNING id, name, enabled, transport, host, port, url, format, batch, send_audit, audit_level, send_entries, send_escalation, send_tickets, ca_cert, client_cert, client_key_encrypted, header_names, headers_encrypted, cursor_id, lease_until, lease_owner, next_attempt_at, failures, failing_since, down_alerted, last_sent_at, last_error, last_error_at, created_by, created_at, updated_at, complement_id, events, hmac_secret_encrypted
 `
 
 type AcquireForwardLeaseParams struct {
@@ -62,6 +62,9 @@ func (q *Queries) AcquireForwardLease(ctx context.Context, arg AcquireForwardLea
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ComplementID,
+		&i.Events,
+		&i.HmacSecretEncrypted,
 	)
 	return i, err
 }
@@ -183,7 +186,7 @@ const createAPIKey = `-- name: CreateAPIKey :one
 INSERT INTO api_keys (name, description, key_prefix, key_hash, scopes, client_ids, area_id, expires_at, created_by)
 VALUES ($1, $2, $3, $4, $5,
   $6, $7, $8, $9)
-RETURNING id, name, key_prefix, key_hash, scopes, active, last_used_at, expires_at, created_by, created_at, description, client_ids, area_id, revoked_at, revoked_by, revoke_reason
+RETURNING id, name, key_prefix, key_hash, scopes, active, last_used_at, expires_at, created_by, created_at, description, client_ids, area_id, revoked_at, revoked_by, revoke_reason, complement_id
 `
 
 type CreateAPIKeyParams struct {
@@ -229,6 +232,7 @@ func (q *Queries) CreateAPIKey(ctx context.Context, arg CreateAPIKeyParams) (Api
 		&i.RevokedAt,
 		&i.RevokedBy,
 		&i.RevokeReason,
+		&i.ComplementID,
 	)
 	return i, err
 }
@@ -240,7 +244,7 @@ VALUES ($1, $2, $3, $4, $5, $6, $7, $8,
   $9, $10, $11, $12, $13,
   $14, $15, $16, $17, $18,
   (SELECT COALESCE(max(fo.id), 0) FROM forward_outbox fo), $19)
-RETURNING id, name, enabled, transport, host, port, url, format, batch, send_audit, audit_level, send_entries, send_escalation, send_tickets, ca_cert, client_cert, client_key_encrypted, header_names, headers_encrypted, cursor_id, lease_until, lease_owner, next_attempt_at, failures, failing_since, down_alerted, last_sent_at, last_error, last_error_at, created_by, created_at, updated_at
+RETURNING id, name, enabled, transport, host, port, url, format, batch, send_audit, audit_level, send_entries, send_escalation, send_tickets, ca_cert, client_cert, client_key_encrypted, header_names, headers_encrypted, cursor_id, lease_until, lease_owner, next_attempt_at, failures, failing_since, down_alerted, last_sent_at, last_error, last_error_at, created_by, created_at, updated_at, complement_id, events, hmac_secret_encrypted
 `
 
 type CreateForwardDestinationParams struct {
@@ -322,6 +326,9 @@ func (q *Queries) CreateForwardDestination(ctx context.Context, arg CreateForwar
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ComplementID,
+		&i.Events,
+		&i.HmacSecretEncrypted,
 	)
 	return i, err
 }
@@ -359,15 +366,17 @@ WHERE o.id > $1 AND o.created_at < now() - interval '7 days' AND (
   OR (o.grp = 'entries' AND $4::boolean)
   OR (o.grp = 'escalation' AND $5::boolean)
   OR (o.grp = 'tickets' AND $6::boolean))
+  AND ($7::text[] IS NULL OR o.event = ANY($7::text[]))
 `
 
 type ExpiredForwardEventsParams struct {
-	CursorID       int64 `json:"cursor_id"`
-	SendAudit      bool  `json:"send_audit"`
-	MinRank        int32 `json:"min_rank"`
-	SendEntries    bool  `json:"send_entries"`
-	SendEscalation bool  `json:"send_escalation"`
-	SendTickets    bool  `json:"send_tickets"`
+	CursorID       int64    `json:"cursor_id"`
+	SendAudit      bool     `json:"send_audit"`
+	MinRank        int32    `json:"min_rank"`
+	SendEntries    bool     `json:"send_entries"`
+	SendEscalation bool     `json:"send_escalation"`
+	SendTickets    bool     `json:"send_tickets"`
+	Events         []string `json:"events"`
 }
 
 type ExpiredForwardEventsRow struct {
@@ -385,6 +394,7 @@ func (q *Queries) ExpiredForwardEvents(ctx context.Context, arg ExpiredForwardEv
 		arg.SendEntries,
 		arg.SendEscalation,
 		arg.SendTickets,
+		arg.Events,
 	)
 	var i ExpiredForwardEventsRow
 	err := row.Scan(&i.Lost, &i.LastID)
@@ -432,7 +442,7 @@ func (q *Queries) FinishIdempotency(ctx context.Context, arg FinishIdempotencyPa
 }
 
 const getAPIKey = `-- name: GetAPIKey :one
-SELECT id, name, key_prefix, key_hash, scopes, active, last_used_at, expires_at, created_by, created_at, description, client_ids, area_id, revoked_at, revoked_by, revoke_reason FROM api_keys WHERE id = $1
+SELECT id, name, key_prefix, key_hash, scopes, active, last_used_at, expires_at, created_by, created_at, description, client_ids, area_id, revoked_at, revoked_by, revoke_reason, complement_id FROM api_keys WHERE id = $1
 `
 
 func (q *Queries) GetAPIKey(ctx context.Context, id uuid.UUID) (ApiKey, error) {
@@ -455,12 +465,13 @@ func (q *Queries) GetAPIKey(ctx context.Context, id uuid.UUID) (ApiKey, error) {
 		&i.RevokedAt,
 		&i.RevokedBy,
 		&i.RevokeReason,
+		&i.ComplementID,
 	)
 	return i, err
 }
 
 const getAPIKeyForAuth = `-- name: GetAPIKeyForAuth :one
-SELECT k.id, k.name, k.key_prefix, k.key_hash, k.scopes, k.active, k.last_used_at, k.expires_at, k.created_by, k.created_at, k.description, k.client_ids, k.area_id, k.revoked_at, k.revoked_by, k.revoke_reason, COALESCE(u.username, '')::text AS creator_username, COALESCE(u.role::text, '')::text AS creator_role,
+SELECT k.id, k.name, k.key_prefix, k.key_hash, k.scopes, k.active, k.last_used_at, k.expires_at, k.created_by, k.created_at, k.description, k.client_ids, k.area_id, k.revoked_at, k.revoked_by, k.revoke_reason, k.complement_id, COALESCE(u.username, '')::text AS creator_username, COALESCE(u.role::text, '')::text AS creator_role,
   COALESCE(u.active, false) AS creator_active
 FROM api_keys k LEFT JOIN users u ON u.id = k.created_by
 WHERE k.key_prefix = $1
@@ -483,6 +494,7 @@ type GetAPIKeyForAuthRow struct {
 	RevokedAt       pgtype.Timestamptz `json:"revoked_at"`
 	RevokedBy       pgtype.UUID        `json:"revoked_by"`
 	RevokeReason    pgtype.Text        `json:"revoke_reason"`
+	ComplementID    pgtype.UUID        `json:"complement_id"`
 	CreatorUsername string             `json:"creator_username"`
 	CreatorRole     string             `json:"creator_role"`
 	CreatorActive   bool               `json:"creator_active"`
@@ -509,6 +521,7 @@ func (q *Queries) GetAPIKeyForAuth(ctx context.Context, keyPrefix string) (GetAP
 		&i.RevokedAt,
 		&i.RevokedBy,
 		&i.RevokeReason,
+		&i.ComplementID,
 		&i.CreatorUsername,
 		&i.CreatorRole,
 		&i.CreatorActive,
@@ -517,7 +530,7 @@ func (q *Queries) GetAPIKeyForAuth(ctx context.Context, keyPrefix string) (GetAP
 }
 
 const getForwardDestination = `-- name: GetForwardDestination :one
-SELECT id, name, enabled, transport, host, port, url, format, batch, send_audit, audit_level, send_entries, send_escalation, send_tickets, ca_cert, client_cert, client_key_encrypted, header_names, headers_encrypted, cursor_id, lease_until, lease_owner, next_attempt_at, failures, failing_since, down_alerted, last_sent_at, last_error, last_error_at, created_by, created_at, updated_at FROM forward_destinations WHERE id = $1
+SELECT id, name, enabled, transport, host, port, url, format, batch, send_audit, audit_level, send_entries, send_escalation, send_tickets, ca_cert, client_cert, client_key_encrypted, header_names, headers_encrypted, cursor_id, lease_until, lease_owner, next_attempt_at, failures, failing_since, down_alerted, last_sent_at, last_error, last_error_at, created_by, created_at, updated_at, complement_id, events, hmac_secret_encrypted FROM forward_destinations WHERE id = $1
 `
 
 func (q *Queries) GetForwardDestination(ctx context.Context, id uuid.UUID) (ForwardDestination, error) {
@@ -556,6 +569,9 @@ func (q *Queries) GetForwardDestination(ctx context.Context, id uuid.UUID) (Forw
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ComplementID,
+		&i.Events,
+		&i.HmacSecretEncrypted,
 	)
 	return i, err
 }
@@ -720,37 +736,40 @@ func (q *Queries) ListAPIKeyRequests(ctx context.Context, apiKeyID pgtype.UUID) 
 }
 
 const listAPIKeys = `-- name: ListAPIKeys :many
-SELECT k.id, k.name, k.key_prefix, k.key_hash, k.scopes, k.active, k.last_used_at, k.expires_at, k.created_by, k.created_at, k.description, k.client_ids, k.area_id, k.revoked_at, k.revoked_by, k.revoke_reason, COALESCE(u.username, '')::text AS created_by_name, COALESCE(rb.username, '')::text AS revoked_by_name,
-  COALESCE(a.name, '')::text AS area_name,
+SELECT k.id, k.name, k.key_prefix, k.key_hash, k.scopes, k.active, k.last_used_at, k.expires_at, k.created_by, k.created_at, k.description, k.client_ids, k.area_id, k.revoked_at, k.revoked_by, k.revoke_reason, k.complement_id, COALESCE(u.username, '')::text AS created_by_name, COALESCE(rb.username, '')::text AS revoked_by_name,
+  COALESCE(a.name, '')::text AS area_name, COALESCE(c.name, '')::text AS complement_name,
   (SELECT count(*) FROM api_key_requests r WHERE r.api_key_id = k.id AND r.created_at > now() - interval '7 days')::int AS calls_week
 FROM api_keys k
 LEFT JOIN users u ON u.id = k.created_by
 LEFT JOIN users rb ON rb.id = k.revoked_by
 LEFT JOIN areas a ON a.id = k.area_id
+LEFT JOIN complements c ON c.id = k.complement_id
 ORDER BY k.active DESC, k.created_at DESC
 `
 
 type ListAPIKeysRow struct {
-	ID            uuid.UUID          `json:"id"`
-	Name          string             `json:"name"`
-	KeyPrefix     string             `json:"key_prefix"`
-	KeyHash       string             `json:"key_hash"`
-	Scopes        []string           `json:"scopes"`
-	Active        bool               `json:"active"`
-	LastUsedAt    pgtype.Timestamptz `json:"last_used_at"`
-	ExpiresAt     pgtype.Timestamptz `json:"expires_at"`
-	CreatedBy     pgtype.UUID        `json:"created_by"`
-	CreatedAt     pgtype.Timestamptz `json:"created_at"`
-	Description   string             `json:"description"`
-	ClientIds     []uuid.UUID        `json:"client_ids"`
-	AreaID        pgtype.UUID        `json:"area_id"`
-	RevokedAt     pgtype.Timestamptz `json:"revoked_at"`
-	RevokedBy     pgtype.UUID        `json:"revoked_by"`
-	RevokeReason  pgtype.Text        `json:"revoke_reason"`
-	CreatedByName string             `json:"created_by_name"`
-	RevokedByName string             `json:"revoked_by_name"`
-	AreaName      string             `json:"area_name"`
-	CallsWeek     int32              `json:"calls_week"`
+	ID             uuid.UUID          `json:"id"`
+	Name           string             `json:"name"`
+	KeyPrefix      string             `json:"key_prefix"`
+	KeyHash        string             `json:"key_hash"`
+	Scopes         []string           `json:"scopes"`
+	Active         bool               `json:"active"`
+	LastUsedAt     pgtype.Timestamptz `json:"last_used_at"`
+	ExpiresAt      pgtype.Timestamptz `json:"expires_at"`
+	CreatedBy      pgtype.UUID        `json:"created_by"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	Description    string             `json:"description"`
+	ClientIds      []uuid.UUID        `json:"client_ids"`
+	AreaID         pgtype.UUID        `json:"area_id"`
+	RevokedAt      pgtype.Timestamptz `json:"revoked_at"`
+	RevokedBy      pgtype.UUID        `json:"revoked_by"`
+	RevokeReason   pgtype.Text        `json:"revoke_reason"`
+	ComplementID   pgtype.UUID        `json:"complement_id"`
+	CreatedByName  string             `json:"created_by_name"`
+	RevokedByName  string             `json:"revoked_by_name"`
+	AreaName       string             `json:"area_name"`
+	ComplementName string             `json:"complement_name"`
+	CallsWeek      int32              `json:"calls_week"`
 }
 
 func (q *Queries) ListAPIKeys(ctx context.Context) ([]ListAPIKeysRow, error) {
@@ -779,9 +798,11 @@ func (q *Queries) ListAPIKeys(ctx context.Context) ([]ListAPIKeysRow, error) {
 			&i.RevokedAt,
 			&i.RevokedBy,
 			&i.RevokeReason,
+			&i.ComplementID,
 			&i.CreatedByName,
 			&i.RevokedByName,
 			&i.AreaName,
+			&i.ComplementName,
 			&i.CallsWeek,
 		); err != nil {
 			return nil, err
@@ -1001,18 +1022,21 @@ WHERE o.id > $1 AND (
   OR (o.grp = 'entries' AND $4::boolean)
   OR (o.grp = 'escalation' AND $5::boolean)
   OR (o.grp = 'tickets' AND $6::boolean))
+  -- Un complemento recibe solo los eventos que se le aprobaron (10i).
+  AND ($7::text[] IS NULL OR o.event = ANY($7::text[]))
 ORDER BY o.id
-LIMIT $7
+LIMIT $8
 `
 
 type ListForwardBatchParams struct {
-	CursorID       int64 `json:"cursor_id"`
-	SendAudit      bool  `json:"send_audit"`
-	MinRank        int32 `json:"min_rank"`
-	SendEntries    bool  `json:"send_entries"`
-	SendEscalation bool  `json:"send_escalation"`
-	SendTickets    bool  `json:"send_tickets"`
-	MaxRows        int32 `json:"max_rows"`
+	CursorID       int64    `json:"cursor_id"`
+	SendAudit      bool     `json:"send_audit"`
+	MinRank        int32    `json:"min_rank"`
+	SendEntries    bool     `json:"send_entries"`
+	SendEscalation bool     `json:"send_escalation"`
+	SendTickets    bool     `json:"send_tickets"`
+	Events         []string `json:"events"`
+	MaxRows        int32    `json:"max_rows"`
 }
 
 func (q *Queries) ListForwardBatch(ctx context.Context, arg ListForwardBatchParams) ([]ForwardOutbox, error) {
@@ -1023,6 +1047,7 @@ func (q *Queries) ListForwardBatch(ctx context.Context, arg ListForwardBatchPara
 		arg.SendEntries,
 		arg.SendEscalation,
 		arg.SendTickets,
+		arg.Events,
 		arg.MaxRows,
 	)
 	if err != nil {
@@ -1053,57 +1078,62 @@ func (q *Queries) ListForwardBatch(ctx context.Context, arg ListForwardBatchPara
 const listForwardDestinations = `-- name: ListForwardDestinations :many
 
 
-SELECT d.id, d.name, d.enabled, d.transport, d.host, d.port, d.url, d.format, d.batch, d.send_audit, d.audit_level, d.send_entries, d.send_escalation, d.send_tickets, d.ca_cert, d.client_cert, d.client_key_encrypted, d.header_names, d.headers_encrypted, d.cursor_id, d.lease_until, d.lease_owner, d.next_attempt_at, d.failures, d.failing_since, d.down_alerted, d.last_sent_at, d.last_error, d.last_error_at, d.created_by, d.created_at, d.updated_at,
+SELECT d.id, d.name, d.enabled, d.transport, d.host, d.port, d.url, d.format, d.batch, d.send_audit, d.audit_level, d.send_entries, d.send_escalation, d.send_tickets, d.ca_cert, d.client_cert, d.client_key_encrypted, d.header_names, d.headers_encrypted, d.cursor_id, d.lease_until, d.lease_owner, d.next_attempt_at, d.failures, d.failing_since, d.down_alerted, d.last_sent_at, d.last_error, d.last_error_at, d.created_by, d.created_at, d.updated_at, d.complement_id, d.events, d.hmac_secret_encrypted,
   COALESCE((SELECT s.sent FROM forward_stats s WHERE s.destination_id = d.id AND s.day = $1::date), 0)::int AS sent_today,
   COALESCE((SELECT sum(s.lost) FROM forward_stats s WHERE s.destination_id = d.id AND s.day > $1::date - 7), 0)::int AS lost_week,
   (SELECT count(*) FROM forward_outbox o WHERE d.enabled AND o.id > d.cursor_id AND (
      (o.grp = 'audit' AND d.send_audit AND (CASE o.level WHEN 'info' THEN 0 WHEN 'warn' THEN 1 ELSE 2 END) >= (CASE d.audit_level WHEN 'info' THEN 0 WHEN 'warn' THEN 1 ELSE 2 END))
      OR (o.grp = 'entries' AND d.send_entries) OR (o.grp = 'escalation' AND d.send_escalation) OR (o.grp = 'tickets' AND d.send_tickets)))::int AS pending
 FROM forward_destinations d
+WHERE d.complement_id IS NULL
 ORDER BY d.created_at
 `
 
 type ListForwardDestinationsRow struct {
-	ID                 uuid.UUID          `json:"id"`
-	Name               string             `json:"name"`
-	Enabled            bool               `json:"enabled"`
-	Transport          string             `json:"transport"`
-	Host               pgtype.Text        `json:"host"`
-	Port               pgtype.Int4        `json:"port"`
-	Url                pgtype.Text        `json:"url"`
-	Format             string             `json:"format"`
-	Batch              bool               `json:"batch"`
-	SendAudit          bool               `json:"send_audit"`
-	AuditLevel         string             `json:"audit_level"`
-	SendEntries        bool               `json:"send_entries"`
-	SendEscalation     bool               `json:"send_escalation"`
-	SendTickets        bool               `json:"send_tickets"`
-	CaCert             pgtype.Text        `json:"ca_cert"`
-	ClientCert         pgtype.Text        `json:"client_cert"`
-	ClientKeyEncrypted pgtype.Text        `json:"client_key_encrypted"`
-	HeaderNames        []string           `json:"header_names"`
-	HeadersEncrypted   pgtype.Text        `json:"headers_encrypted"`
-	CursorID           int64              `json:"cursor_id"`
-	LeaseUntil         pgtype.Timestamptz `json:"lease_until"`
-	LeaseOwner         pgtype.Text        `json:"lease_owner"`
-	NextAttemptAt      pgtype.Timestamptz `json:"next_attempt_at"`
-	Failures           int32              `json:"failures"`
-	FailingSince       pgtype.Timestamptz `json:"failing_since"`
-	DownAlerted        bool               `json:"down_alerted"`
-	LastSentAt         pgtype.Timestamptz `json:"last_sent_at"`
-	LastError          pgtype.Text        `json:"last_error"`
-	LastErrorAt        pgtype.Timestamptz `json:"last_error_at"`
-	CreatedBy          pgtype.UUID        `json:"created_by"`
-	CreatedAt          pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
-	SentToday          int32              `json:"sent_today"`
-	LostWeek           int32              `json:"lost_week"`
-	Pending            int32              `json:"pending"`
+	ID                  uuid.UUID          `json:"id"`
+	Name                string             `json:"name"`
+	Enabled             bool               `json:"enabled"`
+	Transport           string             `json:"transport"`
+	Host                pgtype.Text        `json:"host"`
+	Port                pgtype.Int4        `json:"port"`
+	Url                 pgtype.Text        `json:"url"`
+	Format              string             `json:"format"`
+	Batch               bool               `json:"batch"`
+	SendAudit           bool               `json:"send_audit"`
+	AuditLevel          string             `json:"audit_level"`
+	SendEntries         bool               `json:"send_entries"`
+	SendEscalation      bool               `json:"send_escalation"`
+	SendTickets         bool               `json:"send_tickets"`
+	CaCert              pgtype.Text        `json:"ca_cert"`
+	ClientCert          pgtype.Text        `json:"client_cert"`
+	ClientKeyEncrypted  pgtype.Text        `json:"client_key_encrypted"`
+	HeaderNames         []string           `json:"header_names"`
+	HeadersEncrypted    pgtype.Text        `json:"headers_encrypted"`
+	CursorID            int64              `json:"cursor_id"`
+	LeaseUntil          pgtype.Timestamptz `json:"lease_until"`
+	LeaseOwner          pgtype.Text        `json:"lease_owner"`
+	NextAttemptAt       pgtype.Timestamptz `json:"next_attempt_at"`
+	Failures            int32              `json:"failures"`
+	FailingSince        pgtype.Timestamptz `json:"failing_since"`
+	DownAlerted         bool               `json:"down_alerted"`
+	LastSentAt          pgtype.Timestamptz `json:"last_sent_at"`
+	LastError           pgtype.Text        `json:"last_error"`
+	LastErrorAt         pgtype.Timestamptz `json:"last_error_at"`
+	CreatedBy           pgtype.UUID        `json:"created_by"`
+	CreatedAt           pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt           pgtype.Timestamptz `json:"updated_at"`
+	ComplementID        pgtype.UUID        `json:"complement_id"`
+	Events              []string           `json:"events"`
+	HmacSecretEncrypted pgtype.Text        `json:"hmac_secret_encrypted"`
+	SentToday           int32              `json:"sent_today"`
+	LostWeek            int32              `json:"lost_week"`
+	Pending             int32              `json:"pending"`
 }
 
 // Reenvío de eventos a un SIEM y API de integraciones (spec/19, 10b).
 // ===== Destinos del reenvío =====
 // Con sus cifras: enviados hoy, perdidos en 7 días y lo que espera en cola.
+// Los de los complementos (10i) se administran desde su ficha.
 func (q *Queries) ListForwardDestinations(ctx context.Context, today pgtype.Date) ([]ListForwardDestinationsRow, error) {
 	rows, err := q.db.Query(ctx, listForwardDestinations, today)
 	if err != nil {
@@ -1146,6 +1176,9 @@ func (q *Queries) ListForwardDestinations(ctx context.Context, today pgtype.Date
 			&i.CreatedBy,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.ComplementID,
+			&i.Events,
+			&i.HmacSecretEncrypted,
 			&i.SentToday,
 			&i.LostWeek,
 			&i.Pending,
@@ -1250,20 +1283,24 @@ WHERE t.merged_into_id IS NULL
   AND ($1::uuid[] IS NULL OR t.client_id = ANY($1::uuid[]))
   AND ($2::uuid IS NULL OR t.client_id = $2)
   AND ($3::text IS NULL OR t.status::text = $3)
-  AND ($4::timestamptz IS NULL OR t.updated_at >= $4)
-  AND ($5::timestamptz IS NULL OR (t.created_at, t.id) < ($5::timestamptz, $6::uuid))
+  -- Un informe de un complemento pide como la persona que lo abre (10i): ve
+  -- las colas de sus áreas, igual que en la Ticketera.
+  AND ($4::uuid[] IS NULL OR t.area_id = ANY($4::uuid[]) OR t.requested_area_id = ANY($4::uuid[]))
+  AND ($5::timestamptz IS NULL OR t.updated_at >= $5)
+  AND ($6::timestamptz IS NULL OR (t.created_at, t.id) < ($6::timestamptz, $7::uuid))
 ORDER BY t.created_at DESC, t.id DESC
-LIMIT $7
+LIMIT $8
 `
 
 type ListTicketsForAPIParams struct {
-	ClientIds []uuid.UUID        `json:"client_ids"`
-	ClientID  pgtype.UUID        `json:"client_id"`
-	Status    pgtype.Text        `json:"status"`
-	Since     pgtype.Timestamptz `json:"since"`
-	BeforeAt  pgtype.Timestamptz `json:"before_at"`
-	BeforeID  pgtype.UUID        `json:"before_id"`
-	MaxRows   int32              `json:"max_rows"`
+	ClientIds    []uuid.UUID        `json:"client_ids"`
+	ClientID     pgtype.UUID        `json:"client_id"`
+	Status       pgtype.Text        `json:"status"`
+	VisibleAreas []uuid.UUID        `json:"visible_areas"`
+	Since        pgtype.Timestamptz `json:"since"`
+	BeforeAt     pgtype.Timestamptz `json:"before_at"`
+	BeforeID     pgtype.UUID        `json:"before_id"`
+	MaxRows      int32              `json:"max_rows"`
 }
 
 type ListTicketsForAPIRow struct {
@@ -1333,6 +1370,7 @@ func (q *Queries) ListTicketsForAPI(ctx context.Context, arg ListTicketsForAPIPa
 		arg.ClientIds,
 		arg.ClientID,
 		arg.Status,
+		arg.VisibleAreas,
 		arg.Since,
 		arg.BeforeAt,
 		arg.BeforeID,
@@ -1527,7 +1565,7 @@ func (q *Queries) ReleaseForwardLease(ctx context.Context, arg ReleaseForwardLea
 const revokeAPIKey = `-- name: RevokeAPIKey :one
 UPDATE api_keys SET active = false, revoked_at = now(), revoked_by = $1, revoke_reason = $2
 WHERE id = $3 AND active
-RETURNING id, name, key_prefix, key_hash, scopes, active, last_used_at, expires_at, created_by, created_at, description, client_ids, area_id, revoked_at, revoked_by, revoke_reason
+RETURNING id, name, key_prefix, key_hash, scopes, active, last_used_at, expires_at, created_by, created_at, description, client_ids, area_id, revoked_at, revoked_by, revoke_reason, complement_id
 `
 
 type RevokeAPIKeyParams struct {
@@ -1556,6 +1594,7 @@ func (q *Queries) RevokeAPIKey(ctx context.Context, arg RevokeAPIKeyParams) (Api
 		&i.RevokedAt,
 		&i.RevokedBy,
 		&i.RevokeReason,
+		&i.ComplementID,
 	)
 	return i, err
 }
@@ -1607,7 +1646,7 @@ UPDATE forward_destinations d SET
   next_attempt_at = NULL,
   enabled = $18, updated_at = now()
 WHERE d.id = $19
-RETURNING id, name, enabled, transport, host, port, url, format, batch, send_audit, audit_level, send_entries, send_escalation, send_tickets, ca_cert, client_cert, client_key_encrypted, header_names, headers_encrypted, cursor_id, lease_until, lease_owner, next_attempt_at, failures, failing_since, down_alerted, last_sent_at, last_error, last_error_at, created_by, created_at, updated_at
+RETURNING id, name, enabled, transport, host, port, url, format, batch, send_audit, audit_level, send_entries, send_escalation, send_tickets, ca_cert, client_cert, client_key_encrypted, header_names, headers_encrypted, cursor_id, lease_until, lease_owner, next_attempt_at, failures, failing_since, down_alerted, last_sent_at, last_error, last_error_at, created_by, created_at, updated_at, complement_id, events, hmac_secret_encrypted
 `
 
 type UpdateForwardDestinationParams struct {
@@ -1690,6 +1729,9 @@ func (q *Queries) UpdateForwardDestination(ctx context.Context, arg UpdateForwar
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ComplementID,
+		&i.Events,
+		&i.HmacSecretEncrypted,
 	)
 	return i, err
 }

@@ -8,6 +8,9 @@
         <button type="button" role="tab" class="shifts__tab" [class.shifts__tab--active]="tab() === 'mine'" [attr.aria-selected]="tab() === 'mine'" (click)="tab.set('mine')">{{ i18n.t('shift.tab.mine') }}</button>
         <button type="button" role="tab" class="shifts__tab" [class.shifts__tab--active]="tab() === 'history'" [attr.aria-selected]="tab() === 'history'" (click)="tab.set('history')">{{ i18n.t('shift.tab.history') }}</button>
       }
+      @for (p of pages(); track pageTab(p)) {
+        <button type="button" role="tab" class="shifts__tab" [class.shifts__tab--active]="tab() === pageTab(p)" [attr.aria-selected]="tab() === pageTab(p)" (click)="tab.set(pageTab(p))">{{ p.title }}</button>
+      }
       <button type="button" role="tab" class="shifts__tab" [class.shifts__tab--active]="tab() === 'dotacion'" [attr.aria-selected]="tab() === 'dotacion'" (click)="tab.set('dotacion')">{{ i18n.t('shift.tab.staffing') }}</button>
     </div>
     @if (areaView() && perms.ownAreas().length > 1) {
@@ -93,6 +96,11 @@
     }
     @case ('history') {
       <app-shift-history />
+    }
+    @default {
+      @if (currentPage(); as p) {
+        <app-complement-frame style="height: 100%; min-height: 480px" [slug]="p.slug" [slot]="p.key" [label]="p.title" />
+      }
     }
   }
   </div>

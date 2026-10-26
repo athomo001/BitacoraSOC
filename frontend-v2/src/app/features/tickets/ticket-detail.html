@@ -177,6 +177,7 @@
       @if (d.glpiWrite && !t.glpi && !d.glpiCopy && t.canWork) {
         <button type="button" class="td__btn" [disabled]="busy()" (click)="createInGlpi()"><mat-icon>add_task</mat-icon>{{ i18n.t('gw.create') }}</button>
       }
+      <app-complement-actions target="ticket" [objectId]="t.id" buttonClass="td__btn" (changed)="reloadAll()" />
       @if (canDelete() && !t.glpi) {
         @if (confirmDelete()) {
           <span class="td__confirm" role="group">
@@ -196,6 +197,9 @@
     <button type="button" role="tab" class="td__tab" [attr.aria-selected]="tab() === 'images'" (click)="tab.set('images')">{{ i18n.t('tickets.tab.images') }} <span class="mono">{{ gallery().length }}</span></button>
     <button type="button" role="tab" class="td__tab" [attr.aria-selected]="tab() === 'tasks'" (click)="tab.set('tasks')">{{ i18n.t('tickets.tab.tasks') }} <span class="mono">{{ duration(d.totalTimeSpentSeconds) }}</span></button>
     <button type="button" role="tab" class="td__tab" [attr.aria-selected]="tab() === 'entries'" (click)="tab.set('entries')">{{ i18n.t('tickets.tab.entries') }} <span class="mono">{{ d.entries.length }}</span></button>
+    @for (p of panels(); track panelTab(p)) {
+      <button type="button" role="tab" class="td__tab" [attr.aria-selected]="tab() === panelTab(p)" (click)="tab.set(panelTab(p))"><mat-icon>{{ p.icon }}</mat-icon> {{ p.title }}</button>
+    }
   </div>
 
   <div class="td__feed" role="tabpanel">
@@ -285,6 +289,11 @@
           </button>
         } @empty {
           <p class="td__muted">{{ i18n.t('tickets.entries.empty') }}</p>
+        }
+      }
+      @default {
+        @if (currentPanel(); as p) {
+          <app-complement-frame style="flex: 1; min-height: 360px" [slug]="p.slug" [slot]="p.key" objectType="ticket" [objectId]="t.id" [label]="p.title" (changed)="reloadAll()" />
         }
       }
     }

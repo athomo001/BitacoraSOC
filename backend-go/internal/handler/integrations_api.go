@@ -62,9 +62,17 @@ type apiKeyCaller struct {
 	ExpiresAt   pgtype.Timestamptz
 	Creator     uuid.UUID
 	CreatorName string
+	// Areas limita los tickets a las colas que ve una persona: un informe de
+	// un complemento pide como quien lo tiene abierto (10i). nil = todas
+	// (las llaves de API).
+	Areas []uuid.UUID
 }
 
 func (k apiKeyCaller) has(scope string) bool { return slices.Contains(k.Scopes, scope) }
+
+func (k apiKeyCaller) seesArea(area, requested uuid.UUID) bool {
+	return k.Areas == nil || slices.Contains(k.Areas, area) || slices.Contains(k.Areas, requested)
+}
 
 func (k apiKeyCaller) allows(client uuid.UUID) bool {
 	return k.Clients == nil || slices.Contains(k.Clients, client)
@@ -527,6 +535,63 @@ func (a *IntegrationsAPI) CreateEntry(w http.ResponseWriter, r *http.Request, k 
 	writeData(w, http.StatusCreated, toAPIEntryDTO(rows[0]))
 }
 
+type apiEntryCommentRequest struct {
+	Content string `json:"content"`
+}
+
+// CommentEntry es POST /api/v1/entries/{id}/comments: un seguimiento en la
+// entrada, firmado «quien creó la llave, con <llave>» (un complemento con
+// servidor deja así sus resultados, 10i).
+func (a *IntegrationsAPI) CommentEntry(w http.ResponseWriter, r *http.Request, k apiKeyCaller) {
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		problemdetails.Write(w, r, 404, "not-found", "entrada no encontrada")
+		return
+	}
+	var req apiEntryCommentRequest
+	if err := decodeJSON(w, r, &req); err != nil || strings.TrimSpace(req.Content) == "" || len([]rune(req.Content)) > 20000 {
+		problemdetails.Write(w, r, 400, "invalid-payload", "content es obligatorio (hasta 20000 caracteres)")
+		return
+	}
+	ctx := r.Context()
+	rows, err := a.Queries.ListEntriesForAPI(ctx, db.ListEntriesForAPIParams{ID: pgtype.UUID{Bytes: id, Valid: true}, ClientIds: k.Clients, MaxRows: 1})
+	if err != nil {
+		problemdetails.Write(w, r, 500, "internal-error", "no se pudo leer la entrada")
+		return
+	}
+	if len(rows) == 0 {
+		problemdetails.Write(w, r, 404, "not-found", "entrada no encontrada")
+		return
+	}
+	comment, err := a.Queries.CreateEntryComment(ctx, db.CreateEntryCommentParams{EntryID: id, UserID: k.Creator, Comment: strings.TrimSpace(req.Content),
+		Via: pgtype.Text{String: k.Name, Valid: true}})
+	if err != nil {
+		problemdetails.Write(w, r, 500, "internal-error", "no se pudo agregar el seguimiento")
+		return
+	}
+	a.AuditLog.Log(ctx, "entry.comment_added", audit.LevelInfo, audit.Success(), map[string]any{"entryId": id.String(), "commentId": comment.ID.String(), "apiKey": k.Name})
+	publishSync(ctx, a.Hub, "entry.updated", map[string]string{"id": id.String()})
+	writeData(w, http.StatusCreated, map[string]any{"id": comment.ID, "content": comment.Comment, "createdAt": comment.CreatedAt.Time})
+}
+
+// ===== Clientes =====
+
+// ListClients es GET /api/v1/clients: los clientes activos de la llave.
+func (a *IntegrationsAPI) ListClients(w http.ResponseWriter, r *http.Request, k apiKeyCaller) {
+	rows, err := a.Queries.ListActiveClientNames(r.Context())
+	if err != nil {
+		problemdetails.Write(w, r, 500, "internal-error", "no se pudieron leer los clientes")
+		return
+	}
+	out := make([]apiRef, 0, len(rows))
+	for _, c := range rows {
+		if k.allows(c.ID) {
+			out = append(out, apiRef{ID: c.ID.String(), Name: c.Name})
+		}
+	}
+	writeData(w, http.StatusOK, out)
+}
+
 // ===== Guardia vigente =====
 
 type apiChannelDTO struct {
@@ -703,7 +768,7 @@ func (a *IntegrationsAPI) ListTickets(w http.ResponseWriter, r *http.Request, k 
 		return
 	}
 	rows, err := a.Queries.ListTicketsForAPI(ctx, db.ListTicketsForAPIParams{ClientIds: k.Clients, ClientID: client,
-		Status: pgtype.Text{String: status, Valid: status != ""}, Since: since, BeforeAt: beforeAt, BeforeID: beforeID, MaxRows: limit + 1})
+		Status: pgtype.Text{String: status, Valid: status != ""}, VisibleAreas: k.Areas, Since: since, BeforeAt: beforeAt, BeforeID: beforeID, MaxRows: limit + 1})
 	if err != nil {
 		problemdetails.Write(w, r, 500, "internal-error", "no se pudieron leer los tickets")
 		return
@@ -733,7 +798,7 @@ func (a *IntegrationsAPI) findTicket(ctx context.Context, k apiKeyCaller, ref st
 	if err != nil {
 		return t, err
 	}
-	if !k.allows(t.ClientID) {
+	if !k.allows(t.ClientID) || !k.seesArea(t.AreaID, t.RequestedAreaID) {
 		return t, pgx.ErrNoRows
 	}
 	return t, nil

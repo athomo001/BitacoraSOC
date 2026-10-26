@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, Injector, OnInit, computed, effect, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, Injector, OnInit, computed, effect, inject, signal, viewChild } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -28,6 +28,8 @@ import {
   ReportsService,
 } from '../../core/reports/reports.service';
 import { ClientAlertDialogComponent, ClientAlertDialogData } from './client-alert-dialog';
+import { ComplementSlot, ComplementsService } from '../../core/complements/complements.service';
+import { ComplementFrameComponent } from '../../shared/complement-frame/complement-frame';
 
 import '../../core/i18n/packs/reports';
 const DRAFT_KEY = 'bitacora.reports.draft';
@@ -112,7 +114,7 @@ type PreviewImage = ReportImage & { url: string };
 @Component({
   selector: 'app-reports',
   standalone: true,
-  imports: [FormsModule, DatePipe, MatIconModule],
+  imports: [FormsModule, DatePipe, MatIconModule, ComplementFrameComponent],
   templateUrl: './reports.html',
   styleUrl: './reports.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -131,7 +133,21 @@ export class ReportsComponent implements OnInit {
   protected readonly criticalities = CRITICALITIES;
   protected readonly reputations = REPUTATIONS;
 
-  protected readonly tab = signal<'new' | 'history'>('new');
+  /** 'new', 'history' o la página de un complemento («slug|page:id», 10i). */
+  protected readonly tab = signal<string>('new');
+  private readonly complements = inject(ComplementsService);
+  /** Informes que suman los complementos aprobados (10i). */
+  protected readonly pages = computed(() => this.complements.slots().pages.filter((p) => p.module === 'reports'));
+  protected readonly currentPage = computed(() => this.pages().find((p) => this.pageTab(p) === this.tab()) ?? null);
+  private readonly pageFrame = viewChild(ComplementFrameComponent);
+
+  protected pageTab(p: ComplementSlot): string {
+    return p.slug + '|' + p.key;
+  }
+
+  protected printPage(): void {
+    this.pageFrame()?.print();
+  }
   protected readonly mode = signal<ReportKind>('incident');
 
   // Catálogos

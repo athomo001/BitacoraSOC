@@ -253,6 +253,15 @@
             }
           </div>
 
+          <!-- Complementos aprobados para una entrada (10i): sus acciones y sus pestañas. -->
+          <app-complement-actions target="entry" [objectId]="entry.id" (changed)="reloadSelected()" />
+          @for (p of entryPanels(); track p.slug + p.key) {
+            <details class="en__cpanel">
+              <summary class="adm-label"><mat-icon>{{ p.icon }}</mat-icon> {{ p.title }}</summary>
+              <app-complement-frame style="height: 300px" [slug]="p.slug" [slot]="p.key" objectType="entry" [objectId]="entry.id" [label]="p.title" (changed)="reloadSelected()" />
+            </details>
+          }
+
           <div class="en__fu-head">
             <span class="adm-label">{{ i18n.t('entries.followUps') }}</span>
             @if (entry.followUpOpen) {
@@ -275,7 +284,7 @@
           }
           <ul class="en__comments">
             @for (c of entry.comments; track c.id) {
-              <li><strong>{{ c.authorUsername }}</strong><span class="mono adm-small adm-secondary en__cmeta">{{ c.createdAt | date: 'dd/MM HH:mm' }}</span>
+              <li><strong>{{ c.authorUsername }}</strong>@if (c.via) { <span class="adm-small adm-secondary"> {{ i18n.t('cf.via').replace('{0}', c.via) }}</span> }<span class="mono adm-small adm-secondary en__cmeta">{{ c.createdAt | date: 'dd/MM HH:mm' }}</span>
                 @if (c.glpiPush; as push) { <span class="pill" [class.tone-ok]="push === 'sent'" [class.tone-bad]="push === 'failed'" [class.tone-warn]="push === 'queued'" [title]="c.glpiPushError ?? ''">{{ i18n.t(glpiPushKey(push)) }}</span> }
                 <br />{{ c.comment }}</li>
             } @empty {

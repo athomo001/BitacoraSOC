@@ -192,11 +192,16 @@
             <div class="iv__tabs" role="tablist">
               <button type="button" role="tab" class="iv__tab" [attr.aria-selected]="tab() === 'history'" (click)="tab.set('history')">{{ i18n.t('inv.tab.history') }} <span class="mono">{{ a.events.length }}</span></button>
               <button type="button" role="tab" class="iv__tab" [attr.aria-selected]="tab() === 'tickets'" (click)="tab.set('tickets')">{{ i18n.t('inv.tab.tickets') }} <span class="mono">{{ a.tickets.length }}</span></button>
+              @for (p of panels(); track panelTab(p)) {
+                <button type="button" role="tab" class="iv__tab" [attr.aria-selected]="tab() === panelTab(p)" (click)="tab.set(panelTab(p))"><mat-icon>{{ p.icon }}</mat-icon> {{ p.title }}</button>
+              }
               @if (tab() === 'history' && a.canEdit && !working()) {
                 <button type="button" class="adm-btn adm-push" (click)="working.set(true)"><mat-icon>add</mat-icon>{{ i18n.t('inv.work') }}</button>
               }
             </div>
-            @if (tab() === 'history') {
+            @if (currentPanel(); as p) {
+              <app-complement-frame style="height: 360px" [slug]="p.slug" [slot]="p.key" objectType="asset" [objectId]="a.id" [label]="p.title" />
+            } @else if (tab() === 'history') {
               @if (working()) {
                 <div class="iv__confirm">
                   <label class="adm-label" for="workText">{{ i18n.t('inv.work.text') }}</label>

@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="es" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Incidentes por cliente</title>
+<link rel="stylesheet" href="informe.css">
+</head>
+<body>
+<main class="inf">
+  <header class="inf__head">
+    <div class="inf__titles">
+      <h1 id="titulo">Incidentes por cliente</h1>
+      <p class="inf__lead">Entradas de tipo incidente y tickets de incidente del mes. Ves solo lo que puedes ver en la app.</p>
+    </div>
+    <label class="inf__field">
+      <span>Mes</span>
+      <select id="mes"></select>
+    </label>
+  </header>
+
+  <p id="estado" class="inf__estado" role="status">Cargando…</p>
+
+  <table id="tabla" class="inf__tabla" hidden>
+    <thead>
+      <tr>
+        <th scope="col">Cliente</th>
+        <th scope="col" class="inf__barcol">Incidentes</th>
+        <th scope="col" class="num">En la Bitácora</th>
+        <th scope="col" class="num">Tickets</th>
+        <th scope="col" class="num">Abiertos hoy</th>
+        <th scope="col" class="num">Cierre promedio</th>
+        <th scope="col" class="num">SLA vencido</th>
+      </tr>
+    </thead>
+    <tbody id="filas"></tbody>
+  </table>
+  <p class="inf__pie" id="pie"></p>
+</main>
+<script src="bitacora-complemento.js"></script>
+<script src="informe.js"></script>
+</body>
+</html>

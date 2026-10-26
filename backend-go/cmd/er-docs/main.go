@@ -80,7 +80,7 @@ var domains = []domain{
 	{"Configuración y respaldos", "Configuración única de la instalación, correo, marca, funcionalidades activables y respaldos.",
 		[]string{"app_config", "smtp_config", "app_branding", "system_features", "backup_config", "backup_runs"}},
 	{"Complementos", "Complementos instalados, sus archivos y su almacenamiento.",
-		[]string{"complements", "complement_files", "complement_uploads", "complement_storage"}},
+		[]string{"complements", "complement_files", "complement_uploads", "complement_storage", "complement_schedules"}},
 	{"Ingesta de alertas (después del corte)", "Tablas creadas para la ingesta de alertas del backlog posterior al corte; todavía sin uso.",
 		[]string{"message_templates", "alert_ingestion_rules"}},
 }

@@ -17,6 +17,8 @@ import {
 import { ActionDialogComponent, ActionDialogData } from './action-dialog';
 import { MgmtNotesComponent } from './mgmt-notes';
 import { AccountDialogComponent, AccountDialogData } from './account-dialog';
+import { ComplementSlot, ComplementsService } from '../../core/complements/complements.service';
+import { ComplementFrameComponent } from '../../shared/complement-frame/complement-frame';
 import { ExportDialogComponent, ExportDialogData } from './export-dialog';
 import { GoalDialogComponent, GoalDialogData } from './goal-dialog';
 import { MgmtNav } from './management';
@@ -44,7 +46,7 @@ interface RenewalView {
 @Component({
   selector: 'app-mgmt-clients',
   standalone: true,
-  imports: [DatePipe, MatIconModule, RouterLink, MgmtNotesComponent],
+  imports: [DatePipe, MatIconModule, RouterLink, MgmtNotesComponent, ComplementFrameComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './mgmt-clients.html',
   styleUrl: './mgmt-clients.css',
@@ -71,7 +73,16 @@ export class MgmtClientsComponent {
   protected readonly query = signal('');
   protected readonly selected = signal<string | null>(null);
   protected readonly detail = signal<MgmtClientDetail | null>(null);
-  protected readonly tab = signal<'summary' | 'timeline' | 'notes'>('summary');
+  protected readonly tab = signal<'summary' | 'timeline' | 'notes' | `c:${string}`>('summary');
+  private readonly complements = inject(ComplementsService);
+  /** Pestañas que suman los complementos aprobados (10i). */
+  protected readonly panels = computed(() => this.complements.slots().panels.filter((p) => p.target === 'client'));
+  protected readonly currentPanel = computed(() => this.panels().find((p) => this.panelTab(p) === this.tab()) ?? null);
+
+  protected panelTab(p: ComplementSlot): `c:${string}` {
+    return `c:${p.slug}|${p.key}`;
+  }
+
   /** Cuántas notas internas tiene el cliente (la pestaña lo muestra). */
   protected readonly notesCount = signal<number | null>(null);
   protected readonly error = signal<string | null>(null);

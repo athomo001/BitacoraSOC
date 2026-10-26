@@ -9,8 +9,10 @@ import { I18nService } from '../../core/i18n/i18n.service';
 import { MessageKey } from '../../core/i18n/messages';
 import { problemDetail } from '../../core/http-error';
 import { PreferencesService } from '../../core/preferences/preferences.service';
+import { AdminComplementAddsComponent, fill, pendingOf } from './admin-complement-adds';
 
 import '../../core/i18n/packs/admin';
+import '../../core/i18n/packs/complement-features';
 /** Permisos de la Runtime API, con su explicación en lenguaje claro. */
 export const SCOPES: readonly { code: string; labelKey: MessageKey }[] = [
   { code: 'READ_CONTEXT', labelKey: 'acomp.scope.READ_CONTEXT' },
@@ -56,7 +58,7 @@ function emptyManual(): ManualDraft {
 @Component({
   selector: 'app-admin-complements',
   standalone: true,
-  imports: [DatePipe, FormsModule, MatIconModule],
+  imports: [DatePipe, FormsModule, MatIconModule, AdminComplementAddsComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './admin-complements.html',
   styleUrl: './admin-complements.css',
@@ -105,6 +107,16 @@ export class AdminComplementsComponent implements OnInit {
   protected readonly manual = signal<ManualDraft>(emptyManual());
 
   protected readonly selected = computed(() => this.list().find((c) => c.slug === this.selectedSlug()) ?? null);
+
+  // 10i: «Qué agrega» y «Configuración» (esta solo si declara campos y se aprobó).
+  protected readonly pendingOf = pendingOf;
+  protected readonly fill = fill;
+  protected readonly ficheTab = signal<'general' | 'adds' | 'settings'>('general');
+  protected readonly ficheTabs = computed<('general' | 'adds' | 'settings')[]>(() => {
+    const c = this.detail();
+    const withSettings = !!c?.manifest?.settings?.length && c.approved.includes('settings');
+    return withSettings ? ['general', 'adds', 'settings'] : ['general', 'adds'];
+  });
   protected readonly canDelete = computed(() => this.deleteTyped().trim() === this.detail()?.slug);
 
   async ngOnInit(): Promise<void> {
@@ -129,7 +141,10 @@ export class AdminComplementsComponent implements OnInit {
     this.deleteTyped.set('');
     this.newHost.set('');
     try {
-      this.detail.set(await this.api.get(slug));
+      const c = await this.api.get(slug);
+      this.detail.set(c);
+      // Lo que espera revisión se ve primero.
+      this.ficheTab.set(pendingOf(c) > 0 ? 'adds' : 'general');
     } catch (e) {
       this.error.set(problemDetail(e, this.i18n.t('acomp.loadError')));
     }
@@ -170,6 +185,13 @@ export class AdminComplementsComponent implements OnInit {
       ...c.visiblePermissionGroupIds.map((id) => this.groups().find((g) => g.id === id)?.name ?? '—'),
     ];
     return names.length ? names.join(', ') : this.i18n.t('acomp.everyone');
+  }
+
+  /** «Qué agrega» guardó: la ficha y la lista quedan al día. */
+  protected onUpdated(saved: Complement): void {
+    this.detail.set(saved);
+    this.list.update((l) => l.map((x) => (x.slug === saved.slug ? saved : x)));
+    if (this.ficheTab() === 'settings' && !this.ficheTabs().includes('settings')) this.ficheTab.set('adds');
   }
 
   private async save(patch: Partial<Omit<Complement, 'slug'>>): Promise<void> {
@@ -371,6 +393,7 @@ export class AdminComplementsComponent implements OnInit {
       this.list.set(await this.api.list());
       await this.select(r.complement.slug);
       this.token.set(r.applicationToken);
+      if (r.manifestError) this.error.set(fill(this.i18n.t('cf.manifestError'), r.manifestError));
       void this.api.refresh();
     });
   }

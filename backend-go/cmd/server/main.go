@@ -198,6 +198,11 @@ func run(logger *slog.Logger) error {
 		Signer: complements.NewSigner([]byte(jwtSigningKey)), Breaker: complements.NewBreaker(),
 		AppOrigin: complements.Origin(publicBaseURL), OriginURL: complementsPublicURL,
 		DeleteLimiter: ratelimit.NewAPILimiter(3, time.Hour),
+		// 10i: secretos, cola de eventos, préstamo de las tareas programadas y
+		// la dirección de /api/v1 que se le da a un servicio (por defecto la
+		// pública; en el compose puede ser la interna).
+		Crypto: cryptoBox, Forward: forwardEmitter, Owner: forward.Owner(hostname),
+		Location: complementsLocation(), InternalAPIURL: os.Getenv("COMPLEMENTS_INTERNAL_API_URL"),
 	}
 	complementsHandler.PreviewCacheInit()
 	if rateLimitOff {
@@ -215,6 +220,7 @@ func run(logger *slog.Logger) error {
 	ticketSettingsHandler := &handler.TicketSettingsHandler{Queries: queries, Crypto: cryptoBox, AuditLog: auditLog}
 	ticketSeriesHandler := &handler.TicketSeriesHandler{Pool: pool, Queries: queries, AuditLog: auditLog}
 	ticketsHandler := &handler.TicketsHandler{Pool: pool, Queries: queries, AuditLog: auditLog, PinLimiter: ratelimit.NewAPILimiter(30, 15*time.Minute), Hub: hub, Mailer: ticketMailer, Notify: notifier, Glpi: glpiHandler}
+	complementsHandler.Tickets = ticketsHandler
 	entriesHandler.Tickets = ticketsHandler
 	notesHandler := &handler.NotesHandler{Queries: queries, AuditLog: auditLog}
 	draftsHandler := &handler.DraftsHandler{Queries: queries, AuditLog: auditLog, Hub: hub}
@@ -758,6 +764,14 @@ func run(logger *slog.Logger) error {
 	mux.Handle("POST /api/complements/{slug}/test", complAdmin(complementsHandler.Test))
 	mux.Handle("POST /api/complements/{slug}/embed", complAuthed(complementsHandler.Embed))
 	mux.Handle("POST /api/complements/{slug}/entries", complAuthed(complementsHandler.CreateEntry))
+	// Complementos que agregan funciones (10i, spec/11 §12).
+	mux.Handle("GET /api/complements/slots", complAuthed(complementsHandler.Slots))
+	mux.Handle("PUT /api/complements/{slug}/approvals", complAdmin(complementsHandler.SetApprovals))
+	mux.Handle("POST /api/complements/{slug}/manifest", complAdmin(complementsHandler.RefreshManifest))
+	mux.Handle("GET /api/complements/{slug}/settings", complAdmin(complementsHandler.GetSettings))
+	mux.Handle("PUT /api/complements/{slug}/settings", complAdmin(complementsHandler.PutSettings))
+	mux.Handle("POST /api/complements/{slug}/api", complAuthed(complementsHandler.APIRequest))
+	mux.Handle("POST /api/complements/{slug}/note", complAuthed(complementsHandler.AddNote))
 	// Complement Runtime API (ruta del legacy): token de aplicación, no sesión.
 	mux.HandleFunc("GET /api/internal/versions", runtimeAPI.Versions)
 	mux.Handle("GET /api/internal/v1/context", runtimeAPI.Auth("READ_CONTEXT", runtimeAPI.Context))
@@ -766,6 +780,8 @@ func run(logger *slog.Logger) error {
 	mux.Handle("GET /api/internal/v1/storage", runtimeAPI.Auth("READ_STORAGE", runtimeAPI.StorageGet))
 	mux.Handle("POST /api/internal/v1/storage", runtimeAPI.Auth("WRITE_STORAGE", runtimeAPI.StoragePut))
 	mux.Handle("POST /api/internal/v1/log", runtimeAPI.Auth("WRITE_LOGS", runtimeAPI.Log))
+	mux.Handle("GET /api/internal/v1/settings", runtimeAPI.Auth("", runtimeAPI.Settings))
+	mux.Handle("GET /api/internal/v1/credentials", runtimeAPI.Auth("", runtimeAPI.Credentials))
 	// Recordatorios de turno por correo (spec/12-pendientes.md §2.3b).
 	mux.Handle("GET /api/shift-reminders", admin(shiftRemindersHandler.List))
 	mux.Handle("POST /api/shift-reminders", admin(shiftRemindersHandler.Create))
@@ -922,10 +938,13 @@ func run(logger *slog.Logger) error {
 	mux.Handle("GET /api/integrations/keys/{id}/requests", admin(integrationsHandler.KeyRequests))
 	integrationsAPI := &handler.IntegrationsAPI{Queries: queries, Pool: pool, AuditLog: auditLog, Crypto: cryptoBox,
 		Limiter: ratelimit.NewAPILimiter(600, 15*time.Minute), Tickets: ticketsHandler, Reports: reportsHandler, Hub: hub, AppVersion: os.Getenv("APP_VERSION")}
+	complementsHandler.API = integrationsAPI
 	mux.Handle("GET /api/v1", integrationsAPI.Route("", integrationsAPI.Discovery))
 	mux.Handle("GET /api/v1/entries", integrationsAPI.Route("entries:read", integrationsAPI.ListEntries))
 	mux.Handle("GET /api/v1/entries/{id}", integrationsAPI.Route("entries:read", integrationsAPI.GetEntry))
 	mux.Handle("POST /api/v1/entries", integrationsAPI.Route("entries:write", integrationsAPI.CreateEntry))
+	mux.Handle("POST /api/v1/entries/{id}/comments", integrationsAPI.Route("entries:write", integrationsAPI.CommentEntry))
+	mux.Handle("GET /api/v1/clients", integrationsAPI.Route("clients:read", integrationsAPI.ListClients))
 	mux.Handle("GET /api/v1/oncall", integrationsAPI.Route("oncall:read", integrationsAPI.OnCall))
 	mux.Handle("GET /api/v1/tickets", integrationsAPI.Route("tickets:read", integrationsAPI.ListTickets))
 	mux.Handle("GET /api/v1/tickets/{ref}", integrationsAPI.Route("tickets:read", integrationsAPI.GetTicket))
@@ -1022,6 +1041,8 @@ func run(logger *slog.Logger) error {
 	go scheduler.Run(ctx, 30*time.Second, ticketMailer.Dispatch)
 	// Salud de los complementos servicio y limpieza de subidas vencidas.
 	go scheduler.Run(ctx, 30*time.Second, complementsHandler.ProbeAll)
+	// Tareas programadas de los complementos (10i).
+	go scheduler.Run(ctx, 30*time.Second, complementsHandler.RunSchedules)
 	// Respaldos automáticos: revisa cada minuto si toca la copia programada.
 	go scheduler.Run(ctx, time.Minute, func(ctx context.Context) error { return backupService.RunScheduled(ctx, false) })
 
@@ -1076,4 +1097,18 @@ func run(logger *slog.Logger) error {
 	defer cancel()
 	_ = complementsSrv.Shutdown(shutdownCtx)
 	return srv.Shutdown(shutdownCtx)
+}
+
+// complementsLocation es la zona horaria de las tareas programadas de los
+// complementos: TZ si está, si no la de Chile.
+func complementsLocation() *time.Location {
+	for _, name := range []string{os.Getenv("TZ"), "America/Santiago"} {
+		if name == "" {
+			continue
+		}
+		if loc, err := time.LoadLocation(name); err == nil {
+			return loc
+		}
+	}
+	return time.Local
 }

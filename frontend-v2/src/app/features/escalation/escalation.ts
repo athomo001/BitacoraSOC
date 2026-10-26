@@ -37,6 +37,7 @@ import { MessageKey } from '../../core/i18n/messages';
 import { FlowState, StepStatus, flowState, formatCountdown, secondsUntilEscalation, stepContactKey } from './escalation-flow';
 
 import '../../core/i18n/packs/escalation';
+import { ComplementPageLinksComponent } from '../../shared/complement-frame/complement-page-links';
 type ScopeKind = 'asset' | 'unit' | 'service';
 
 /** Cuántas opciones se pintan en la lista del buscador (con más, se sigue escribiendo). */
@@ -95,7 +96,7 @@ const CHANNEL_ICON: Record<ChannelType, string> = { call: 'call', sms: 'sms', wh
 @Component({
   selector: 'app-escalation',
   standalone: true,
-  imports: [FormsModule, DatePipe, MatIconModule, RouterLink, MaintenanceWindowsComponent, RaciPanelComponent],
+  imports: [FormsModule, DatePipe, MatIconModule, RouterLink, MaintenanceWindowsComponent, RaciPanelComponent, ComplementPageLinksComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './escalation.html',
   styleUrl: './escalation.css',

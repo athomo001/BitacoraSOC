@@ -128,6 +128,8 @@ type entryCommentDTO struct {
 	// GlpiPush: «También en GLPI» (10d.2): queued | sent | failed.
 	GlpiPush      string  `json:"glpiPush,omitempty"`
 	GlpiPushError *string `json:"glpiPushError,omitempty"`
+	// Via: el complemento o la llave de API con que se dejó (10i).
+	Via *string `json:"via,omitempty"`
 }
 
 type entryDetailDTO struct {
@@ -303,7 +305,7 @@ func (h *EntriesHandler) Get(w http.ResponseWriter, r *http.Request) {
 	comments := make([]entryCommentDTO, 0, len(commentRows))
 	for _, c := range commentRows {
 		comment := entryCommentDTO{ID: c.ID, EntryID: c.EntryID, AuthorUsername: c.AuthorUsername, Comment: c.Comment, IsSystemGenerated: c.IsSystemGenerated,
-			GlpiPush: c.GlpiPushState.String, GlpiPushError: textPtr(c.GlpiPushError)}
+			GlpiPush: c.GlpiPushState.String, GlpiPushError: textPtr(c.GlpiPushError), Via: textPtr(c.Via)}
 		if c.CreatedAt.Valid {
 			comment.CreatedAt = c.CreatedAt.Time
 		}

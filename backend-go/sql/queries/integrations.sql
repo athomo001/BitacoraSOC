@@ -11,6 +11,8 @@ SELECT d.*,
      (o.grp = 'audit' AND d.send_audit AND (CASE o.level WHEN 'info' THEN 0 WHEN 'warn' THEN 1 ELSE 2 END) >= (CASE d.audit_level WHEN 'info' THEN 0 WHEN 'warn' THEN 1 ELSE 2 END))
      OR (o.grp = 'entries' AND d.send_entries) OR (o.grp = 'escalation' AND d.send_escalation) OR (o.grp = 'tickets' AND d.send_tickets)))::int AS pending
 FROM forward_destinations d
+-- Los de los complementos (10i) se administran desde su ficha.
+WHERE d.complement_id IS NULL
 ORDER BY d.created_at;
 
 -- name: GetForwardDestination :one
@@ -73,6 +75,8 @@ WHERE o.id > sqlc.arg('cursor_id') AND (
   OR (o.grp = 'entries' AND sqlc.arg('send_entries')::boolean)
   OR (o.grp = 'escalation' AND sqlc.arg('send_escalation')::boolean)
   OR (o.grp = 'tickets' AND sqlc.arg('send_tickets')::boolean))
+  -- Un complemento recibe solo los eventos que se le aprobaron (10i).
+  AND (sqlc.narg('events')::text[] IS NULL OR o.event = ANY(sqlc.narg('events')::text[]))
 ORDER BY o.id
 LIMIT sqlc.arg('max_rows');
 
@@ -84,7 +88,8 @@ WHERE o.id > sqlc.arg('cursor_id') AND o.created_at < now() - interval '7 days' 
   (o.grp = 'audit' AND sqlc.arg('send_audit')::boolean AND (CASE o.level WHEN 'info' THEN 0 WHEN 'warn' THEN 1 ELSE 2 END) >= sqlc.arg('min_rank')::int)
   OR (o.grp = 'entries' AND sqlc.arg('send_entries')::boolean)
   OR (o.grp = 'escalation' AND sqlc.arg('send_escalation')::boolean)
-  OR (o.grp = 'tickets' AND sqlc.arg('send_tickets')::boolean));
+  OR (o.grp = 'tickets' AND sqlc.arg('send_tickets')::boolean))
+  AND (sqlc.narg('events')::text[] IS NULL OR o.event = ANY(sqlc.narg('events')::text[]));
 
 -- name: AdvanceForwardCursor :exec
 UPDATE forward_destinations SET cursor_id = GREATEST(cursor_id, sqlc.arg('cursor_id')) WHERE id = sqlc.arg('id');
@@ -132,12 +137,13 @@ RETURNING *;
 
 -- name: ListAPIKeys :many
 SELECT k.*, COALESCE(u.username, '')::text AS created_by_name, COALESCE(rb.username, '')::text AS revoked_by_name,
-  COALESCE(a.name, '')::text AS area_name,
+  COALESCE(a.name, '')::text AS area_name, COALESCE(c.name, '')::text AS complement_name,
   (SELECT count(*) FROM api_key_requests r WHERE r.api_key_id = k.id AND r.created_at > now() - interval '7 days')::int AS calls_week
 FROM api_keys k
 LEFT JOIN users u ON u.id = k.created_by
 LEFT JOIN users rb ON rb.id = k.revoked_by
 LEFT JOIN areas a ON a.id = k.area_id
+LEFT JOIN complements c ON c.id = k.complement_id
 ORDER BY k.active DESC, k.created_at DESC;
 
 -- name: GetAPIKey :one
@@ -229,6 +235,9 @@ WHERE t.merged_into_id IS NULL
   AND (sqlc.narg('client_ids')::uuid[] IS NULL OR t.client_id = ANY(sqlc.narg('client_ids')::uuid[]))
   AND (sqlc.narg('client_id')::uuid IS NULL OR t.client_id = sqlc.narg('client_id'))
   AND (sqlc.narg('status')::text IS NULL OR t.status::text = sqlc.narg('status'))
+  -- Un informe de un complemento pide como la persona que lo abre (10i): ve
+  -- las colas de sus áreas, igual que en la Ticketera.
+  AND (sqlc.narg('visible_areas')::uuid[] IS NULL OR t.area_id = ANY(sqlc.narg('visible_areas')::uuid[]) OR t.requested_area_id = ANY(sqlc.narg('visible_areas')::uuid[]))
   AND (sqlc.narg('since')::timestamptz IS NULL OR t.updated_at >= sqlc.narg('since'))
   AND (sqlc.narg('before_at')::timestamptz IS NULL OR (t.created_at, t.id) < (sqlc.narg('before_at')::timestamptz, sqlc.narg('before_id')::uuid))
 ORDER BY t.created_at DESC, t.id DESC

@@ -15,6 +15,8 @@ import { AssetCsvComponent } from './asset-csv';
 import { AssetGroupsComponent } from './asset-groups';
 import { coordsLabel } from './location-fields';
 
+import { ComplementSlot, ComplementsService } from '../../core/complements/complements.service';
+import { ComplementFrameComponent } from '../../shared/complement-frame/complement-frame';
 import '../../core/i18n/packs/inventory';
 
 type Panel = 'detail' | 'new' | 'edit' | 'csv' | 'requests' | 'groups';
@@ -35,7 +37,7 @@ const EVENT_ICON: Record<AssetEvent['kind'], string> = {
 @Component({
   selector: 'app-inventory',
   standalone: true,
-  imports: [MatIconModule, DatePipe, RouterLink, AssetFormComponent, AssetCsvComponent, AssetGroupsComponent],
+  imports: [MatIconModule, DatePipe, RouterLink, AssetFormComponent, AssetCsvComponent, AssetGroupsComponent, ComplementFrameComponent],
   templateUrl: './inventory.html',
   styleUrl: './inventory.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -74,7 +76,16 @@ export class InventoryComponent implements OnInit {
   protected readonly selectedId = signal<string | null>(null);
   protected readonly asset = signal<InventoryAsset | null>(null);
   protected readonly panel = signal<Panel>('detail');
-  protected readonly tab = signal<'history' | 'tickets'>('history');
+  protected readonly tab = signal<'history' | 'tickets' | `c:${string}`>('history');
+  private readonly complements = inject(ComplementsService);
+  /** Pestañas que suman los complementos aprobados (10i). */
+  protected readonly panels = computed(() => this.complements.slots().panels.filter((p) => p.target === 'asset'));
+  protected readonly currentPanel = computed(() => this.panels().find((p) => this.panelTab(p) === this.tab()) ?? null);
+
+  protected panelTab(p: ComplementSlot): `c:${string}` {
+    return `c:${p.slug}|${p.key}`;
+  }
+
   protected readonly error = signal<string | null>(null);
   protected readonly busy = signal(false);
   protected readonly loaded = signal(false);

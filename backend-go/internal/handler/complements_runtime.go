@@ -301,3 +301,44 @@ func (a *RuntimeAPI) Log(w http.ResponseWriter, r *http.Request, c db.Complement
 	})
 	writeLegacyJSON(w, http.StatusAccepted, map[string]string{"message": "Log recibido"})
 }
+
+// Settings es GET /api/internal/v1/settings: la configuración aprobada del
+// complemento, con los secretos descifrados (10i). Sin «Configuración»
+// aprobada devuelve vacío.
+func (a *RuntimeAPI) Settings(w http.ResponseWriter, r *http.Request, c db.Complement) {
+	h := a.Complements
+	m, eff := effectiveOf(c)
+	out := publicSettings(m, eff, settingsOf(c))
+	if eff["settings"] {
+		secrets := h.secretsOf(c)
+		for _, f := range m.Settings {
+			if f.Type == "secret" {
+				out[f.Key] = secrets[f.Key]
+			}
+		}
+	}
+	writeLegacyJSON(w, http.StatusOK, map[string]any{"success": true, "settings": out})
+}
+
+// Credentials es GET /api/internal/v1/credentials: la llave de la API de
+// integraciones (con los permisos de datos aprobados) y el secreto con que
+// se firman los ganchos. El servicio los pide aquí en vez de copiarlos a
+// mano; cambian al volver a aprobar.
+func (a *RuntimeAPI) Credentials(w http.ResponseWriter, r *http.Request, c db.Complement) {
+	h := a.Complements
+	m, eff := effectiveOf(c)
+	base := strings.TrimRight(h.InternalAPIURL, "/")
+	if base == "" {
+		base = strings.TrimRight(h.AppOrigin, "/")
+	}
+	out := map[string]any{"success": true, "apiBaseUrl": base + "/api/v1", "scopes": m.ApprovedData(eff),
+		"integrationKey": nil, "hookSecret": nil}
+	if key := h.decrypt(c.IntegrationKeyEncrypted); key != "" {
+		out["integrationKey"] = key
+	}
+	if secret := h.decrypt(c.HookSecretEncrypted); secret != "" {
+		out["hookSecret"] = secret
+	}
+	h.AuditLog.Log(r.Context(), "complement.credentials.read", audit.LevelInfo, audit.Success(), map[string]any{"slug": c.Slug})
+	writeLegacyJSON(w, http.StatusOK, out)
+}

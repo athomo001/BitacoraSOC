@@ -2,8 +2,8 @@
 -- Un seguimiento deja la entrada «En seguimiento» (10j), también los de
 -- sistema que deja Escalamiento.
 WITH inserted AS (
-  INSERT INTO entry_comments (entry_id, user_id, comment, is_system_generated)
-  VALUES ($1, $2, $3, $4) RETURNING *
+  INSERT INTO entry_comments (entry_id, user_id, comment, is_system_generated, via)
+  VALUES ($1, $2, $3, $4, sqlc.narg('via')) RETURNING *
 ), opened AS (
   UPDATE entries SET follow_up_open = true, follow_up_closed_at = NULL, follow_up_closed_by = NULL, follow_up_close_note = NULL
   WHERE id = $1

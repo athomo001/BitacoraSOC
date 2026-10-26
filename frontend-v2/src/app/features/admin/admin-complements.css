@@ -230,3 +230,17 @@ mat-icon {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* 10i: lo que espera revisión, en la lista. */
+.ac__pending {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--status-warning);
+}
+
+.ac__pending mat-icon {
+  width: 14px;
+  height: 14px;
+  font-size: 14px;
+}

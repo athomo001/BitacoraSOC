@@ -24,6 +24,10 @@ import { defangWithCount } from '../../core/entries/defang';
 import { Entry, EntryAuthor, EntryComment, EntryDetail, EntryFilters, EntryScope, EntryType, EntriesService, TagSuggestion } from '../../core/entries/entries.service';
 import { openCsvImport } from '../../shared/csv-import/open-csv-import';
 
+import { ComplementsService } from '../../core/complements/complements.service';
+import { ComplementFrameComponent } from '../../shared/complement-frame/complement-frame';
+import { ComplementActionsComponent } from '../../shared/complement-frame/complement-actions';
+import '../../core/i18n/packs/complement-features';
 import '../../core/i18n/packs/glpi';
 import '../../core/i18n/packs/entries';
 import '../../core/i18n/packs/imports';
@@ -66,7 +70,7 @@ function summaryOf(content: string): string {
 @Component({
   selector: 'app-entries',
   standalone: true,
-  imports: [FormsModule, DatePipe, MatIconModule, MarkdownComponent, AuthImgDirective, RouterLink],
+  imports: [FormsModule, DatePipe, MatIconModule, MarkdownComponent, AuthImgDirective, RouterLink, ComplementFrameComponent, ComplementActionsComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { '(document:keydown)': 'onKeydown($event)' },
   templateUrl: './entries.html',
@@ -476,6 +480,23 @@ export class EntriesComponent implements OnInit {
       this.error.set(problemDetail(error, this.i18n.t('entries.linkError')));
     } finally {
       this.linkBusy.set(false);
+    }
+  }
+
+  /** Pestañas de complementos aprobadas para una entrada (10i), como secciones plegables. */
+  private readonly complements = inject(ComplementsService);
+  protected readonly entryPanels = computed(() => this.complements.slots().panels.filter((p) => p.target === 'entry'));
+
+  /** Un complemento dejó un seguimiento: se relee la entrada abierta. */
+  protected async reloadSelected(): Promise<void> {
+    const entry = this.selected();
+    if (!entry) return;
+    try {
+      const fresh = await this.api.get(entry.id);
+      if (this.selected()?.id === fresh.id) this.selected.set(fresh);
+      this.patchListed(fresh.id, { followUpOpen: fresh.followUpOpen, followUpCount: fresh.comments.length, lastFollowUpAt: fresh.lastFollowUpAt });
+    } catch {
+      // Se ve al volver a abrirla.
     }
   }
 

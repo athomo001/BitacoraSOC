@@ -14,6 +14,8 @@ import (
 type Querier interface {
 	AckClientAlert(ctx context.Context, arg AckClientAlertParams) error
 	AcknowledgeShiftClosure(ctx context.Context, arg AcknowledgeShiftClosureParams) (ShiftClosure, error)
+	// Un solo nodo la dispara: préstamo de 2 minutos.
+	AcquireComplementSchedule(ctx context.Context, arg AcquireComplementScheduleParams) (ComplementSchedule, error)
 	// Un solo nodo envía cada destino (spec/09): el préstamo dura 30 s y el
 	// otro nodo lo respeta.
 	AcquireForwardLease(ctx context.Context, arg AcquireForwardLeaseParams) (ForwardDestination, error)
@@ -153,6 +155,7 @@ type Querier interface {
 	CreateClientAlertRule(ctx context.Context, arg CreateClientAlertRuleParams) (ClientAlertRule, error)
 	CreateClientNote(ctx context.Context, arg CreateClientNoteParams) (ClientNote, error)
 	CreateComplement(ctx context.Context, arg CreateComplementParams) (Complement, error)
+	CreateComplementAPIKey(ctx context.Context, arg CreateComplementAPIKeyParams) (ApiKey, error)
 	// Entrada creada por un complemento (Runtime API o CREATE_ENTRY del iframe).
 	CreateComplementEntry(ctx context.Context, arg CreateComplementEntryParams) (Entry, error)
 	CreateComplementUpload(ctx context.Context, arg CreateComplementUploadParams) (CreateComplementUploadRow, error)
@@ -278,7 +281,9 @@ type Querier interface {
 	// Archivos y storage caen por CASCADE; las entradas quedan (FK en NULL) con
 	// su owner_complement_name.
 	DeleteComplement(ctx context.Context, id uuid.UUID) (int64, error)
+	DeleteComplementDestination(ctx context.Context, complementID pgtype.UUID) error
 	DeleteComplementFiles(ctx context.Context, complementID uuid.UUID) error
+	DeleteComplementSchedulesExcept(ctx context.Context, arg DeleteComplementSchedulesExceptParams) error
 	DeleteComplementUpload(ctx context.Context, id uuid.UUID) error
 	DeleteContactChannel(ctx context.Context, arg DeleteContactChannelParams) (int64, error)
 	// Sus áreas quedan sin departamento (ON DELETE SET NULL) y su grupo de
@@ -399,6 +404,7 @@ type Querier interface {
 	FindTeamMemberByUser(ctx context.Context, arg FindTeamMemberByUserParams) (uuid.UUID, error)
 	// usuario del CSV del legacy: username, correo o nombre completo.
 	FindUserForGuardImport(ctx context.Context, q_ string) (FindUserForGuardImportRow, error)
+	FinishComplementSchedule(ctx context.Context, arg FinishComplementScheduleParams) error
 	FinishGlpiRun(ctx context.Context, arg FinishGlpiRunParams) error
 	FinishGlpiTicketRun(ctx context.Context, arg FinishGlpiTicketRunParams) error
 	FinishIdempotency(ctx context.Context, arg FinishIdempotencyParams) error
@@ -447,7 +453,10 @@ type Querier interface {
 	GetChecklistTemplate(ctx context.Context, id uuid.UUID) (ChecklistTemplate, error)
 	GetClientAlertRule(ctx context.Context, id uuid.UUID) (ClientAlertRule, error)
 	GetClientNote(ctx context.Context, id uuid.UUID) (ClientNote, error)
+	GetComplementAPIKey(ctx context.Context, complementID pgtype.UUID) (ApiKey, error)
+	GetComplementByID(ctx context.Context, id uuid.UUID) (Complement, error)
 	GetComplementBySlug(ctx context.Context, slug string) (Complement, error)
+	GetComplementDestination(ctx context.Context, complementID pgtype.UUID) (ForwardDestination, error)
 	GetComplementFile(ctx context.Context, arg GetComplementFileParams) (GetComplementFileRow, error)
 	GetComplementStorage(ctx context.Context, arg GetComplementStorageParams) (ComplementStorage, error)
 	GetComplementUpload(ctx context.Context, id uuid.UUID) (ComplementUpload, error)
@@ -720,6 +729,7 @@ type Querier interface {
 	// Los clientes que atienden esas áreas (tienen tickets en ellas): los que ve
 	// una CSM con alcance, además de los suyos.
 	ListClientsWithTicketsInAreas(ctx context.Context, areaIds []uuid.UUID) ([]uuid.UUID, error)
+	ListComplementSchedules(ctx context.Context, complementID uuid.UUID) ([]ComplementSchedule, error)
 	ListComplementStorage(ctx context.Context, arg ListComplementStorageParams) ([]ComplementStorage, error)
 	// Complementos (spec/11-complementos.md, Fase 13b).
 	ListComplements(ctx context.Context) ([]Complement, error)
@@ -744,6 +754,7 @@ type Querier interface {
 	// admiten búsqueda parcial (ILIKE).
 	ListDirectory(ctx context.Context, arg ListDirectoryParams) ([]ListDirectoryRow, error)
 	ListDrafts(ctx context.Context, arg ListDraftsParams) ([]EntryDraft, error)
+	ListDueComplementSchedules(ctx context.Context) ([]ListDueComplementSchedulesRow, error)
 	ListDueForwardDestinations(ctx context.Context) ([]uuid.UUID, error)
 	ListDueNotices(ctx context.Context) ([]ListDueNoticesRow, error)
 	ListDueTicketMails(ctx context.Context, now pgtype.Timestamptz) ([]TicketMailOutbox, error)
@@ -795,6 +806,7 @@ type Querier interface {
 	// Reenvío de eventos a un SIEM y API de integraciones (spec/19, 10b).
 	// ===== Destinos del reenvío =====
 	// Con sus cifras: enviados hoy, perdidos en 7 días y lo que espera en cola.
+	// Los de los complementos (10i) se administran desde su ficha.
 	ListForwardDestinations(ctx context.Context, today pgtype.Date) ([]ListForwardDestinationsRow, error)
 	// Qué grupos pide algún destino encendido: sin destinos, no se encola nada.
 	ListForwardSubscriptions(ctx context.Context) ([]ListForwardSubscriptionsRow, error)
@@ -1276,9 +1288,11 @@ type Querier interface {
 	RetryGlpiOutbox(ctx context.Context, id pgtype.UUID) (int64, error)
 	RetryTicketMail(ctx context.Context, arg RetryTicketMailParams) (int64, error)
 	RevokeAPIKey(ctx context.Context, arg RevokeAPIKeyParams) (ApiKey, error)
+	RevokeComplementAPIKeys(ctx context.Context, arg RevokeComplementAPIKeysParams) error
 	// ===== Enlaces públicos: el de teletrabajo (/p/telework) y los de la 10h, que se
 	// administran en Administración → Enlaces públicos (public_links.sql) =====
 	RotatePublicShareLink(ctx context.Context, arg RotatePublicShareLinkParams) (PublicShareLink, error)
+	SetAPIKeyScopes(ctx context.Context, arg SetAPIKeyScopesParams) error
 	SetAgendaFlowActive(ctx context.Context, arg SetAgendaFlowActiveParams) (int64, error)
 	SetAgendaTaskActive(ctx context.Context, arg SetAgendaTaskActiveParams) (int64, error)
 	SetAgendaTaskApplication(ctx context.Context, arg SetAgendaTaskApplicationParams) error
@@ -1295,7 +1309,15 @@ type Querier interface {
 	SetBrandingLogo(ctx context.Context, arg SetBrandingLogoParams) error
 	SetCalendarFeedWindows(ctx context.Context, arg SetCalendarFeedWindowsParams) (int64, error)
 	SetChecklistCooldown(ctx context.Context, shiftCheckCooldownMinutes int32) (int32, error)
+	SetComplementApprovals(ctx context.Context, arg SetComplementApprovalsParams) (Complement, error)
 	SetComplementArtifact(ctx context.Context, arg SetComplementArtifactParams) error
+	// La llave de integraciones y el secreto de los ganchos, cifrados; el
+	// servicio los pide con su token de aplicación.
+	SetComplementCredentials(ctx context.Context, arg SetComplementCredentialsParams) error
+	// ===== Complementos que agregan funciones (10i, spec/11 §12) =====
+	// Una versión nueva: lo aprobado que ya no declara se olvida en Go.
+	SetComplementManifest(ctx context.Context, arg SetComplementManifestParams) (Complement, error)
+	SetComplementSettings(ctx context.Context, arg SetComplementSettingsParams) error
 	SetComplementToken(ctx context.Context, arg SetComplementTokenParams) error
 	// email/phone de contacts son la copia denormalizada del canal preferido de
 	// cada tipo (la fuente de verdad son contact_channels), cifrada + indexada
@@ -1496,6 +1518,11 @@ type Querier interface {
 	UpsertAssignment(ctx context.Context, arg UpsertAssignmentParams) (WorkShiftAssignment, error)
 	// Generar uno nuevo deja inútil el anterior.
 	UpsertCalendarFeed(ctx context.Context, arg UpsertCalendarFeedParams) error
+	// Destino HTTP interno del complemento con los eventos aprobados. Al crearse
+	// parte desde ahora: no recibe lo de antes.
+	UpsertComplementDestination(ctx context.Context, arg UpsertComplementDestinationParams) (ForwardDestination, error)
+	// Si la tarea ya existía se queda con la próxima ejecución más cercana.
+	UpsertComplementSchedule(ctx context.Context, arg UpsertComplementScheduleParams) error
 	UpsertComplementStorage(ctx context.Context, arg UpsertComplementStorageParams) (ComplementStorage, error)
 	UpsertDotacionDay(ctx context.Context, arg UpsertDotacionDayParams) error
 	// Borradores (Autosave, HU-7d): generaliza personal_notes a cualquier

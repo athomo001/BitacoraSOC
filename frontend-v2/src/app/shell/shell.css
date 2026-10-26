@@ -325,3 +325,6 @@
     padding: 0;
   }
 }
+
+/* 10i: bajo la barra de un complemento (32px) */
+.shell--bar { height: calc(100% - 32px); }

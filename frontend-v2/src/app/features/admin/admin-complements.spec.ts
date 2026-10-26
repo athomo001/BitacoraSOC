@@ -8,11 +8,13 @@ const DOOM: Complement = {
   slug: 'doom-browser', name: 'DOOM', icon: 'sports_esports', sourceType: 'zip_static', status: 'active', entryPath: 'index.html',
   scopes: [], allowedCollections: [], connectHosts: [], visibleRoles: ['admin', 'user'], visiblePermissionGroupIds: [], hasToken: false,
   artifactFiles: 11, artifactBytes: 8_120_000, artifactSha256: '3f9ad21c0000', publishedAt: '2026-09-28T17:02:00Z', circuit: 'CLOSED',
+  items: [], approved: [], isHouse: false,
 };
 const MAPA: Complement = {
   slug: 'mapa-enlaces', name: 'Mapa de enlaces', icon: 'hub', sourceType: 'manual', status: 'active', entryPath: '/', baseUrl: 'https://mapa.x.cl',
   healthPath: '/health', scopes: ['READ_CONTEXT'], allowedCollections: [], connectHosts: [], visibleRoles: [], visiblePermissionGroupIds: [],
   hasToken: true, tokenIssuedAt: '2026-09-27T10:00:00Z', circuit: 'OPEN',
+  items: [], approved: [], isHouse: false,
 };
 
 /** Deja correr las promesas pendientes (la app no usa zone.js). */
@@ -109,5 +111,40 @@ describe('AdminComplementsComponent', () => {
     await refresh();
     const req = http.expectOne((r) => r.method === 'PATCH' && r.url === '/api/complements/mapa-enlaces');
     expect(req.request.body).toEqual({ scopes: ['READ_CONTEXT', 'WRITE_ENTRIES'], allowedCollections: ['entries'] });
+  });
+
+  // 10i: lo que declara complement.json se aprueba cosa por cosa.
+  const VT: Complement = {
+    ...MAPA, slug: 'virustotal', name: 'VirusTotal', circuit: 'CLOSED',
+    manifest: { version: '1.3.0', panels: [{ id: 'reputacion', target: 'ticket', title: 'Reputación' }], topbar: { path: 'barra.html' }, data: ['entries:read'] },
+    items: [{ key: 'panel:reputacion', kind: 'panel', house: false }, { key: 'topbar', kind: 'topbar', house: true }, { key: 'data:entries:read', kind: 'data', house: false }],
+    approved: ['data:entries:read'], isHouse: false,
+  };
+
+  it('lo que espera revisión se ve en la lista y abre «Qué agrega»; aprobar guarda solo esa cosa', async () => {
+    const fixture = TestBed.createComponent(AdminComplementsComponent);
+    fixture.detectChanges();
+    http.expectOne('/api/complements').flush({ data: [VT] });
+    http.expectOne('/api/permission-groups').flush({ data: [] });
+    await settle();
+    http.expectOne('/api/complements/virustotal').flush({ data: VT });
+    await settle();
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    // La barra pide «de la casa»: no cuenta como pendiente.
+    expect(el.querySelector('tbody tr')?.textContent).toContain('1 por revisar');
+    expect(el.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toContain('Qué agrega');
+    expect(el.textContent).toContain('Esta versión pide 1 cosa nueva');
+    const rows = [...el.querySelectorAll('.ca__row')].map((r) => r.textContent ?? '');
+    expect(rows.find((r) => r.includes('Pestaña en el ticket'))).toContain('Esperando tu revisión');
+    const bar = rows.find((r) => r.includes('Barra superior')) ?? '';
+    expect(bar).toContain('Requiere «de la casa»');
+    expect(bar).not.toContain('Aprobar');
+    expect(rows.find((r) => r.includes('Lee entradas de la Bitácora'))).toContain('Aprobado');
+    const approve = [...el.querySelectorAll('.ca__row')].find((r) => r.textContent?.includes('Pestaña en el ticket'))?.querySelector('button') as HTMLButtonElement;
+    approve.click();
+    await settle();
+    const req = http.expectOne((r) => r.method === 'PUT' && r.url === '/api/complements/virustotal/approvals');
+    expect(req.request.body).toEqual({ approved: ['data:entries:read', 'panel:reputacion'], house: false });
   });
 });

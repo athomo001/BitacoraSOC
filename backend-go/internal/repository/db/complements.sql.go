@@ -12,6 +12,35 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const acquireComplementSchedule = `-- name: AcquireComplementSchedule :one
+UPDATE complement_schedules SET lease_until = now() + interval '2 minutes', lease_owner = $1
+WHERE complement_id = $2 AND name = $3 AND next_run_at <= now()
+  AND (lease_until IS NULL OR lease_until < now())
+RETURNING complement_id, name, next_run_at, lease_until, lease_owner, last_run_at, last_status
+`
+
+type AcquireComplementScheduleParams struct {
+	Owner        pgtype.Text `json:"owner"`
+	ComplementID uuid.UUID   `json:"complement_id"`
+	Name         string      `json:"name"`
+}
+
+// Un solo nodo la dispara: préstamo de 2 minutos.
+func (q *Queries) AcquireComplementSchedule(ctx context.Context, arg AcquireComplementScheduleParams) (ComplementSchedule, error) {
+	row := q.db.QueryRow(ctx, acquireComplementSchedule, arg.Owner, arg.ComplementID, arg.Name)
+	var i ComplementSchedule
+	err := row.Scan(
+		&i.ComplementID,
+		&i.Name,
+		&i.NextRunAt,
+		&i.LeaseUntil,
+		&i.LeaseOwner,
+		&i.LastRunAt,
+		&i.LastStatus,
+	)
+	return i, err
+}
+
 const claimComplementTicket = `-- name: ClaimComplementTicket :execrows
 INSERT INTO token_denylist (jti, user_id, expires_at) VALUES ($1, $2, $3) ON CONFLICT (jti) DO NOTHING
 `
@@ -58,7 +87,7 @@ INSERT INTO complements (
   slug, name, description, icon, source_type, status, entry_path, base_url, internal_base_url, health_path,
   scopes, allowed_collections, connect_hosts, visible_roles, visible_permission_group_ids, created_by
 ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
-RETURNING id, slug, name, description, icon, source_type, status, entry_path, base_url, internal_base_url, health_path, api_version, scopes, allowed_collections, connect_hosts, visible_roles, visible_permission_group_ids, token_hash, token_issued_at, artifact_sha256, artifact_bytes, artifact_files, published_at, created_by, created_at, updated_at
+RETURNING id, slug, name, description, icon, source_type, status, entry_path, base_url, internal_base_url, health_path, api_version, scopes, allowed_collections, connect_hosts, visible_roles, visible_permission_group_ids, token_hash, token_issued_at, artifact_sha256, artifact_bytes, artifact_files, published_at, created_by, created_at, updated_at, manifest, approved, is_house, settings, secrets_encrypted, integration_key_encrypted, hook_secret_encrypted
 `
 
 type CreateComplementParams struct {
@@ -127,6 +156,62 @@ func (q *Queries) CreateComplement(ctx context.Context, arg CreateComplementPara
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Manifest,
+		&i.Approved,
+		&i.IsHouse,
+		&i.Settings,
+		&i.SecretsEncrypted,
+		&i.IntegrationKeyEncrypted,
+		&i.HookSecretEncrypted,
+	)
+	return i, err
+}
+
+const createComplementAPIKey = `-- name: CreateComplementAPIKey :one
+INSERT INTO api_keys (name, description, key_prefix, key_hash, scopes, created_by, complement_id)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+RETURNING id, name, key_prefix, key_hash, scopes, active, last_used_at, expires_at, created_by, created_at, description, client_ids, area_id, revoked_at, revoked_by, revoke_reason, complement_id
+`
+
+type CreateComplementAPIKeyParams struct {
+	Name         string      `json:"name"`
+	Description  string      `json:"description"`
+	KeyPrefix    string      `json:"key_prefix"`
+	KeyHash      string      `json:"key_hash"`
+	Scopes       []string    `json:"scopes"`
+	CreatedBy    pgtype.UUID `json:"created_by"`
+	ComplementID pgtype.UUID `json:"complement_id"`
+}
+
+func (q *Queries) CreateComplementAPIKey(ctx context.Context, arg CreateComplementAPIKeyParams) (ApiKey, error) {
+	row := q.db.QueryRow(ctx, createComplementAPIKey,
+		arg.Name,
+		arg.Description,
+		arg.KeyPrefix,
+		arg.KeyHash,
+		arg.Scopes,
+		arg.CreatedBy,
+		arg.ComplementID,
+	)
+	var i ApiKey
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.KeyPrefix,
+		&i.KeyHash,
+		&i.Scopes,
+		&i.Active,
+		&i.LastUsedAt,
+		&i.ExpiresAt,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.Description,
+		&i.ClientIds,
+		&i.AreaID,
+		&i.RevokedAt,
+		&i.RevokedBy,
+		&i.RevokeReason,
+		&i.ComplementID,
 	)
 	return i, err
 }
@@ -241,12 +326,35 @@ func (q *Queries) DeleteComplement(ctx context.Context, id uuid.UUID) (int64, er
 	return result.RowsAffected(), nil
 }
 
+const deleteComplementDestination = `-- name: DeleteComplementDestination :exec
+DELETE FROM forward_destinations WHERE complement_id = $1
+`
+
+func (q *Queries) DeleteComplementDestination(ctx context.Context, complementID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, deleteComplementDestination, complementID)
+	return err
+}
+
 const deleteComplementFiles = `-- name: DeleteComplementFiles :exec
 DELETE FROM complement_files WHERE complement_id = $1
 `
 
 func (q *Queries) DeleteComplementFiles(ctx context.Context, complementID uuid.UUID) error {
 	_, err := q.db.Exec(ctx, deleteComplementFiles, complementID)
+	return err
+}
+
+const deleteComplementSchedulesExcept = `-- name: DeleteComplementSchedulesExcept :exec
+DELETE FROM complement_schedules WHERE complement_id = $1 AND NOT (name = ANY($2::text[]))
+`
+
+type DeleteComplementSchedulesExceptParams struct {
+	ComplementID uuid.UUID `json:"complement_id"`
+	Keep         []string  `json:"keep"`
+}
+
+func (q *Queries) DeleteComplementSchedulesExcept(ctx context.Context, arg DeleteComplementSchedulesExceptParams) error {
+	_, err := q.db.Exec(ctx, deleteComplementSchedulesExcept, arg.ComplementID, arg.Keep)
 	return err
 }
 
@@ -271,8 +379,105 @@ func (q *Queries) DeleteExpiredComplementUploads(ctx context.Context) (int64, er
 	return result.RowsAffected(), nil
 }
 
+const finishComplementSchedule = `-- name: FinishComplementSchedule :exec
+UPDATE complement_schedules SET next_run_at = $1, last_run_at = now(), last_status = $2,
+  lease_until = NULL, lease_owner = NULL
+WHERE complement_id = $3 AND name = $4
+`
+
+type FinishComplementScheduleParams struct {
+	NextRunAt    pgtype.Timestamptz `json:"next_run_at"`
+	Status       pgtype.Text        `json:"status"`
+	ComplementID uuid.UUID          `json:"complement_id"`
+	Name         string             `json:"name"`
+}
+
+func (q *Queries) FinishComplementSchedule(ctx context.Context, arg FinishComplementScheduleParams) error {
+	_, err := q.db.Exec(ctx, finishComplementSchedule,
+		arg.NextRunAt,
+		arg.Status,
+		arg.ComplementID,
+		arg.Name,
+	)
+	return err
+}
+
+const getComplementAPIKey = `-- name: GetComplementAPIKey :one
+SELECT id, name, key_prefix, key_hash, scopes, active, last_used_at, expires_at, created_by, created_at, description, client_ids, area_id, revoked_at, revoked_by, revoke_reason, complement_id FROM api_keys WHERE complement_id = $1 AND active
+`
+
+func (q *Queries) GetComplementAPIKey(ctx context.Context, complementID pgtype.UUID) (ApiKey, error) {
+	row := q.db.QueryRow(ctx, getComplementAPIKey, complementID)
+	var i ApiKey
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.KeyPrefix,
+		&i.KeyHash,
+		&i.Scopes,
+		&i.Active,
+		&i.LastUsedAt,
+		&i.ExpiresAt,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.Description,
+		&i.ClientIds,
+		&i.AreaID,
+		&i.RevokedAt,
+		&i.RevokedBy,
+		&i.RevokeReason,
+		&i.ComplementID,
+	)
+	return i, err
+}
+
+const getComplementByID = `-- name: GetComplementByID :one
+SELECT id, slug, name, description, icon, source_type, status, entry_path, base_url, internal_base_url, health_path, api_version, scopes, allowed_collections, connect_hosts, visible_roles, visible_permission_group_ids, token_hash, token_issued_at, artifact_sha256, artifact_bytes, artifact_files, published_at, created_by, created_at, updated_at, manifest, approved, is_house, settings, secrets_encrypted, integration_key_encrypted, hook_secret_encrypted FROM complements WHERE id = $1
+`
+
+func (q *Queries) GetComplementByID(ctx context.Context, id uuid.UUID) (Complement, error) {
+	row := q.db.QueryRow(ctx, getComplementByID, id)
+	var i Complement
+	err := row.Scan(
+		&i.ID,
+		&i.Slug,
+		&i.Name,
+		&i.Description,
+		&i.Icon,
+		&i.SourceType,
+		&i.Status,
+		&i.EntryPath,
+		&i.BaseUrl,
+		&i.InternalBaseUrl,
+		&i.HealthPath,
+		&i.ApiVersion,
+		&i.Scopes,
+		&i.AllowedCollections,
+		&i.ConnectHosts,
+		&i.VisibleRoles,
+		&i.VisiblePermissionGroupIds,
+		&i.TokenHash,
+		&i.TokenIssuedAt,
+		&i.ArtifactSha256,
+		&i.ArtifactBytes,
+		&i.ArtifactFiles,
+		&i.PublishedAt,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Manifest,
+		&i.Approved,
+		&i.IsHouse,
+		&i.Settings,
+		&i.SecretsEncrypted,
+		&i.IntegrationKeyEncrypted,
+		&i.HookSecretEncrypted,
+	)
+	return i, err
+}
+
 const getComplementBySlug = `-- name: GetComplementBySlug :one
-SELECT id, slug, name, description, icon, source_type, status, entry_path, base_url, internal_base_url, health_path, api_version, scopes, allowed_collections, connect_hosts, visible_roles, visible_permission_group_ids, token_hash, token_issued_at, artifact_sha256, artifact_bytes, artifact_files, published_at, created_by, created_at, updated_at FROM complements WHERE slug = $1
+SELECT id, slug, name, description, icon, source_type, status, entry_path, base_url, internal_base_url, health_path, api_version, scopes, allowed_collections, connect_hosts, visible_roles, visible_permission_group_ids, token_hash, token_issued_at, artifact_sha256, artifact_bytes, artifact_files, published_at, created_by, created_at, updated_at, manifest, approved, is_house, settings, secrets_encrypted, integration_key_encrypted, hook_secret_encrypted FROM complements WHERE slug = $1
 `
 
 func (q *Queries) GetComplementBySlug(ctx context.Context, slug string) (Complement, error) {
@@ -305,6 +510,60 @@ func (q *Queries) GetComplementBySlug(ctx context.Context, slug string) (Complem
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Manifest,
+		&i.Approved,
+		&i.IsHouse,
+		&i.Settings,
+		&i.SecretsEncrypted,
+		&i.IntegrationKeyEncrypted,
+		&i.HookSecretEncrypted,
+	)
+	return i, err
+}
+
+const getComplementDestination = `-- name: GetComplementDestination :one
+SELECT id, name, enabled, transport, host, port, url, format, batch, send_audit, audit_level, send_entries, send_escalation, send_tickets, ca_cert, client_cert, client_key_encrypted, header_names, headers_encrypted, cursor_id, lease_until, lease_owner, next_attempt_at, failures, failing_since, down_alerted, last_sent_at, last_error, last_error_at, created_by, created_at, updated_at, complement_id, events, hmac_secret_encrypted FROM forward_destinations WHERE complement_id = $1
+`
+
+func (q *Queries) GetComplementDestination(ctx context.Context, complementID pgtype.UUID) (ForwardDestination, error) {
+	row := q.db.QueryRow(ctx, getComplementDestination, complementID)
+	var i ForwardDestination
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Enabled,
+		&i.Transport,
+		&i.Host,
+		&i.Port,
+		&i.Url,
+		&i.Format,
+		&i.Batch,
+		&i.SendAudit,
+		&i.AuditLevel,
+		&i.SendEntries,
+		&i.SendEscalation,
+		&i.SendTickets,
+		&i.CaCert,
+		&i.ClientCert,
+		&i.ClientKeyEncrypted,
+		&i.HeaderNames,
+		&i.HeadersEncrypted,
+		&i.CursorID,
+		&i.LeaseUntil,
+		&i.LeaseOwner,
+		&i.NextAttemptAt,
+		&i.Failures,
+		&i.FailingSince,
+		&i.DownAlerted,
+		&i.LastSentAt,
+		&i.LastError,
+		&i.LastErrorAt,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.ComplementID,
+		&i.Events,
+		&i.HmacSecretEncrypted,
 	)
 	return i, err
 }
@@ -398,6 +657,38 @@ func (q *Queries) InsertComplementFile(ctx context.Context, arg InsertComplement
 	return err
 }
 
+const listComplementSchedules = `-- name: ListComplementSchedules :many
+SELECT complement_id, name, next_run_at, lease_until, lease_owner, last_run_at, last_status FROM complement_schedules WHERE complement_id = $1 ORDER BY name
+`
+
+func (q *Queries) ListComplementSchedules(ctx context.Context, complementID uuid.UUID) ([]ComplementSchedule, error) {
+	rows, err := q.db.Query(ctx, listComplementSchedules, complementID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ComplementSchedule
+	for rows.Next() {
+		var i ComplementSchedule
+		if err := rows.Scan(
+			&i.ComplementID,
+			&i.Name,
+			&i.NextRunAt,
+			&i.LeaseUntil,
+			&i.LeaseOwner,
+			&i.LastRunAt,
+			&i.LastStatus,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listComplementStorage = `-- name: ListComplementStorage :many
 SELECT complement_id, key, value, updated_by_user_id, updated_via, updated_at FROM complement_storage
 WHERE complement_id = $1 AND ($2::text IS NULL OR key = $2)
@@ -439,7 +730,7 @@ func (q *Queries) ListComplementStorage(ctx context.Context, arg ListComplementS
 
 const listComplements = `-- name: ListComplements :many
 
-SELECT id, slug, name, description, icon, source_type, status, entry_path, base_url, internal_base_url, health_path, api_version, scopes, allowed_collections, connect_hosts, visible_roles, visible_permission_group_ids, token_hash, token_issued_at, artifact_sha256, artifact_bytes, artifact_files, published_at, created_by, created_at, updated_at FROM complements ORDER BY name
+SELECT id, slug, name, description, icon, source_type, status, entry_path, base_url, internal_base_url, health_path, api_version, scopes, allowed_collections, connect_hosts, visible_roles, visible_permission_group_ids, token_hash, token_issued_at, artifact_sha256, artifact_bytes, artifact_files, published_at, created_by, created_at, updated_at, manifest, approved, is_house, settings, secrets_encrypted, integration_key_encrypted, hook_secret_encrypted FROM complements ORDER BY name
 `
 
 // Complementos (spec/11-complementos.md, Fase 13b).
@@ -479,7 +770,46 @@ func (q *Queries) ListComplements(ctx context.Context) ([]Complement, error) {
 			&i.CreatedBy,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.Manifest,
+			&i.Approved,
+			&i.IsHouse,
+			&i.Settings,
+			&i.SecretsEncrypted,
+			&i.IntegrationKeyEncrypted,
+			&i.HookSecretEncrypted,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listDueComplementSchedules = `-- name: ListDueComplementSchedules :many
+SELECT s.complement_id, s.name FROM complement_schedules s JOIN complements c ON c.id = s.complement_id
+WHERE s.next_run_at <= now() AND c.status = 'active' AND (s.lease_until IS NULL OR s.lease_until < now())
+ORDER BY s.next_run_at
+LIMIT 50
+`
+
+type ListDueComplementSchedulesRow struct {
+	ComplementID uuid.UUID `json:"complement_id"`
+	Name         string    `json:"name"`
+}
+
+func (q *Queries) ListDueComplementSchedules(ctx context.Context) ([]ListDueComplementSchedulesRow, error) {
+	rows, err := q.db.Query(ctx, listDueComplementSchedules)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListDueComplementSchedulesRow
+	for rows.Next() {
+		var i ListDueComplementSchedulesRow
+		if err := rows.Scan(&i.ComplementID, &i.Name); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -584,7 +914,7 @@ func (q *Queries) ListRecentEntriesForComplement(ctx context.Context, limit int3
 }
 
 const listVisibleComplementCandidates = `-- name: ListVisibleComplementCandidates :many
-SELECT id, slug, name, description, icon, source_type, status, entry_path, base_url, internal_base_url, health_path, api_version, scopes, allowed_collections, connect_hosts, visible_roles, visible_permission_group_ids, token_hash, token_issued_at, artifact_sha256, artifact_bytes, artifact_files, published_at, created_by, created_at, updated_at FROM complements WHERE status <> 'disabled' ORDER BY name
+SELECT id, slug, name, description, icon, source_type, status, entry_path, base_url, internal_base_url, health_path, api_version, scopes, allowed_collections, connect_hosts, visible_roles, visible_permission_group_ids, token_hash, token_issued_at, artifact_sha256, artifact_bytes, artifact_files, published_at, created_by, created_at, updated_at, manifest, approved, is_house, settings, secrets_encrypted, integration_key_encrypted, hook_secret_encrypted FROM complements WHERE status <> 'disabled' ORDER BY name
 `
 
 // Activos o en mantenimiento; la visibilidad por rol y grupo se filtra en Go.
@@ -624,6 +954,13 @@ func (q *Queries) ListVisibleComplementCandidates(ctx context.Context) ([]Comple
 			&i.CreatedBy,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.Manifest,
+			&i.Approved,
+			&i.IsHouse,
+			&i.Settings,
+			&i.SecretsEncrypted,
+			&i.IntegrationKeyEncrypted,
+			&i.HookSecretEncrypted,
 		); err != nil {
 			return nil, err
 		}
@@ -633,6 +970,88 @@ func (q *Queries) ListVisibleComplementCandidates(ctx context.Context) ([]Comple
 		return nil, err
 	}
 	return items, nil
+}
+
+const revokeComplementAPIKeys = `-- name: RevokeComplementAPIKeys :exec
+UPDATE api_keys SET active = false, revoked_at = now(), revoked_by = $1, revoke_reason = $2
+WHERE complement_id = $3 AND active
+`
+
+type RevokeComplementAPIKeysParams struct {
+	RevokedBy    pgtype.UUID `json:"revoked_by"`
+	Reason       pgtype.Text `json:"reason"`
+	ComplementID pgtype.UUID `json:"complement_id"`
+}
+
+func (q *Queries) RevokeComplementAPIKeys(ctx context.Context, arg RevokeComplementAPIKeysParams) error {
+	_, err := q.db.Exec(ctx, revokeComplementAPIKeys, arg.RevokedBy, arg.Reason, arg.ComplementID)
+	return err
+}
+
+const setAPIKeyScopes = `-- name: SetAPIKeyScopes :exec
+UPDATE api_keys SET scopes = $2 WHERE id = $1
+`
+
+type SetAPIKeyScopesParams struct {
+	ID     uuid.UUID `json:"id"`
+	Scopes []string  `json:"scopes"`
+}
+
+func (q *Queries) SetAPIKeyScopes(ctx context.Context, arg SetAPIKeyScopesParams) error {
+	_, err := q.db.Exec(ctx, setAPIKeyScopes, arg.ID, arg.Scopes)
+	return err
+}
+
+const setComplementApprovals = `-- name: SetComplementApprovals :one
+UPDATE complements SET approved = $2, is_house = $3, updated_at = now() WHERE id = $1
+RETURNING id, slug, name, description, icon, source_type, status, entry_path, base_url, internal_base_url, health_path, api_version, scopes, allowed_collections, connect_hosts, visible_roles, visible_permission_group_ids, token_hash, token_issued_at, artifact_sha256, artifact_bytes, artifact_files, published_at, created_by, created_at, updated_at, manifest, approved, is_house, settings, secrets_encrypted, integration_key_encrypted, hook_secret_encrypted
+`
+
+type SetComplementApprovalsParams struct {
+	ID       uuid.UUID `json:"id"`
+	Approved []string  `json:"approved"`
+	IsHouse  bool      `json:"is_house"`
+}
+
+func (q *Queries) SetComplementApprovals(ctx context.Context, arg SetComplementApprovalsParams) (Complement, error) {
+	row := q.db.QueryRow(ctx, setComplementApprovals, arg.ID, arg.Approved, arg.IsHouse)
+	var i Complement
+	err := row.Scan(
+		&i.ID,
+		&i.Slug,
+		&i.Name,
+		&i.Description,
+		&i.Icon,
+		&i.SourceType,
+		&i.Status,
+		&i.EntryPath,
+		&i.BaseUrl,
+		&i.InternalBaseUrl,
+		&i.HealthPath,
+		&i.ApiVersion,
+		&i.Scopes,
+		&i.AllowedCollections,
+		&i.ConnectHosts,
+		&i.VisibleRoles,
+		&i.VisiblePermissionGroupIds,
+		&i.TokenHash,
+		&i.TokenIssuedAt,
+		&i.ArtifactSha256,
+		&i.ArtifactBytes,
+		&i.ArtifactFiles,
+		&i.PublishedAt,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Manifest,
+		&i.Approved,
+		&i.IsHouse,
+		&i.Settings,
+		&i.SecretsEncrypted,
+		&i.IntegrationKeyEncrypted,
+		&i.HookSecretEncrypted,
+	)
+	return i, err
 }
 
 const setComplementArtifact = `-- name: SetComplementArtifact :exec
@@ -657,6 +1076,93 @@ func (q *Queries) SetComplementArtifact(ctx context.Context, arg SetComplementAr
 	return err
 }
 
+const setComplementCredentials = `-- name: SetComplementCredentials :exec
+UPDATE complements SET integration_key_encrypted = $2, hook_secret_encrypted = $3 WHERE id = $1
+`
+
+type SetComplementCredentialsParams struct {
+	ID                      uuid.UUID   `json:"id"`
+	IntegrationKeyEncrypted pgtype.Text `json:"integration_key_encrypted"`
+	HookSecretEncrypted     pgtype.Text `json:"hook_secret_encrypted"`
+}
+
+// La llave de integraciones y el secreto de los ganchos, cifrados; el
+// servicio los pide con su token de aplicación.
+func (q *Queries) SetComplementCredentials(ctx context.Context, arg SetComplementCredentialsParams) error {
+	_, err := q.db.Exec(ctx, setComplementCredentials, arg.ID, arg.IntegrationKeyEncrypted, arg.HookSecretEncrypted)
+	return err
+}
+
+const setComplementManifest = `-- name: SetComplementManifest :one
+
+UPDATE complements SET manifest = $2, approved = $3, updated_at = now() WHERE id = $1
+RETURNING id, slug, name, description, icon, source_type, status, entry_path, base_url, internal_base_url, health_path, api_version, scopes, allowed_collections, connect_hosts, visible_roles, visible_permission_group_ids, token_hash, token_issued_at, artifact_sha256, artifact_bytes, artifact_files, published_at, created_by, created_at, updated_at, manifest, approved, is_house, settings, secrets_encrypted, integration_key_encrypted, hook_secret_encrypted
+`
+
+type SetComplementManifestParams struct {
+	ID       uuid.UUID `json:"id"`
+	Manifest []byte    `json:"manifest"`
+	Approved []string  `json:"approved"`
+}
+
+// ===== Complementos que agregan funciones (10i, spec/11 §12) =====
+// Una versión nueva: lo aprobado que ya no declara se olvida en Go.
+func (q *Queries) SetComplementManifest(ctx context.Context, arg SetComplementManifestParams) (Complement, error) {
+	row := q.db.QueryRow(ctx, setComplementManifest, arg.ID, arg.Manifest, arg.Approved)
+	var i Complement
+	err := row.Scan(
+		&i.ID,
+		&i.Slug,
+		&i.Name,
+		&i.Description,
+		&i.Icon,
+		&i.SourceType,
+		&i.Status,
+		&i.EntryPath,
+		&i.BaseUrl,
+		&i.InternalBaseUrl,
+		&i.HealthPath,
+		&i.ApiVersion,
+		&i.Scopes,
+		&i.AllowedCollections,
+		&i.ConnectHosts,
+		&i.VisibleRoles,
+		&i.VisiblePermissionGroupIds,
+		&i.TokenHash,
+		&i.TokenIssuedAt,
+		&i.ArtifactSha256,
+		&i.ArtifactBytes,
+		&i.ArtifactFiles,
+		&i.PublishedAt,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Manifest,
+		&i.Approved,
+		&i.IsHouse,
+		&i.Settings,
+		&i.SecretsEncrypted,
+		&i.IntegrationKeyEncrypted,
+		&i.HookSecretEncrypted,
+	)
+	return i, err
+}
+
+const setComplementSettings = `-- name: SetComplementSettings :exec
+UPDATE complements SET settings = $2, secrets_encrypted = $3, updated_at = now() WHERE id = $1
+`
+
+type SetComplementSettingsParams struct {
+	ID               uuid.UUID   `json:"id"`
+	Settings         []byte      `json:"settings"`
+	SecretsEncrypted pgtype.Text `json:"secrets_encrypted"`
+}
+
+func (q *Queries) SetComplementSettings(ctx context.Context, arg SetComplementSettingsParams) error {
+	_, err := q.db.Exec(ctx, setComplementSettings, arg.ID, arg.Settings, arg.SecretsEncrypted)
+	return err
+}
+
 const setComplementToken = `-- name: SetComplementToken :exec
 UPDATE complements SET token_hash = $2, token_issued_at = now(), updated_at = now() WHERE slug = $1
 `
@@ -677,7 +1183,7 @@ UPDATE complements SET
   health_path = $9, scopes = $10, allowed_collections = $11, connect_hosts = $12, visible_roles = $13,
   visible_permission_group_ids = $14, updated_at = now()
 WHERE slug = $1
-RETURNING id, slug, name, description, icon, source_type, status, entry_path, base_url, internal_base_url, health_path, api_version, scopes, allowed_collections, connect_hosts, visible_roles, visible_permission_group_ids, token_hash, token_issued_at, artifact_sha256, artifact_bytes, artifact_files, published_at, created_by, created_at, updated_at
+RETURNING id, slug, name, description, icon, source_type, status, entry_path, base_url, internal_base_url, health_path, api_version, scopes, allowed_collections, connect_hosts, visible_roles, visible_permission_group_ids, token_hash, token_issued_at, artifact_sha256, artifact_bytes, artifact_files, published_at, created_by, created_at, updated_at, manifest, approved, is_house, settings, secrets_encrypted, integration_key_encrypted, hook_secret_encrypted
 `
 
 type UpdateComplementParams struct {
@@ -744,8 +1250,112 @@ func (q *Queries) UpdateComplement(ctx context.Context, arg UpdateComplementPara
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Manifest,
+		&i.Approved,
+		&i.IsHouse,
+		&i.Settings,
+		&i.SecretsEncrypted,
+		&i.IntegrationKeyEncrypted,
+		&i.HookSecretEncrypted,
 	)
 	return i, err
+}
+
+const upsertComplementDestination = `-- name: UpsertComplementDestination :one
+INSERT INTO forward_destinations (name, enabled, transport, url, format, batch, send_audit, audit_level,
+  send_entries, send_escalation, send_tickets, header_names, complement_id, events, hmac_secret_encrypted, cursor_id, created_by)
+VALUES ($1, true, 'http', $2, 'json', false, false, 'info',
+  $3, $4, $5, '{}', $6,
+  $7::text[], $8, (SELECT COALESCE(max(fo.id), 0) FROM forward_outbox fo), $9)
+ON CONFLICT (complement_id) WHERE complement_id IS NOT NULL DO UPDATE SET
+  name = EXCLUDED.name, url = EXCLUDED.url, send_entries = EXCLUDED.send_entries, send_escalation = EXCLUDED.send_escalation,
+  send_tickets = EXCLUDED.send_tickets, events = EXCLUDED.events, hmac_secret_encrypted = EXCLUDED.hmac_secret_encrypted,
+  enabled = true, updated_at = now()
+RETURNING id, name, enabled, transport, host, port, url, format, batch, send_audit, audit_level, send_entries, send_escalation, send_tickets, ca_cert, client_cert, client_key_encrypted, header_names, headers_encrypted, cursor_id, lease_until, lease_owner, next_attempt_at, failures, failing_since, down_alerted, last_sent_at, last_error, last_error_at, created_by, created_at, updated_at, complement_id, events, hmac_secret_encrypted
+`
+
+type UpsertComplementDestinationParams struct {
+	Name                string      `json:"name"`
+	Url                 pgtype.Text `json:"url"`
+	SendEntries         bool        `json:"send_entries"`
+	SendEscalation      bool        `json:"send_escalation"`
+	SendTickets         bool        `json:"send_tickets"`
+	ComplementID        pgtype.UUID `json:"complement_id"`
+	Events              []string    `json:"events"`
+	HmacSecretEncrypted pgtype.Text `json:"hmac_secret_encrypted"`
+	CreatedBy           pgtype.UUID `json:"created_by"`
+}
+
+// Destino HTTP interno del complemento con los eventos aprobados. Al crearse
+// parte desde ahora: no recibe lo de antes.
+func (q *Queries) UpsertComplementDestination(ctx context.Context, arg UpsertComplementDestinationParams) (ForwardDestination, error) {
+	row := q.db.QueryRow(ctx, upsertComplementDestination,
+		arg.Name,
+		arg.Url,
+		arg.SendEntries,
+		arg.SendEscalation,
+		arg.SendTickets,
+		arg.ComplementID,
+		arg.Events,
+		arg.HmacSecretEncrypted,
+		arg.CreatedBy,
+	)
+	var i ForwardDestination
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Enabled,
+		&i.Transport,
+		&i.Host,
+		&i.Port,
+		&i.Url,
+		&i.Format,
+		&i.Batch,
+		&i.SendAudit,
+		&i.AuditLevel,
+		&i.SendEntries,
+		&i.SendEscalation,
+		&i.SendTickets,
+		&i.CaCert,
+		&i.ClientCert,
+		&i.ClientKeyEncrypted,
+		&i.HeaderNames,
+		&i.HeadersEncrypted,
+		&i.CursorID,
+		&i.LeaseUntil,
+		&i.LeaseOwner,
+		&i.NextAttemptAt,
+		&i.Failures,
+		&i.FailingSince,
+		&i.DownAlerted,
+		&i.LastSentAt,
+		&i.LastError,
+		&i.LastErrorAt,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.ComplementID,
+		&i.Events,
+		&i.HmacSecretEncrypted,
+	)
+	return i, err
+}
+
+const upsertComplementSchedule = `-- name: UpsertComplementSchedule :exec
+INSERT INTO complement_schedules (complement_id, name, next_run_at) VALUES ($1, $2, $3)
+ON CONFLICT (complement_id, name) DO UPDATE SET next_run_at = LEAST(complement_schedules.next_run_at, EXCLUDED.next_run_at)
+`
+
+type UpsertComplementScheduleParams struct {
+	ComplementID uuid.UUID          `json:"complement_id"`
+	Name         string             `json:"name"`
+	NextRunAt    pgtype.Timestamptz `json:"next_run_at"`
+}
+
+// Si la tarea ya existía se queda con la próxima ejecución más cercana.
+func (q *Queries) UpsertComplementSchedule(ctx context.Context, arg UpsertComplementScheduleParams) error {
+	_, err := q.db.Exec(ctx, upsertComplementSchedule, arg.ComplementID, arg.Name, arg.NextRunAt)
+	return err
 }
 
 const upsertComplementStorage = `-- name: UpsertComplementStorage :one

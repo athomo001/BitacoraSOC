@@ -27,9 +27,14 @@ import { TicketFollowupsComponent } from '../management/ticket-followups';
 import { TicketGlpiCommentComponent } from './ticket-glpi-comment';
 import { GlpiCreateDialogComponent, GlpiCreateDialogData } from './glpi-create-dialog';
 
+import { ComplementSlot, ComplementsService } from '../../core/complements/complements.service';
+import { ComplementFrameComponent } from '../../shared/complement-frame/complement-frame';
+import { ComplementActionsComponent } from '../../shared/complement-frame/complement-actions';
+import '../../core/i18n/packs/complement-features';
 import '../../core/i18n/packs/tickets';
 import '../../core/i18n/packs/glpi';
-type Tab = 'activity' | 'images' | 'tasks' | 'entries';
+/** Las fijas y la pestaña de un complemento («c:slug|panel:id», 10i). */
+type Tab = 'activity' | 'images' | 'tasks' | 'entries' | `c:${string}`;
 
 /** Tope del diseño aprobado (comentario del dueño #14); el backend también lo exige. */
 const MAX_IMAGES = 10;
@@ -60,7 +65,7 @@ const TASK_PRESETS = [15, 30, 60] as const;
 @Component({
   selector: 'app-ticket-detail',
   standalone: true,
-  imports: [DatePipe, FormsModule, MatIconModule, MarkdownComponent, AuthImgDirective, TicketRelationsComponent, TicketMailComponent, RouterLink, PlacePickerComponent, TicketFollowupsComponent, TicketGlpiCommentComponent],
+  imports: [DatePipe, FormsModule, MatIconModule, MarkdownComponent, AuthImgDirective, TicketRelationsComponent, TicketMailComponent, RouterLink, PlacePickerComponent, TicketFollowupsComponent, TicketGlpiCommentComponent, ComplementFrameComponent, ComplementActionsComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './ticket-detail.html',
   styleUrl: './ticket-detail.css',
@@ -135,6 +140,14 @@ export class TicketDetailComponent {
   protected readonly error = signal<string | null>(null);
   protected readonly busy = signal(false);
   protected readonly tab = signal<Tab>('activity');
+  private readonly complements = inject(ComplementsService);
+  /** Pestañas que suman los complementos aprobados (10i). */
+  protected readonly panels = computed(() => this.complements.slots().panels.filter((p) => p.target === 'ticket'));
+  protected readonly currentPanel = computed(() => this.panels().find((p) => this.panelTab(p) === this.tab()) ?? null);
+
+  protected panelTab(p: ComplementSlot): Tab {
+    return `c:${p.slug}|${p.key}`;
+  }
   protected readonly copied = signal(false);
   protected readonly taskPresets = TASK_PRESETS;
 
@@ -388,6 +401,8 @@ export class TicketDetailComponent {
     if (kind === 'parent') return this.i18n.t('tkrel.fromParent');
     if (kind === 'child') return '↓ ' + short;
     if (kind === 'merged') return this.i18n.tf('tkrel.fromMerged', short);
+    // Comentario que dejó un complemento (ADD_NOTE, 10i): «con VirusTotal».
+    if (kind === 'complement') return this.i18n.t('cf.via').replace('{0}', origin.slice('complement:'.length));
     return '';
   }
 

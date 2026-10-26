@@ -1,6 +1,7 @@
 <div class="esc">
   <div class="esc__toolbar">
     <h1 class="esc__title"><mat-icon>place</mat-icon>{{ i18n.t('esc.title') }}</h1>
+    <app-complement-page-links module="escalation" />
     <span class="esc__segs" role="tablist" [attr.aria-label]="i18n.t('esc.whatFails')">
       @if (socEnabled()) {
         <button type="button" role="tab" class="seg" [attr.aria-pressed]="scopeKind() === 'service'" [attr.aria-selected]="scopeKind() === 'service'" (click)="setKind('service')">{{ i18n.t('escAdmin.kind.service') }}</button>

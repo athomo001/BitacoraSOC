@@ -110,18 +110,28 @@ func TargetOf(d db.ForwardDestination, box *crypto.Box, hostname string) (Target
 			return t, errors.New("las cabeceras guardadas no se pueden leer")
 		}
 	}
+	if d.HmacSecretEncrypted.Valid && d.HmacSecretEncrypted.String != "" {
+		if box == nil {
+			return t, errors.New("no hay llave de cifrado para firmar los eventos")
+		}
+		secret, err := box.Decrypt(d.HmacSecretEncrypted.String)
+		if err != nil {
+			return t, errors.New("no se pudo descifrar el secreto de firma")
+		}
+		t.HMACSecret = secret
+	}
 	return t, nil
 }
 
 func (w *Worker) deliver(ctx context.Context, d db.ForwardDestination) {
 	filter := func(cursor int64) db.ListForwardBatchParams {
 		return db.ListForwardBatchParams{CursorID: cursor, SendAudit: d.SendAudit, MinRank: int32(Rank(d.AuditLevel)),
-			SendEntries: d.SendEntries, SendEscalation: d.SendEscalation, SendTickets: d.SendTickets, MaxRows: batchRows}
+			SendEntries: d.SendEntries, SendEscalation: d.SendEscalation, SendTickets: d.SendTickets, MaxRows: batchRows, Events: d.Events}
 	}
 	cursor := d.CursorID
 	f := filter(cursor)
 	if exp, err := w.Queries.ExpiredForwardEvents(ctx, db.ExpiredForwardEventsParams{CursorID: cursor, SendAudit: f.SendAudit, MinRank: f.MinRank,
-		SendEntries: f.SendEntries, SendEscalation: f.SendEscalation, SendTickets: f.SendTickets}); err == nil && exp.Lost > 0 {
+		SendEntries: f.SendEntries, SendEscalation: f.SendEscalation, SendTickets: f.SendTickets, Events: f.Events}); err == nil && exp.Lost > 0 {
 		cursor = exp.LastID
 		_ = w.Queries.AdvanceForwardCursor(ctx, db.AdvanceForwardCursorParams{ID: d.ID, CursorID: cursor})
 		_ = w.Queries.AddForwardStats(ctx, db.AddForwardStatsParams{ID: d.ID, Day: w.today(), Lost: exp.Lost})

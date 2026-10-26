@@ -9,10 +9,19 @@
       <button type="button" role="tab" class="rp__tab" [attr.aria-selected]="tab() === 'history'" (click)="tab.set('history'); loadHistory()">
         {{ i18n.t('rpt.tab.history') }} <span class="mono">{{ historyTotal() }}</span>
       </button>
+      <!-- Informes de complementos aprobados (10i). -->
+      @for (p of pages(); track pageTab(p)) {
+        <button type="button" role="tab" class="rp__tab" [attr.aria-selected]="tab() === pageTab(p)" (click)="tab.set(pageTab(p))"><mat-icon>{{ p.icon }}</mat-icon> {{ p.title }}</button>
+      }
+      @if (currentPage()) {
+        <button type="button" class="adm-btn" style="margin: 0 0 6px auto" (click)="printPage()"><mat-icon>download</mat-icon>{{ i18n.t('cf.downloadPdf') }}</button>
+      }
     </div>
   </header>
 
-  @if (tab() === 'new') {
+  @if (currentPage(); as p) {
+    <app-complement-frame style="flex: 1" [slug]="p.slug" [slot]="p.key" [label]="p.title" />
+  } @else if (tab() === 'new') {
     <div class="rp__split" [class.rp__split--resizing]="resizing()" [style.grid-template-columns]="splitColumns()">
       <!-- Formulario -->
       <div class="rp__form" (paste)="onPaste($event)">

@@ -16,11 +16,12 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/audit"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/auth"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/complements"
+	"github.com/athomo001/BitacoraSOC/backend-go/internal/crypto"
+	"github.com/athomo001/BitacoraSOC/backend-go/internal/forward"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/middleware"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/problemdetails"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/ratelimit"
@@ -43,7 +44,8 @@ const applicationTokenTTL = 365 * 24 * time.Hour
 // sirve en el origen aislado vive en complements_origin.go y la Runtime API
 // en complements_runtime.go.
 type ComplementsHandler struct {
-	Pool     *pgxpool.Pool
+	// Pool abre las transacciones (en las pruebas, una transacción externa).
+	Pool     txBeginner
 	Queries  *db.Queries
 	AuditLog *audit.Logger
 	JWT      *auth.JWTIssuer
@@ -59,6 +61,19 @@ type ComplementsHandler struct {
 	HTTP *http.Client
 	// DeleteLimiter: 3 eliminaciones por hora por admin (regla del legacy).
 	DeleteLimiter *ratelimit.APILimiter
+
+	// Lo que usan los complementos que agregan funciones (10i,
+	// complements_features.go): la caja de los secretos, la cola de eventos
+	// de la 10b, la API de integraciones (API_REQUEST), la Ticketera
+	// (ADD_NOTE), el nodo para el préstamo de las tareas programadas, la zona
+	// horaria y la dirección de /api/v1 que se le da a un servicio.
+	Crypto         *crypto.Box
+	Forward        *forward.Emitter
+	API            *IntegrationsAPI
+	Tickets        *TicketsHandler
+	Owner          string
+	Location       *time.Location
+	InternalAPIURL string
 
 	previews *previewCache
 }
@@ -115,6 +130,12 @@ type complementDTO struct {
 	Circuit                   string      `json:"circuit"`
 	CircuitDetail             string      `json:"circuitDetail,omitempty"`
 	EntriesCount              *int32      `json:"entriesCount,omitempty"`
+	// 10i: lo que declara complement.json, lo aprobado y si es «de la casa».
+	Manifest *complements.Manifest `json:"manifest,omitempty"`
+	Items    []complements.Item    `json:"items"`
+	Approved []string              `json:"approved"`
+	IsHouse  bool                  `json:"isHouse"`
+	Features *featuresDTO          `json:"features,omitempty"`
 }
 
 func (h *ComplementsHandler) toDTO(c db.Complement) complementDTO {
@@ -137,6 +158,14 @@ func (h *ComplementsHandler) toDTO(c db.Complement) complementDTO {
 	}
 	if c.SourceType == db.ComplementSourceManual && h.Breaker != nil {
 		dto.Circuit, dto.CircuitDetail = h.Breaker.State(c.Slug)
+	}
+	m := manifestOf(c)
+	dto.Items, dto.Approved, dto.IsHouse = m.Items(), nonNilStrings(c.Approved), c.IsHouse
+	if dto.Items == nil {
+		dto.Items = []complements.Item{}
+	}
+	if len(dto.Items) > 0 || m.Version != "" {
+		dto.Manifest = &m
 	}
 	return dto
 }
@@ -168,11 +197,7 @@ func (h *ComplementsHandler) Get(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	dto := h.toDTO(c)
-	if n, err := h.Queries.CountComplementEntries(r.Context(), pgtype.UUID{Bytes: c.ID, Valid: true}); err == nil {
-		dto.EntriesCount = &n
-	}
-	writeData(w, http.StatusOK, dto)
+	writeData(w, http.StatusOK, h.detailDTO(r.Context(), c))
 }
 
 func (h *ComplementsHandler) bySlug(w http.ResponseWriter, r *http.Request) (db.Complement, bool) {
@@ -362,14 +387,22 @@ func (h *ComplementsHandler) Publish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.previews.forget(id.String())
-	h.AuditLog.Log(ctx, "complement.published", audit.LevelWarn, audit.Success(), map[string]any{
+	meta := map[string]any{
 		"slug": saved.Slug, "files": analysis.Files, "bytes": analysis.Bytes, "sha256": analysis.SHA256, "update": status == http.StatusOK,
-	})
+	}
+	if analysis.Manifest != nil {
+		meta["manifestVersion"] = analysis.Manifest.Version
+	}
+	h.AuditLog.Log(ctx, "complement.published", audit.LevelWarn, audit.Success(), meta)
 	fresh, err := h.Queries.GetComplementBySlug(ctx, saved.Slug)
 	if err != nil {
 		fresh = saved
 	}
-	writeData(w, status, h.toDTO(fresh))
+	// Lo que declara su complement.json: lo nuevo queda por revisar (10i).
+	if withManifest, err := h.applyManifest(ctx, fresh, analysis.Manifest, user.ID); err == nil {
+		fresh = withManifest
+	}
+	writeData(w, status, h.detailDTO(ctx, fresh))
 }
 
 type manualRequest struct {
@@ -451,7 +484,18 @@ func (h *ComplementsHandler) CreateManual(w http.ResponseWriter, r *http.Request
 	}
 	h.AuditLog.Log(r.Context(), "complement.registered", audit.LevelWarn, audit.Success(), map[string]any{"slug": c.Slug, "baseUrl": req.BaseURL, "scopes": scopes})
 	c, _ = h.Queries.GetComplementBySlug(r.Context(), c.Slug)
-	writeData(w, http.StatusCreated, map[string]any{"complement": h.toDTO(c), "applicationToken": token})
+	out := map[string]any{"applicationToken": token}
+	// Lo que declara su complement.json (10i). Si todavía no responde, se
+	// lee después con «Leer de nuevo».
+	if m, err := h.fetchManifest(r.Context(), c); err != nil {
+		out["manifestError"] = err.Error()
+	} else if m != nil {
+		if saved, err := h.applyManifest(r.Context(), c, m, user.ID); err == nil {
+			c = saved
+		}
+	}
+	out["complement"] = h.detailDTO(r.Context(), c)
+	writeData(w, http.StatusCreated, out)
 }
 
 func (h *ComplementsHandler) issueToken(ctx context.Context, slug string) (string, error) {
@@ -837,10 +881,43 @@ func (h *ComplementsHandler) visibleComplement(w http.ResponseWriter, r *http.Re
 
 // Embed entrega la dirección del iframe: para un estático, un enlace de un
 // solo uso al origen aislado; para un servicio, su propia dirección.
+//
+// Con cuerpo {slot, objectType, objectId} abre una ranura aprobada (10i): la
+// página, la pestaña, la acción o la barra, con la ficha abierta.
 func (h *ComplementsHandler) Embed(w http.ResponseWriter, r *http.Request) {
 	c, user, ok := h.visibleComplement(w, r)
 	if !ok {
 		return
+	}
+	req, okBody := readEmbedRequest(r)
+	if !okBody {
+		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "cuerpo de la request inválido")
+		return
+	}
+	m, eff := effectiveOf(c)
+	slotFile, object := "", ""
+	if req.Slot != "" {
+		p, target, ok := slotPath(m, eff, req.Slot)
+		if !ok {
+			problemdetails.Write(w, r, http.StatusNotFound, "not-found", "esa parte del complemento no está aprobada")
+			return
+		}
+		slotFile = p
+		if target != "" {
+			if _, err := uuid.Parse(req.ObjectID); err != nil || req.ObjectType != target {
+				problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "falta la ficha abierta ("+target+")")
+				return
+			}
+			object = target + ":" + req.ObjectID
+		}
+	}
+	out := map[string]any{"settings": publicSettings(m, eff, settingsOf(c))}
+	if object != "" {
+		out["object"] = map[string]string{"type": req.ObjectType, "id": req.ObjectID}
+	}
+	meta := map[string]any{"slug": c.Slug}
+	if req.Slot != "" {
+		meta["slot"] = req.Slot
 	}
 	if c.SourceType == db.ComplementSourceManual {
 		if state, _ := h.Breaker.State(c.Slug); state == complements.CircuitOpen {
@@ -848,18 +925,25 @@ func (h *ComplementsHandler) Embed(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		target := c.BaseUrl.String + c.EntryPath
-		h.AuditLog.Log(r.Context(), "complement.opened", audit.LevelInfo, audit.Success(), map[string]any{"slug": c.Slug})
-		writeData(w, http.StatusOK, map[string]string{"url": target, "origin": complements.Origin(target)})
+		if req.Slot != "" {
+			target = embedTarget(c.BaseUrl.String, c.EntryPath, slotFile, object)
+		}
+		h.AuditLog.Log(r.Context(), "complement.opened", audit.LevelInfo, audit.Success(), meta)
+		out["url"], out["origin"] = target, complements.Origin(target)
+		writeData(w, http.StatusOK, out)
 		return
 	}
 	ticket, _ := h.Signer.Issue(complements.KindEmbed, c.Slug, user.ID, user.Role, complements.EmbedTTL)
-	h.AuditLog.Log(r.Context(), "complement.opened", audit.LevelInfo, audit.Success(), map[string]any{"slug": c.Slug})
-	writeData(w, http.StatusOK, map[string]string{
-		// Con el archivo de entrada explícito: hay complementos del legacy que
-		// sacan su slug de la dirección (/c/<slug>/index.html).
-		"url":    strings.TrimRight(h.OriginURL, "/") + "/c/" + c.Slug + "/" + c.EntryPath + "?embed=" + url.QueryEscape(ticket),
-		"origin": complements.Origin(h.OriginURL),
-	})
+	h.AuditLog.Log(r.Context(), "complement.opened", audit.LevelInfo, audit.Success(), meta)
+	// Con el archivo de entrada explícito: hay complementos del legacy que
+	// sacan su slug de la dirección (/c/<slug>/index.html).
+	target := embedTarget(strings.TrimRight(h.OriginURL, "/")+"/c/"+c.Slug, c.EntryPath, slotFile, object)
+	sep := "?"
+	if strings.Contains(target, "?") {
+		sep = "&"
+	}
+	out["url"], out["origin"] = target+sep+"embed="+url.QueryEscape(ticket), complements.Origin(h.OriginURL)
+	writeData(w, http.StatusOK, out)
 }
 
 type complementEntryRequest struct {

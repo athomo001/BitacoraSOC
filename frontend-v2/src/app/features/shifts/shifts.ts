@@ -15,8 +15,11 @@ import {
   TeleworkCondition,
 } from '../../core/shifts/shifts.service';
 
+import { ComplementSlot, ComplementsService } from '../../core/complements/complements.service';
+import { ComplementFrameComponent } from '../../shared/complement-frame/complement-frame';
 import '../../core/i18n/packs/shifts';
-type ShiftsTab = 'mine' | 'history' | 'dotacion' | 'guards';
+/** Las fijas y la página de un complemento («c:slug|page:id», 10i). */
+type ShiftsTab = 'mine' | 'history' | 'dotacion' | 'guards' | `c:${string}`;
 
 const ALL_CONDITIONS: TeleworkCondition[] = ['office', 'telework', 'guardia', 'training', 'medical_appointment', 'vacation', 'medical_leave'];
 
@@ -49,7 +52,7 @@ function mondayOf(d: Date): Date {
 @Component({
   selector: 'app-shifts',
   standalone: true,
-  imports: [FormsModule, ButtonComponent, MyShiftComponent, ShiftHistoryComponent, AdminGuardsComponent],
+  imports: [FormsModule, ButtonComponent, MyShiftComponent, ShiftHistoryComponent, AdminGuardsComponent, ComplementFrameComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './shifts.html',
   styleUrl: './shifts.css',
@@ -63,6 +66,14 @@ export class ShiftsComponent implements OnInit {
   protected readonly perms = inject(PermissionsService);
 
   protected readonly tab = signal<ShiftsTab>('mine');
+  private readonly complements = inject(ComplementsService);
+  /** Páginas que suman los complementos aprobados (10i). */
+  protected readonly pages = computed(() => this.complements.slots().pages.filter((p) => p.module === 'shifts'));
+  protected readonly currentPage = computed(() => this.pages().find((p) => this.pageTab(p) === this.tab()) ?? null);
+
+  protected pageTab(p: ComplementSlot): ShiftsTab {
+    return `c:${p.slug}|${p.key}`;
+  }
   /**
    * La gente de un área propia (TI, Infra) que no es Operativa ve sus
    * guardias (solo mirar) y la Dotación de su área (9e); Mi turno e

@@ -99,18 +99,6 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/directory/directory').then((module) => module.DirectoryComponent),
       },
-      // Complementos (spec/11): una pestaña por complemento; el ítem del menú
-      // solo aparece con la funcionalidad encendida.
-      {
-        path: 'complements',
-        loadComponent: () =>
-          import('./features/complements/complements').then((module) => module.ComplementsComponent),
-      },
-      {
-        path: 'complements/:slug',
-        loadComponent: () =>
-          import('./features/complements/complements').then((module) => module.ComplementsComponent),
-      },
       // Gestión CSM (spec/16 §4.4, 9.4): Clientes, Metas, Indicadores y Plantillas. El backend decide quién la ve.
       {
         path: 'management',
@@ -126,6 +114,10 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/admin/admin-shell').then((module) => module.AdminShellComponent),
       },
+      // Complementos (spec/11): /complements y /complements/:slug (una pestaña
+      // por complemento) y /m/:módulo/:slug/:id (página de un complemento en
+      // un módulo, 10i). Sus rutas viajan con su código, no en la carga inicial.
+      { path: '', loadChildren: () => import('./features/complements/complement-routes').then((module) => module.COMPLEMENT_ROUTES) },
     ],
   },
   { path: '**', redirectTo: '' },

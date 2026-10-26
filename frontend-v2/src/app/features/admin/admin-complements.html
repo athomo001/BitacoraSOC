@@ -22,7 +22,9 @@
               <td>
                 <span class="ac__name">
                   <mat-icon>{{ c.icon }}</mat-icon>
-                  <span><strong class="adm-block">{{ c.name }}</strong><span class="adm-small adm-secondary">{{ typeLabel(c) }} · <span class="mono">{{ c.slug }}</span></span></span>
+                  <span><strong class="adm-block">{{ c.name }}</strong><span class="adm-small adm-secondary">{{ typeLabel(c) }} · <span class="mono">{{ c.slug }}</span></span>
+                    @if (pendingOf(c); as n) { <span class="adm-small ac__pending"><mat-icon>schedule</mat-icon>{{ n === 1 ? i18n.t('cf.pendingOne') : fill(i18n.t('cf.pending'), n) }}</span> }
+                  </span>
                 </span>
               </td>
               <td><span class="pill" [class]="stateTone(c)">{{ stateLabel(c) }}</span></td>
@@ -43,6 +45,16 @@
         <h3 class="adm-card__title"><mat-icon>{{ c.icon }}</mat-icon>{{ c.name }}</h3>
         <span class="pill tone-neutral adm-push">{{ typeLabel(c) }}</span>
       </div>
+      <div class="adm-tabs" role="tablist">
+        @for (t of ficheTabs(); track t) {
+          <button type="button" role="tab" class="adm-tab" [attr.aria-selected]="ficheTab() === t" (click)="ficheTab.set(t)">{{ i18n.t($any('cf.tab.' + t)) }}</button>
+        }
+      </div>
+      @if (ficheTab() !== 'general') {
+        <div class="adm-card__body">
+          <app-admin-complement-adds [complement]="c" [mode]="ficheTab() === 'settings' ? 'settings' : 'adds'" (updated)="onUpdated($event)" />
+        </div>
+      } @else {
       <div class="adm-card__body">
         <div class="adm-field">
           <span class="adm-label">{{ i18n.t('acomp.status') }}</span>
@@ -146,6 +158,7 @@
           }
         </div>
       </div>
+      }
     }
 
     @if (!flow() && !detail() && !loading()) {

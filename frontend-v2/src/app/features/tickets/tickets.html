@@ -10,6 +10,7 @@
       <span class="pill" [class.tone-warn]="summary().paused > 0"><span class="mono">{{ summary().paused }}</span> {{ i18n.t('tickets.summary.paused') }}</span>
       <span class="pill tone-ok"><span class="mono">{{ summary().resolvedToday }}</span> {{ i18n.t('tickets.summary.resolvedToday') }}</span>
     </div>
+    <app-complement-page-links module="tickets" />
     <button type="button" class="tk__new" (click)="openNew()"><mat-icon>add</mat-icon>{{ i18n.t('tickets.new') }}</button>
   </header>
 

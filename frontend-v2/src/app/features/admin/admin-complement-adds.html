@@ -1,0 +1,134 @@
+@let c = complement();
+@if (error(); as e) { <p class="adm-error" role="alert">{{ e }}</p> }
+
+@if (mode() === 'adds') {
+  <div class="ca">
+    @if (service()) {
+      <div class="ca__version">
+        <span class="adm-small adm-secondary">@if (manifest()?.version; as v) { {{ fill(i18n.t('cf.version'), v) }} }</span>
+        <button type="button" class="adm-btn" [disabled]="busy()" [title]="i18n.t('cf.rereadHint')" (click)="reread()"><mat-icon>sync</mat-icon>{{ i18n.t('cf.reread') }}</button>
+      </div>
+    } @else if (manifest()?.version; as v) {
+      <span class="adm-small adm-secondary">{{ fill(i18n.t('cf.version'), v) }}</span>
+    }
+
+    @if (!c.items.length) {
+      <p class="ca__empty">{{ i18n.t('cf.noManifest') }}</p>
+    } @else {
+      <label class="ca__house">
+        <input type="checkbox" [checked]="c.isHouse" [disabled]="busy()" (change)="toggleHouse()" />
+        <span>
+          <strong>{{ i18n.t('cf.house') }}</strong>
+          <span class="adm-hint">{{ i18n.t('cf.houseHint') }}</span>
+        </span>
+      </label>
+
+      @if (pending(); as n) {
+        <p class="ca__banner" role="status"><mat-icon>schedule</mat-icon>{{ n === 1 ? i18n.t('cf.bannerOne') : fill(i18n.t('cf.banner'), n) }}</p>
+      }
+
+      @for (group of [{ key: 'cf.group.screen', rows: screenRows() }, { key: 'cf.group.back', rows: backRows() }, { key: 'cf.group.data', rows: dataRows() }]; track group.key) {
+        @if (group.rows.length) {
+          <section class="ca__group">
+            <h4 class="ca__title">{{ i18n.t($any(group.key)) }}</h4>
+            @for (r of group.rows; track r.key) {
+              <div class="ca__row">
+                <span class="ca__what">
+                  <span class="ca__name" [class.ca__name--off]="r.state === 'house'">{{ r.what }}</span>
+                  <span class="adm-small adm-secondary">{{ r.detail }}</span>
+                </span>
+                <span class="ca__state" [class]="'ca__state ca__state--' + r.state">
+                  <mat-icon>{{ r.state === 'ok' ? 'check' : r.state === 'pending' ? 'schedule' : 'lock' }}</mat-icon>
+                  {{ i18n.t(r.state === 'ok' ? 'cf.st.ok' : r.state === 'pending' ? 'cf.st.pending' : 'cf.st.house') }}
+                </span>
+                <span class="ca__act">
+                  @if (r.state !== 'house') {
+                    <button type="button" class="adm-btn" [class.adm-btn--primary]="r.state === 'pending'" [disabled]="busy()" (click)="toggle(r.key)">
+                      {{ i18n.t(r.state === 'ok' ? 'cf.remove' : 'cf.approve') }}
+                    </button>
+                  }
+                </span>
+              </div>
+            }
+            @if (group.key === 'cf.group.back' && c.features; as f) {
+              @if (f.events; as ev) {
+                <p class="adm-small adm-secondary ca__status">{{ fill(i18n.t('cf.eventsTo'), ev.url) }}@if (ev.lastError) { · <span class="text-bad">{{ fill(i18n.t('cf.eventsError'), ev.lastError) }}</span> }</p>
+              }
+              @for (s of f.schedules; track s.name) {
+                <p class="adm-small adm-secondary ca__status">
+                  <span class="mono">{{ s.name }}</span> {{ fill(i18n.t('cf.scheduleNext'), (s.nextRunAt | date: 'dd/MM HH:mm') ?? '') }}
+                  @if (s.lastRunAt) { · {{ fill(i18n.t('cf.scheduleLast'), (s.lastRunAt | date: 'dd/MM HH:mm') ?? '', s.lastStatus ?? '') }} }
+                </p>
+              }
+            }
+            @if (group.key === 'cf.group.data') {
+              <p class="adm-hint ca__how">{{ i18n.t(service() ? 'cf.dataHowService' : 'cf.dataHowBrowser') }}</p>
+              @if (c.features?.integrationKey; as k) {
+                <p class="adm-small adm-secondary ca__status">
+                  {{ fill(i18n.t('cf.keyReady'), k.prefix + '…') }}
+                  @if (k.lastUsedAt) { {{ fill(i18n.t('cf.keyUsed'), (k.lastUsedAt | date: 'dd/MM HH:mm') ?? '') }} }
+                </p>
+              }
+            }
+          </section>
+        }
+      }
+    }
+  </div>
+}
+
+@if (mode() === 'settings') {
+  @if (settings(); as s) {
+    <form class="ca ca__form" (ngSubmit)="saveSettings()">
+      @for (f of s.fields; track f.key) {
+        @switch (f.type) {
+          @case ('secret') {
+            <div class="adm-field">
+              <span class="adm-label">{{ f.label }}@if (f.required) { * }</span>
+              @if (editingSecret() === f.key || !s.secrets[f.key]?.set) {
+                <span class="ca__line">
+                  <input class="adm-input mono" type="password" autocomplete="new-password" [name]="'secret-' + f.key" [attr.aria-label]="f.label"
+                    [placeholder]="i18n.t('cf.set.newValue')" [ngModel]="secrets()[f.key] ?? ''" (ngModelChange)="setSecret(f.key, $event)" />
+                  @if (s.secrets[f.key]?.set) { <button type="button" class="adm-btn" (click)="editingSecret.set(null); setSecret(f.key, '')">{{ i18n.t('adminChecklist.cancel') }}</button> }
+                </span>
+              } @else {
+                <span class="ca__line">
+                  <span class="ca__secret">{{ fill(i18n.t('cf.set.saved'), (s.secrets[f.key].savedAt | date: 'dd/MM') ?? '', s.secrets[f.key].last4 ?? '') }}</span>
+                  <button type="button" class="adm-btn" (click)="editingSecret.set(f.key)">{{ i18n.t('cf.set.change') }}</button>
+                  @if (!f.required) { <button type="button" class="adm-btn adm-btn--danger" [disabled]="busy()" (click)="saveSettings([f.key])">{{ i18n.t('cf.set.clear') }}</button> }
+                </span>
+              }
+              <span class="adm-hint">{{ f.help || i18n.t('cf.set.secretHint') }}</span>
+            </div>
+          }
+          @case ('boolean') {
+            <label class="ca__check">
+              <input type="checkbox" [name]="'v-' + f.key" [ngModel]="value(f) === true" (ngModelChange)="setValue(f.key, $event)" />
+              <span>{{ f.label }}@if (f.help) { <span class="adm-hint">{{ f.help }}</span> }</span>
+            </label>
+          }
+          @case ('select') {
+            <label class="adm-field">
+              <span class="adm-label">{{ f.label }}@if (f.required) { * }</span>
+              <select class="adm-input" [name]="'v-' + f.key" [ngModel]="value(f)" (ngModelChange)="setValue(f.key, $event)">
+                <option value="">{{ i18n.t('cf.set.choose') }}</option>
+                @for (o of f.options ?? []; track o) { <option [value]="o">{{ o }}</option> }
+              </select>
+              @if (f.help) { <span class="adm-hint">{{ f.help }}</span> }
+            </label>
+          }
+          @default {
+            <label class="adm-field">
+              <span class="adm-label">{{ f.label }}@if (f.required) { * }</span>
+              <input class="adm-input" [class.ca__number]="f.type === 'number'" [type]="f.type === 'number' ? 'number' : 'text'" [name]="'v-' + f.key"
+                [ngModel]="value(f)" (ngModelChange)="setValue(f.key, $event)" />
+              @if (f.help) { <span class="adm-hint">{{ f.help }}</span> }
+            </label>
+          }
+        }
+      }
+      @if (notice(); as n) { <p class="adm-small text-ok" role="status">{{ n }}</p> }
+      <span><button type="submit" class="adm-btn adm-btn--primary" [disabled]="busy()">{{ i18n.t('cf.set.save') }}</button></span>
+    </form>
+  }
+}

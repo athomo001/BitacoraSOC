@@ -1,0 +1,7 @@
+{
+  "version": "1.0.0",
+  "pages": [
+    { "id": "incidentes-por-cliente", "module": "reports", "title": "Incidentes por cliente", "path": "index.html" }
+  ],
+  "data": ["entries:read", "tickets:read", "clients:read"]
+}

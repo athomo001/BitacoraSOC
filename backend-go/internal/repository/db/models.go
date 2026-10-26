@@ -1357,6 +1357,7 @@ type ApiKey struct {
 	RevokedAt    pgtype.Timestamptz `json:"revoked_at"`
 	RevokedBy    pgtype.UUID        `json:"revoked_by"`
 	RevokeReason pgtype.Text        `json:"revoke_reason"`
+	ComplementID pgtype.UUID        `json:"complement_id"`
 }
 
 type ApiKeyRequest struct {
@@ -1713,6 +1714,13 @@ type Complement struct {
 	CreatedBy                 pgtype.UUID        `json:"created_by"`
 	CreatedAt                 pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt                 pgtype.Timestamptz `json:"updated_at"`
+	Manifest                  []byte             `json:"manifest"`
+	Approved                  []string           `json:"approved"`
+	IsHouse                   bool               `json:"is_house"`
+	Settings                  []byte             `json:"settings"`
+	SecretsEncrypted          pgtype.Text        `json:"secrets_encrypted"`
+	IntegrationKeyEncrypted   pgtype.Text        `json:"integration_key_encrypted"`
+	HookSecretEncrypted       pgtype.Text        `json:"hook_secret_encrypted"`
 }
 
 type ComplementFile struct {
@@ -1721,6 +1729,16 @@ type ComplementFile struct {
 	ContentType  string    `json:"content_type"`
 	Sha256       string    `json:"sha256"`
 	Content      []byte    `json:"content"`
+}
+
+type ComplementSchedule struct {
+	ComplementID uuid.UUID          `json:"complement_id"`
+	Name         string             `json:"name"`
+	NextRunAt    pgtype.Timestamptz `json:"next_run_at"`
+	LeaseUntil   pgtype.Timestamptz `json:"lease_until"`
+	LeaseOwner   pgtype.Text        `json:"lease_owner"`
+	LastRunAt    pgtype.Timestamptz `json:"last_run_at"`
+	LastStatus   pgtype.Text        `json:"last_status"`
 }
 
 type ComplementStorage struct {
@@ -1829,6 +1847,7 @@ type EntryComment struct {
 	GlpiFollowupID    pgtype.Int4        `json:"glpi_followup_id"`
 	GlpiPushState     pgtype.Text        `json:"glpi_push_state"`
 	GlpiPushError     pgtype.Text        `json:"glpi_push_error"`
+	Via               pgtype.Text        `json:"via"`
 }
 
 type EntryDraft struct {
@@ -1916,38 +1935,41 @@ type EscalationStep struct {
 }
 
 type ForwardDestination struct {
-	ID                 uuid.UUID          `json:"id"`
-	Name               string             `json:"name"`
-	Enabled            bool               `json:"enabled"`
-	Transport          string             `json:"transport"`
-	Host               pgtype.Text        `json:"host"`
-	Port               pgtype.Int4        `json:"port"`
-	Url                pgtype.Text        `json:"url"`
-	Format             string             `json:"format"`
-	Batch              bool               `json:"batch"`
-	SendAudit          bool               `json:"send_audit"`
-	AuditLevel         string             `json:"audit_level"`
-	SendEntries        bool               `json:"send_entries"`
-	SendEscalation     bool               `json:"send_escalation"`
-	SendTickets        bool               `json:"send_tickets"`
-	CaCert             pgtype.Text        `json:"ca_cert"`
-	ClientCert         pgtype.Text        `json:"client_cert"`
-	ClientKeyEncrypted pgtype.Text        `json:"client_key_encrypted"`
-	HeaderNames        []string           `json:"header_names"`
-	HeadersEncrypted   pgtype.Text        `json:"headers_encrypted"`
-	CursorID           int64              `json:"cursor_id"`
-	LeaseUntil         pgtype.Timestamptz `json:"lease_until"`
-	LeaseOwner         pgtype.Text        `json:"lease_owner"`
-	NextAttemptAt      pgtype.Timestamptz `json:"next_attempt_at"`
-	Failures           int32              `json:"failures"`
-	FailingSince       pgtype.Timestamptz `json:"failing_since"`
-	DownAlerted        bool               `json:"down_alerted"`
-	LastSentAt         pgtype.Timestamptz `json:"last_sent_at"`
-	LastError          pgtype.Text        `json:"last_error"`
-	LastErrorAt        pgtype.Timestamptz `json:"last_error_at"`
-	CreatedBy          pgtype.UUID        `json:"created_by"`
-	CreatedAt          pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
+	ID                  uuid.UUID          `json:"id"`
+	Name                string             `json:"name"`
+	Enabled             bool               `json:"enabled"`
+	Transport           string             `json:"transport"`
+	Host                pgtype.Text        `json:"host"`
+	Port                pgtype.Int4        `json:"port"`
+	Url                 pgtype.Text        `json:"url"`
+	Format              string             `json:"format"`
+	Batch               bool               `json:"batch"`
+	SendAudit           bool               `json:"send_audit"`
+	AuditLevel          string             `json:"audit_level"`
+	SendEntries         bool               `json:"send_entries"`
+	SendEscalation      bool               `json:"send_escalation"`
+	SendTickets         bool               `json:"send_tickets"`
+	CaCert              pgtype.Text        `json:"ca_cert"`
+	ClientCert          pgtype.Text        `json:"client_cert"`
+	ClientKeyEncrypted  pgtype.Text        `json:"client_key_encrypted"`
+	HeaderNames         []string           `json:"header_names"`
+	HeadersEncrypted    pgtype.Text        `json:"headers_encrypted"`
+	CursorID            int64              `json:"cursor_id"`
+	LeaseUntil          pgtype.Timestamptz `json:"lease_until"`
+	LeaseOwner          pgtype.Text        `json:"lease_owner"`
+	NextAttemptAt       pgtype.Timestamptz `json:"next_attempt_at"`
+	Failures            int32              `json:"failures"`
+	FailingSince        pgtype.Timestamptz `json:"failing_since"`
+	DownAlerted         bool               `json:"down_alerted"`
+	LastSentAt          pgtype.Timestamptz `json:"last_sent_at"`
+	LastError           pgtype.Text        `json:"last_error"`
+	LastErrorAt         pgtype.Timestamptz `json:"last_error_at"`
+	CreatedBy           pgtype.UUID        `json:"created_by"`
+	CreatedAt           pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt           pgtype.Timestamptz `json:"updated_at"`
+	ComplementID        pgtype.UUID        `json:"complement_id"`
+	Events              []string           `json:"events"`
+	HmacSecretEncrypted pgtype.Text        `json:"hmac_secret_encrypted"`
 }
 
 type ForwardOutbox struct {

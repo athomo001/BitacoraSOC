@@ -12,6 +12,7 @@ import { CLOCK_TONE, PRIORITY_SHORT, PRIORITY_TONE, STATUS_TONE, clockText } fro
 import { TicketDetailComponent } from './ticket-detail';
 
 import '../../core/i18n/packs/tickets';
+import { ComplementPageLinksComponent } from '../../shared/complement-frame/complement-page-links';
 /**
  * Ticketera (/tickets, Fase 10) según el diseño aprobado: resumen de la cola
  * arriba, filtros de un clic, tabla densa con prioridad/estado como pastillas
@@ -21,7 +22,7 @@ import '../../core/i18n/packs/tickets';
 @Component({
   selector: 'app-tickets',
   standalone: true,
-  imports: [FormsModule, MatIconModule, TicketDetailComponent],
+  imports: [FormsModule, MatIconModule, TicketDetailComponent, ComplementPageLinksComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './tickets.html',
   styleUrl: './tickets.css',

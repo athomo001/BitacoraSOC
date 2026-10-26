@@ -22,6 +22,7 @@ var auditExempt = map[string]string{
 	"POST /api/glpi/preview":                       "solo lee GLPI y muestra qué cambiaría, no guarda nada (la importación sí se audita)",
 	"POST /api/glpi/tickets/sync":                  "solo arranca la corrida en segundo plano; la corrida se audita al terminar (glpi.tickets.sync)",
 	"POST /api/maintenance-windows/series/preview": "solo calcula las próximas fechas de una ventana que se repite, no guarda nada (crearla sí se audita)",
+	"POST /api/complements/{slug}/api":             "API_REQUEST de un complemento: solo lee /api/v1 como la persona (es POST porque lleva la ruta en el cuerpo); abrir el complemento sí se audita",
 }
 
 // TestEveryWriteRouteAudits recorre las rutas POST/PUT/PATCH/DELETE que

@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="es" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<title>Servicio de ejemplo</title>
+<style>
+  :root, [data-theme='dark'] { --bg: #161b22; --text: #f0f6fc; --muted: #8b949e; --line: #30363d; --accent: #58a6ff; color-scheme: dark; }
+  [data-theme='light'] { --bg: #fff; --text: #1f2328; --muted: #59636e; --line: #d0d7de; --accent: #0969da; color-scheme: light; }
+  [data-theme='pink'] { --bg: #fffafd; --text: #3a1f52; --muted: #5e3f7d; --line: #e2cdea; --accent: #9c1b5e; color-scheme: light; }
+  body { margin: 0; padding: 16px; background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, sans-serif; }
+  p { margin: 0 0 12px; color: var(--muted); }
+  button { height: 32px; padding: 0 14px; border: 0; border-radius: 6px; background: var(--accent); color: var(--bg); font: inherit; font-weight: 600; cursor: pointer; }
+  pre { padding: 10px; border: 1px solid var(--line); border-radius: 6px; overflow: auto; }
+</style>
+</head>
+<body>
+  <p id="donde">Esperando la ficha…</p>
+  <button type="button" id="nota">Agregar seguimiento</button>
+  <pre id="dato" hidden></pre>
+  <script src="bitacora-complemento.js"></script>
+  <script>
+    // La ficha abierta llega en el contexto (y en ?object=tipo:id).
+    Bitacora.onContext(function (ctx) {
+      var o = ctx.object;
+      document.getElementById('donde').textContent = o ? 'Abierto en ' + (o.type === 'ticket' ? 'el ticket ' : 'la entrada ') + o.id : 'Sin ficha';
+      if (o && o.type === 'entry') {
+        Bitacora.api('/entries/' + o.id).then(function (b) {
+          var pre = document.getElementById('dato');
+          pre.textContent = b.data.content;
+          pre.hidden = false;
+        });
+      }
+    });
+    document.getElementById('nota').addEventListener('click', function () {
+      var saludo = (Bitacora.context && Bitacora.context.settings && Bitacora.context.settings.saludo) || 'Hola desde el ejemplo';
+      Bitacora.addNote(saludo).then(function () { Bitacora.close(); }, function (e) { alert(e.message); });
+    });
+  </script>
+</body>
+</html>

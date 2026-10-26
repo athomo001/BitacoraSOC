@@ -110,6 +110,7 @@ describe('ShellComponent', () => {
   it('Complementos no aparece apagado, ni encendido sin complementos visibles', async () => {
     const { fixture, el } = await render([{ code: 'complements', isEnabled: true }]);
     httpMock.expectOne('/api/complements/active').flush({ data: [] });
+    httpMock.expectOne('/api/complements/slots').flush({ data: { pages: [], panels: [], actions: [], topbar: null } });
     await fixture.whenStable();
     fixture.detectChanges();
     expect(navLabels(el)).not.toContain('Complementos');
@@ -120,9 +121,22 @@ describe('ShellComponent', () => {
     httpMock.expectOne('/api/complements/active').flush({
       data: [{ slug: 'doom', name: 'DOOM', icon: 'sports_esports', status: 'active', sourceType: 'zip_static', circuit: 'CLOSED' }],
     });
-    await fixture.whenStable();
+    httpMock.expectOne('/api/complements/slots').flush({ data: { pages: [], panels: [], actions: [], topbar: null } });
+    await new Promise((resolve) => setTimeout(resolve)); // las dos llamadas de refresh()
     fixture.detectChanges();
     expect(navLabels(el)).toContain('Complementos');
+    expect(el.querySelector('.shell--bar')).toBeNull();
+  });
+
+  it('la barra superior de un complemento «de la casa» (10i) baja la app 32px', async () => {
+    const { fixture, el } = await render([{ code: 'complements', isEnabled: true }]);
+    httpMock.expectOne('/api/complements/active').flush({ data: [] });
+    httpMock.expectOne('/api/complements/slots').flush({
+      data: { pages: [], panels: [], actions: [], topbar: { slug: 'enlaces', name: 'Estado de enlaces', icon: 'lan', key: 'topbar', title: 'Estado de enlaces' } },
+    });
+    await new Promise((resolve) => setTimeout(resolve));
+    fixture.detectChanges();
+    expect(el.querySelector('.shell--bar')).not.toBeNull();
   });
 
   it('con la ticketera activa la muestra como sección propia justo debajo de Bitácora', async () => {

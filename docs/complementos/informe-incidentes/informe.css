@@ -1,0 +1,190 @@
+/* Los colores de la app en sus tres temas: el informe se ve igual que el resto. */
+:root,
+[data-theme='dark'] {
+  --bg: #161b22;
+  --line: #30363d;
+  --soft: #21262d;
+  --text: #f0f6fc;
+  --muted: #8b949e;
+  --accent: #58a6ff;
+  --warn: #d29922;
+  color-scheme: dark;
+}
+
+[data-theme='light'] {
+  --bg: #fff;
+  --line: #d0d7de;
+  --soft: #eaeef2;
+  --text: #1f2328;
+  --muted: #59636e;
+  --accent: #0969da;
+  --warn: #9a6700;
+  color-scheme: light;
+}
+
+[data-theme='pink'] {
+  --bg: #fffafd;
+  --line: #e2cdea;
+  --soft: #f5e6f7;
+  --text: #3a1f52;
+  --muted: #5e3f7d;
+  --accent: #9c1b5e;
+  --warn: #6b4300;
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.45 'Geist', system-ui, sans-serif;
+}
+
+.dyslexia body {
+  font-family: 'OpenDyslexic', 'Geist', system-ui, sans-serif;
+}
+
+.inf {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 22px 26px;
+}
+
+.inf__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 16px;
+}
+
+.inf__titles {
+  flex: 1;
+  min-width: 260px;
+}
+
+h1 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.inf__lead,
+.inf__estado,
+.inf__pie {
+  margin: 4px 0 0;
+  color: var(--muted);
+}
+
+.inf__field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+select {
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+}
+
+.inf__tabla {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th {
+  padding: 8px 10px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+}
+
+td {
+  padding: 10px;
+  border-top: 1px solid var(--soft);
+}
+
+th:first-child,
+td:first-child {
+  padding-left: 0;
+}
+
+.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.cliente {
+  font-weight: 500;
+}
+
+.inf__barcol {
+  width: 28%;
+}
+
+.barra {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.barra__pista {
+  flex: 1;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: var(--soft);
+}
+
+.barra__relleno {
+  display: block;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--accent);
+}
+
+.alerta {
+  color: var(--warn);
+}
+
+.tenue {
+  color: var(--muted);
+}
+
+/* «Descargar PDF» de la app abre la impresión: hoja clara y sin el selector. */
+@media print {
+  :root,
+  [data-theme] {
+    --bg: #fff;
+    --line: #d0d7de;
+    --soft: #d0d7de;
+    --text: #1f2328;
+    --muted: #59636e;
+    --accent: #0969da;
+    --warn: #9a6700;
+  }
+
+  .inf__field {
+    display: none;
+  }
+
+  .inf {
+    padding: 0;
+  }
+
+  .barra__relleno {
+    print-color-adjust: exact;
+  }
+}

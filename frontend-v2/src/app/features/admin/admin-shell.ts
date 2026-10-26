@@ -34,17 +34,23 @@ import { AdminIntegrationsComponent } from './admin-integrations';
 import { AdminPublicLinksComponent } from './admin-public-links';
 import { SystemFeaturesService } from '../../core/system-features/system-features.service';
 
+import { ComplementsService } from '../../core/complements/complements.service';
+import { ComplementFrameComponent } from '../../shared/complement-frame/complement-frame';
 import '../../core/i18n/packs/admin';
 import '../../core/i18n/packs/raci';
 export type AdminSection =
   | 'access' | 'areas' | 'shifts' | 'checklist' | 'escalation' | 'raci' | 'tickets' | 'clientAlerts' | 'smtp' | 'reports'
   | 'agenda' | 'notifications' | 'organizations' | 'territory' | 'inventory' | 'teams'
-  | 'modules' | 'brand' | 'features' | 'glpi' | 'integrations' | 'publicLinks' | 'backups' | 'audit' | 'complements' | 'tags';
+  | 'modules' | 'brand' | 'features' | 'glpi' | 'integrations' | 'publicLinks' | 'backups' | 'audit' | 'complements' | 'tags'
+  // Página de un complemento «de la casa» (10i): «c:slug|page:id».
+  | `c:${string}`;
 
 interface NavItem {
   id: AdminSection;
   icon: string;
   labelKey: MessageKey;
+  /** Nombre propio (las páginas de complementos, que no tienen texto en los packs). */
+  label?: string;
   badge?: string;
   /** Sección de un módulo SOC/NOC: si el módulo no aplica, no aparece (sin aviso de "desactivado"). */
   requiresModule?: DomainModule;
@@ -133,7 +139,7 @@ function normalize(text: string): string {
     MatIconModule, AdminModulesComponent, AdminBrandComponent, AdminFeaturesComponent, AdminTerritoryComponent, AdminInventoryComponent, AdminOrganizationsComponent, AdminTeamsComponent,
     AdminEscalationComponent, AdminShiftsComponent, AdminSmtpComponent, AdminReportsComponent, AdminBackupsComponent, AdminAuditComponent,
     AdminAccessComponent, AdminChecklistComponent, AdminComplementsComponent, AdminClientAlertsComponent, AdminTicketsComponent, AdminAreasComponent, AdminAgendaComponent, AdminNotificationsComponent, AdminGlpiComponent,
-    AdminEntryTagsComponent, AdminRaciComponent, AdminIntegrationsComponent, AdminPublicLinksComponent,
+    AdminEntryTagsComponent, AdminRaciComponent, AdminIntegrationsComponent, AdminPublicLinksComponent, ComplementFrameComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { '(document:keydown)': 'onKeydown($event)' },
@@ -156,7 +162,7 @@ function normalize(text: string): string {
               @for (item of group.items; track item.id) {
                 <button type="button" class="adm__item" [class.adm__item--active]="active() === item.id" [attr.aria-current]="active() === item.id ? 'page' : null" (click)="go(item.id)">
                   <mat-icon>{{ item.icon }}</mat-icon>
-                  <span class="adm__item-label">{{ i18n.t(item.labelKey) }}</span>
+                  <span class="adm__item-label">{{ item.label ?? i18n.t(item.labelKey) }}</span>
                   @if (item.badge) { <span class="pill tone-system">{{ item.badge }}</span> }
                 </button>
               }
@@ -194,6 +200,11 @@ function normalize(text: string): string {
           @case ('audit') { <app-admin-audit /> }
           @case ('complements') { <app-admin-complements /> }
           @case ('tags') { <app-admin-entry-tags /> }
+          @default {
+            @if (complementPage(); as p) {
+              <app-complement-frame style="height: calc(100% - 4px)" [slug]="p.slug" [slot]="p.key" [label]="p.title" />
+            }
+          }
         }
       </main>
     </div>
@@ -244,9 +255,14 @@ export class AdminShellComponent {
   private readonly selected = signal<AdminSection>(readSection());
   protected readonly query = signal('');
 
+  private readonly complements = inject(ComplementsService);
+  /** Páginas en Administración de complementos «de la casa» (10i): un grupo más del menú. */
+  private readonly complementPages = computed(() => this.complements.slots().pages.filter((p) => p.module === 'admin'));
+  protected readonly complementPage = computed(() => this.complementPages().find((p) => `c:${p.slug}|${p.key}` === this.active()) ?? null);
+
   /** El menú sin las secciones de módulos que no aplican. */
   private readonly nav = computed(() =>
-    NAV.map((group) => ({
+    [...NAV, { labelKey: 'nav.complements' as MessageKey, items: this.complementPages().map((p): NavItem => ({ id: `c:${p.slug}|${p.key}`, icon: p.icon, labelKey: 'nav.complements', label: p.title })) }].map((group) => ({
       ...group,
       items: group.items.filter(
         (item) =>
@@ -281,7 +297,7 @@ export class AdminShellComponent {
     if (!q) return this.nav();
     return this.nav().map((group) => {
       const groupMatches = normalize(this.i18n.t(group.labelKey)).includes(q);
-      return { ...group, items: group.items.filter((item) => groupMatches || normalize(this.i18n.t(item.labelKey)).includes(q)) };
+      return { ...group, items: group.items.filter((item) => groupMatches || normalize(item.label ?? this.i18n.t(item.labelKey)).includes(q)) };
     }).filter((group) => group.items.length > 0);
   });
 

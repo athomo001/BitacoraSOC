@@ -1,4 +1,6 @@
-<div class="shell">
+<!-- Barra superior de un complemento «de la casa» (10i): franja fija de 32px sobre toda la app. -->
+@if (topbar()) { <ng-container #bar /> }
+<div class="shell" [class.shell--bar]="topbar()">
   <nav class="shell__sidebar" [attr.aria-label]="i18n.t('nav.primary')">
     <!-- Con logo, solo el logo a su tamaño (como el legacy); en la barra angosta, el ícono de la pestaña. -->
     <div class="shell__brand" [class.shell__brand--logo]="branding.logoUrl()">

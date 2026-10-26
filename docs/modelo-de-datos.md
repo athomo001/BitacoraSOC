@@ -2,7 +2,7 @@
 
 > Generado por `backend-go/cmd/er-docs` desde `backend-go/sql/schema/0001_init_schema.sql`, el esquema que usa sqlc, con todas las migraciones aplicadas. **No se edita a mano**: si cambia el esquema, se regenera con `go run ./cmd/er-docs` desde `backend-go/`.
 
-123 tablas en PostgreSQL, agrupadas en 17 dominios. Notación pata de gallo: `||` uno, `|o` / `o|` cero o uno, `o{` cero o muchos. La etiqueta de cada línea es la columna que hace la referencia.
+124 tablas en PostgreSQL, agrupadas en 17 dominios. Notación pata de gallo: `||` uno, `|o` / `o|` cero o uno, `o{` cero o muchos. La etiqueta de cada línea es la columna que hace la referencia.
 
 - Cada entidad muestra todas sus columnas salvo `created_at` y `updated_at`. `PK` clave primaria, `FK` referencia a otra tabla, `UK` valor único.
 - Las tablas de otros dominios aparecen como cajas sin columnas: son la misma tabla, dibujada donde se une.
@@ -28,7 +28,7 @@ Correspondencia con el legacy (MongoDB): [modelo-er-legacy-2.0.md](modelo-er-leg
 13. [Reportes y avisos por cliente](#13-reportes-y-avisos-por-cliente) — 5 tablas
 14. [Auditoría, notas y alertas de sala](#14-auditoría-notas-y-alertas-de-sala) — 4 tablas
 15. [Configuración y respaldos](#15-configuración-y-respaldos) — 6 tablas
-16. [Complementos](#16-complementos) — 4 tablas
+16. [Complementos](#16-complementos) — 5 tablas
 17. [Ingesta de alertas (después del corte)](#17-ingesta-de-alertas-después-del-corte) — 2 tablas
 
 ---
@@ -1296,6 +1296,9 @@ erDiagram
         text last_error
         timestamptz last_error_at
         uuid created_by FK
+        uuid complement_id FK
+        text[] events
+        text hmac_secret_encrypted
     }
     FORWARD_OUTBOX {
         bigserial id PK
@@ -1326,6 +1329,7 @@ erDiagram
         timestamptz revoked_at
         uuid revoked_by FK
         text revoke_reason
+        uuid complement_id FK
     }
     API_KEY_REQUESTS {
         bigserial id PK
@@ -1350,6 +1354,8 @@ erDiagram
     API_KEYS |o--o{ API_KEY_REQUESTS : "api_key_id"
     API_KEYS ||--o{ API_IDEMPOTENCY : "api_key_id"
     AREAS |o--o{ API_KEYS : "area_id"
+    COMPLEMENTS |o--o{ API_KEYS : "complement_id"
+    COMPLEMENTS |o--o{ FORWARD_DESTINATIONS : "complement_id"
     FORWARD_DESTINATIONS ||--o{ FORWARD_STATS : "destination_id"
 ```
 
@@ -1511,6 +1517,7 @@ erDiagram
         int glpi_followup_id
         text glpi_push_state
         text glpi_push_error
+        text via
     }
     ENTRY_ATTACHMENTS {
         uuid id PK
@@ -1835,6 +1842,13 @@ erDiagram
         int artifact_files
         timestamptz published_at
         uuid created_by FK
+        jsonb manifest
+        text[] approved
+        boolean is_house
+        jsonb settings
+        text secrets_encrypted
+        text integration_key_encrypted
+        text hook_secret_encrypted
     }
     COMPLEMENT_FILES {
         uuid complement_id PK, FK
@@ -1858,8 +1872,18 @@ erDiagram
         uuid updated_by_user_id FK
         text updated_via
     }
+    COMPLEMENT_SCHEDULES {
+        uuid complement_id PK, FK
+        text name PK
+        timestamptz next_run_at
+        timestamptz lease_until
+        text lease_owner
+        timestamptz last_run_at
+        text last_status
+    }
 
     COMPLEMENTS ||--o{ COMPLEMENT_FILES : "complement_id"
+    COMPLEMENTS ||--o{ COMPLEMENT_SCHEDULES : "complement_id"
     COMPLEMENTS ||--o{ COMPLEMENT_STORAGE : "complement_id"
     USERS |o--o{ COMPLEMENT_STORAGE : "updated_by_user_id"
 ```

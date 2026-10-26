@@ -2809,3 +2809,46 @@ CREATE INDEX idx_assets_group ON assets(group_id) WHERE group_id IS NOT NULL;
 -- entradas de incidente de la Bitácora).
 CREATE INDEX IF NOT EXISTS idx_tickets_asset ON tickets(asset_id) WHERE asset_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_entries_asset ON entries(asset_id, created_at DESC) WHERE asset_id IS NOT NULL;
+
+-- 000063: complementos que agregan funciones a la app (10i, spec/11 §12).
+ALTER TABLE complements
+  ADD COLUMN manifest JSONB NOT NULL DEFAULT '{}',
+  ADD COLUMN approved TEXT[] NOT NULL DEFAULT '{}',
+  ADD COLUMN is_house BOOLEAN NOT NULL DEFAULT false,
+  ADD COLUMN settings JSONB NOT NULL DEFAULT '{}',
+  ADD COLUMN secrets_encrypted TEXT,
+  ADD COLUMN integration_key_encrypted TEXT,
+  ADD COLUMN hook_secret_encrypted TEXT;
+
+-- La llave de la API de integraciones de un complemento con servidor
+-- (§12.3): se crea al aprobar sus permisos de datos y cae con él.
+ALTER TABLE api_keys ADD COLUMN complement_id UUID REFERENCES complements(id) ON DELETE CASCADE;
+CREATE UNIQUE INDEX idx_api_keys_complement ON api_keys(complement_id) WHERE complement_id IS NOT NULL AND active;
+
+-- Los ganchos a eventos reutilizan la cola de la 10b: el complemento es un
+-- destino HTTP interno más, que recibe solo los eventos aprobados (events),
+-- firmados con HMAC. No se muestra en Administración → Integraciones.
+ALTER TABLE forward_destinations
+  ADD COLUMN complement_id UUID REFERENCES complements(id) ON DELETE CASCADE,
+  ADD COLUMN events TEXT[],
+  ADD COLUMN hmac_secret_encrypted TEXT;
+CREATE UNIQUE INDEX idx_forward_destinations_complement ON forward_destinations(complement_id) WHERE complement_id IS NOT NULL;
+
+-- Tareas programadas aprobadas: la app llama POST <servicio>/hooks/schedule/<nombre>.
+-- Un solo nodo la dispara (préstamo de 2 minutos, como el reenvío).
+CREATE TABLE complement_schedules (
+  complement_id UUID NOT NULL REFERENCES complements(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  next_run_at TIMESTAMPTZ NOT NULL,
+  lease_until TIMESTAMPTZ,
+  lease_owner TEXT,
+  last_run_at TIMESTAMPTZ,
+  last_status TEXT,
+  PRIMARY KEY (complement_id, name)
+);
+CREATE INDEX idx_complement_schedules_due ON complement_schedules(next_run_at);
+
+-- Seguimientos que deja un complemento (ADD_NOTE) o una llave de la API:
+-- se firman «persona, con <complemento>». En los tickets va en
+-- ticket_comments.origin como 'complement:<nombre>'.
+ALTER TABLE entry_comments ADD COLUMN via TEXT;

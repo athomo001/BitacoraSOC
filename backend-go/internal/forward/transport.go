@@ -3,8 +3,11 @@ package forward
 import (
 	"bytes"
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -27,6 +30,9 @@ type Target struct {
 	ClientCert string
 	ClientKey  string
 	Headers    map[string]string
+	// HMACSecret firma cada POST (los ganchos de un complemento, 10i):
+	// ver Sign.
+	HMACSecret string
 	// Hostname va en el HOSTNAME de RFC 5424 (el nodo que envía).
 	Hostname string
 	Timeout  time.Duration
@@ -192,6 +198,11 @@ func sendHTTP(ctx context.Context, t Target, msgs []Message) (int, error) {
 		for k, v := range t.Headers {
 			req.Header.Set(k, v)
 		}
+		if t.HMACSecret != "" {
+			ts := strconv.FormatInt(time.Now().Unix(), 10)
+			req.Header.Set("X-Bitacora-Timestamp", ts)
+			req.Header.Set("X-Bitacora-Signature", Sign(t.HMACSecret, ts, body))
+		}
 		resp, err := client.Do(req)
 		if err != nil {
 			return fmt.Errorf("no se pudo conectar: %w", err)
@@ -228,4 +239,14 @@ func sendHTTP(ctx context.Context, t Target, msgs []Message) (int, error) {
 		}
 	}
 	return len(msgs), nil
+}
+
+// Sign es la firma de un POST a un complemento: «sha256=» + HMAC-SHA256 en
+// hexadecimal de «<timestamp>.<cuerpo>» con su secreto. El complemento la
+// recalcula y rechaza lo que no coincide o tiene más de 5 minutos.
+func Sign(secret, timestamp string, body []byte) string {
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write([]byte(timestamp + "."))
+	mac.Write(body)
+	return "sha256=" + hex.EncodeToString(mac.Sum(nil))
 }

@@ -1,5 +1,5 @@
 import { BrandingService, Branding } from '../core/branding/branding.service';
-import { ChangeDetectionStrategy, Component, DestroyRef, HostListener, Injector, OnInit, computed, effect, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, HostListener, Injector, OnInit, ViewContainerRef, computed, effect, inject, untracked, viewChild } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { SHELL_NAV_ITEMS } from './shell-nav';
@@ -65,6 +65,14 @@ export class ShellComponent implements OnInit {
       if (this.features.isEnabled('complements')) void this.complements.refresh();
       else this.complements.clear();
     });
+    effect(() => {
+      const bar = this.topbar();
+      const host = this.topbarHost();
+      if (!bar || !host) return;
+      untracked(() =>
+        void import('../shared/complement-frame/complement-frame').then((m) => m.mountFrame(host, bar)),
+      );
+    });
     // Si apagan (aquí o en otra pestaña) el módulo de la pantalla abierta, se
     // sale de ella: un módulo apagado no se ve (regla del dueño). Solo cuenta
     // el paso de encendido a apagado, no la carga inicial.
@@ -82,6 +90,11 @@ export class ShellComponent implements OnInit {
       }
     });
   }
+
+  /** La barra superior de un complemento «de la casa» (10i), una por instalación. */
+  protected readonly topbar = computed(() => this.complements.slots().topbar);
+  /** Dónde va el iframe de la barra: se descarga solo si hay barra (no pesa en la carga inicial). */
+  private readonly topbarHost = viewChild('bar', { read: ViewContainerRef });
 
   /** Se recalcula solo cuando cambia una funcionalidad: activar la ticketera la muestra al instante. */
   protected readonly navItems = computed(() =>

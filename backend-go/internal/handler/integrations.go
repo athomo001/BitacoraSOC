@@ -34,7 +34,7 @@ import (
 
 // APIScopes: la única lista de permisos de una llave; la pantalla la lee de
 // GET /api/integrations/meta (nunca se copia a mano).
-var APIScopes = []string{"entries:read", "entries:write", "oncall:read", "tickets:read", "tickets:write", "reports:render", "reports:send"}
+var APIScopes = []string{"entries:read", "entries:write", "oncall:read", "tickets:read", "tickets:write", "clients:read", "reports:render", "reports:send"}
 
 // apiKeyPrefix: las llaves son bop_ + 43 caracteres base62.
 const (
@@ -512,23 +512,25 @@ func (h *IntegrationsHandler) TestDestination(w http.ResponseWriter, r *http.Req
 // ===== Llaves =====
 
 type apiKeyDTO struct {
-	ID            uuid.UUID   `json:"id"`
-	Name          string      `json:"name"`
-	Description   string      `json:"description"`
-	Prefix        string      `json:"prefix"`
-	Scopes        []string    `json:"scopes"`
-	ClientIDs     []uuid.UUID `json:"clientIds"`
-	AreaID        *uuid.UUID  `json:"areaId"`
-	AreaName      string      `json:"areaName,omitempty"`
-	State         string      `json:"state"` // active | expired | revoked
-	ExpiresAt     *time.Time  `json:"expiresAt"`
-	LastUsedAt    *time.Time  `json:"lastUsedAt"`
-	CreatedAt     time.Time   `json:"createdAt"`
-	CreatedByName string      `json:"createdByName"`
-	RevokedAt     *time.Time  `json:"revokedAt"`
-	RevokedByName string      `json:"revokedByName,omitempty"`
-	RevokeReason  *string     `json:"revokeReason"`
-	CallsWeek     int32       `json:"callsWeek"`
+	ID          uuid.UUID   `json:"id"`
+	Name        string      `json:"name"`
+	Description string      `json:"description"`
+	Prefix      string      `json:"prefix"`
+	Scopes      []string    `json:"scopes"`
+	ClientIDs   []uuid.UUID `json:"clientIds"`
+	AreaID      *uuid.UUID  `json:"areaId"`
+	AreaName    string      `json:"areaName,omitempty"`
+	// ComplementName: la llave de un complemento con servidor (10i).
+	ComplementName string     `json:"complementName,omitempty"`
+	State          string     `json:"state"` // active | expired | revoked
+	ExpiresAt      *time.Time `json:"expiresAt"`
+	LastUsedAt     *time.Time `json:"lastUsedAt"`
+	CreatedAt      time.Time  `json:"createdAt"`
+	CreatedByName  string     `json:"createdByName"`
+	RevokedAt      *time.Time `json:"revokedAt"`
+	RevokedByName  string     `json:"revokedByName,omitempty"`
+	RevokeReason   *string    `json:"revokeReason"`
+	CallsWeek      int32      `json:"callsWeek"`
 }
 
 func apiKeyState(active bool, expires pgtype.Timestamptz, now time.Time) string {
@@ -545,7 +547,8 @@ func toAPIKeyDTO(k db.ListAPIKeysRow, now time.Time) apiKeyDTO {
 	dto := apiKeyDTO{ID: k.ID, Name: k.Name, Description: k.Description, Prefix: k.KeyPrefix, Scopes: k.Scopes, ClientIDs: k.ClientIds,
 		AreaID: uuidPtr(k.AreaID), AreaName: k.AreaName, State: apiKeyState(k.Active, k.ExpiresAt, now), ExpiresAt: timestamptzPtr(k.ExpiresAt),
 		LastUsedAt: timestamptzPtr(k.LastUsedAt), CreatedByName: k.CreatedByName, RevokedAt: timestamptzPtr(k.RevokedAt),
-		RevokedByName: k.RevokedByName, RevokeReason: textPtr(k.RevokeReason), CallsWeek: k.CallsWeek}
+		RevokedByName: k.RevokedByName, RevokeReason: textPtr(k.RevokeReason), CallsWeek: k.CallsWeek,
+		ComplementName: k.ComplementName}
 	if k.CreatedAt.Valid {
 		dto.CreatedAt = k.CreatedAt.Time
 	}

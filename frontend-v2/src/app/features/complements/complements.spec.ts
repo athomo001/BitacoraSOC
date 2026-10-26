@@ -41,6 +41,7 @@ describe('ComplementsComponent', () => {
     const fixture = TestBed.createComponent(ComplementsComponent);
     fixture.detectChanges();
     http.expectOne('/api/complements/active').flush({ data: LIST });
+    http.expectOne('/api/complements/slots').flush({ data: { pages: [], panels: [], actions: [], topbar: null } });
     await settle();
     http.expectOne('/api/complements/diccionario/embed').flush({ data: { url: `${ORIGIN}/c/diccionario/index.html?embed=x`, origin: ORIGIN } });
     await settle();

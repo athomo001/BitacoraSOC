@@ -53,6 +53,8 @@ export interface EntryComment {
   /** «También en GLPI» (10d.2): en cola, enviado o no se envió. */
   glpiPush?: 'queued' | 'sent' | 'failed';
   glpiPushError?: string;
+  /** El complemento o la llave de API con que se dejó (10i): «con VirusTotal». */
+  via?: string;
 }
 
 export interface EntryDetail extends Entry {
