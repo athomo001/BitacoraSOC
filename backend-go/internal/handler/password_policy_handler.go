@@ -48,8 +48,14 @@ type PasswordPolicyHandler struct {
 
 // Get es público: lo leen el perfil, el cambio obligatorio y el reseteo por
 // correo (este último sin sesión) para avisar el mínimo antes de enviar.
+// domainAccounts: con LDAP encendido el login avisa que esas cuentas no se
+// recuperan por correo (spec/20).
 func (h *PasswordPolicyHandler) Get(w http.ResponseWriter, r *http.Request) {
-	writeData(w, http.StatusOK, map[string]any{"minLength": passwordMinLength(r.Context(), h.Queries)})
+	ctx := r.Context()
+	writeData(w, http.StatusOK, map[string]any{
+		"minLength":      passwordMinLength(ctx, h.Queries),
+		"domainAccounts": featureEnabled(ctx, h.Queries, ldapFeature),
+	})
 }
 
 func (h *PasswordPolicyHandler) Update(w http.ResponseWriter, r *http.Request) {

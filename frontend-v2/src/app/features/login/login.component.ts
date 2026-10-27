@@ -31,13 +31,14 @@ import {
   inject,
 } from '@angular/core';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
-import { HttpErrorResponse } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { Title } from '@angular/platform-browser';
+import { firstValueFrom } from 'rxjs';
 import anime from 'animejs';
 import { BrandingService } from '../../core/branding/branding.service';
 import { AuthService } from '../../core/auth/auth.service';
-import { isMfaPending } from '../../core/auth/auth.models';
+import { ApiEnvelope, isMfaPending } from '../../core/auth/auth.models';
 
 import { LOGIN_THEMES, LOGIN_THEME_STORAGE_KEY as THEME_STORAGE_KEY, LoginTheme } from './login-themes';
 
@@ -78,6 +79,9 @@ export class LoginComponent implements OnInit, OnDestroy {
   bannerType: 'success' | 'error' | 'info' = 'info';
   mfaToken = '';
   needsMfaSetup = false;
+  /** LDAP encendido: la recuperación avisa que las cuentas del dominio no aplican. */
+  domainAccounts = false;
+  private domainAccountsLoaded = false;
   mfaQrCode = '';
   mfaSecret = '';
   private glitchTimer?: ReturnType<typeof setTimeout>;
@@ -105,6 +109,7 @@ export class LoginComponent implements OnInit, OnDestroy {
 
   private readonly fb = inject(FormBuilder);
   private readonly authService = inject(AuthService);
+  private readonly http = inject(HttpClient);
   private readonly router = inject(Router);
   private readonly ngZone = inject(NgZone);
   private readonly cdr = inject(ChangeDetectorRef);
@@ -429,6 +434,23 @@ export class LoginComponent implements OnInit, OnDestroy {
     this.loginForm.get('username')?.markAsUntouched();
     this.loginForm.get('password')?.setValue('');
     this.loginForm.get('password')?.markAsUntouched();
+    void this.loadDomainAccounts();
+  }
+
+  private async loadDomainAccounts(): Promise<void> {
+    if (this.domainAccountsLoaded) return;
+    this.domainAccountsLoaded = true;
+    try {
+      // Acá y no en AuthService: el login es lazy y el bundle inicial está al límite.
+      const policy = await firstValueFrom(
+        this.http.get<ApiEnvelope<{ domainAccounts?: boolean }>>('/api/auth/password-policy'),
+      );
+      this.domainAccounts = policy.data.domainAccounts === true;
+      this.render();
+    } catch {
+      // Sin respuesta no se muestra el aviso; se reintenta en la próxima apertura.
+      this.domainAccountsLoaded = false;
+    }
   }
 
   switchToLogin(): void {

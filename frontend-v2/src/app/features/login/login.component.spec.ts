@@ -106,4 +106,21 @@ describe('LoginComponent (portado del legacy)', () => {
     await done;
     expect(component.bannerMessage).toBe('SOLICITUD RECIBIDA');
   });
+
+  for (const domainAccounts of [true, false]) {
+    it(`recuperación ${domainAccounts ? 'avisa' : 'no menciona'} las cuentas del dominio con LDAP ${domainAccounts ? 'encendido' : 'apagado'}`, async () => {
+      const { fixture, component, el } = render();
+      component.selectLoginTheme('modern');
+      component.switchToRecovery();
+      httpMock.expectOne('/api/auth/password-policy').flush({ data: { minLength: 6, domainAccounts } });
+      await fixture.whenStable();
+      fixture.detectChanges();
+      expect(el.textContent?.includes('cuenta del dominio')).toBe(domainAccounts);
+
+      // Se consulta una sola vez por carga del login.
+      component.switchToLogin();
+      component.switchToRecovery();
+      httpMock.expectNone('/api/auth/password-policy');
+    });
+  }
 });

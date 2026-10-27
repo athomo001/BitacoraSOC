@@ -75,9 +75,11 @@ services:
       - bitacora-app
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+    # CADDY_BIND_ADDR: 127.0.0.1 en local; 0.0.0.0 en QA (el Jenkinsfile lo
+    # pone en el .env) para que la app se alcance desde la red.
     ports:
-      - "127.0.0.1:8081:80"
-      - "127.0.0.1:8082:8082"
+      - "${CADDY_BIND_ADDR:-127.0.0.1}:8081:80"
+      - "${CADDY_BIND_ADDR:-127.0.0.1}:8082:8082"
     networks:
       - bitacora-rewrite-network
 

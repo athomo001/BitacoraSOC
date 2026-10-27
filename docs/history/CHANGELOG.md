@@ -4,6 +4,12 @@ Registro de cambios relevantes del proyecto.
 
 > Las entradas `[Rewrite]` registran avance de la reescritura Go/Angular especificada en `spec/` (ver `spec/02-alcance-y-roadmap.md`), fase por fase. No llevan número de versión de `package.json` porque documentan spec/decisiones/código de un sistema todavía no desplegado — el sistema en producción sigue siendo el de las entradas versionadas de abajo hasta el corte (Fase 14).
 
+## [Rewrite] Recuperar contraseña avisa de las cuentas del dominio - 2026-10-27
+
+- La recuperación por correo ya ignoraba las cuentas vinculadas al directorio (`spec/20`), pero quien tiene una veía «SOLICITUD RECIBIDA» y no le llegaba nada. Con LDAP encendido, la pantalla de recuperación de los seis temas del login suma «Si entras con tu cuenta del dominio, cambia la contraseña en el directorio de tu organización». Con LDAP apagado no aparece. No revela si el correo existe.
+- `GET /api/auth/password-policy` (público) suma `domainAccounts`. El login lo consulta al abrir la recuperación, una vez por carga.
+- Pruebas: la pantalla con LDAP encendido y apagado.
+
 ## [Rewrite] Complementos que agregan funciones a la app (10i) - 2026-10-26
 
 - Pedido del dueño: que un complemento sume funciones a la Bitácora sin tocar el núcleo, como los plugins de GLPI (`spec/11` §12). Decisiones del 2026-10-26: entra todo §12.2, la barra superior y las páginas en Administración son solo para complementos «de la casa», la prueba es un informe en Reportes y el orquestador queda fuera. Diseño aprobado: <https://claude.ai/artifact/FwDwV5LL1txKrM6UZBQUEj>.

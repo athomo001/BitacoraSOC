@@ -239,6 +239,9 @@
             <div class="panel-footer">
               <div class="footer-text">RECUPERACIÓN SEGURA ACTIVA</div>
               <div class="footer-text small">NO SE DIVULGARÁ EL ESTADO DE LA CUENTA</div>
+              @if (domainAccounts) {
+                <div class="footer-text small">CUENTA DEL DOMINIO: CAMBIE LA CONTRASEÑA EN EL DIRECTORIO</div>
+              }
             </div>
           </div>
 
@@ -645,6 +648,12 @@
                 recuperación. Por seguridad no se reconoce el estado de la cuenta.</span
               >
             </div>
+            @if (domainAccounts) {
+              <div class="cy-info-box">
+                <span>🏢</span>
+                <span>Si entras con tu cuenta del dominio, cambia la contraseña en el directorio de tu organización.</span>
+              </div>
+            }
 
             <form [formGroup]="recoveryForm" (ngSubmit)="onRecoverySubmit()" class="cy-form">
               <div class="cy-field">
@@ -929,6 +938,11 @@
                   si la dirección ingresada existe en el sistema.</span
                 >
               </div>
+              @if (domainAccounts) {
+                <div class="info-alert-box">
+                  <span>Si entras con tu cuenta del dominio, cambia la contraseña en el directorio de tu organización.</span>
+                </div>
+              }
 
               <form [formGroup]="recoveryForm" (ngSubmit)="onRecoverySubmit()" class="login-form">
                 <div class="form-group">
@@ -1240,6 +1254,11 @@
                   si la dirección ingresada existe en el sistema.</span
                 >
               </div>
+              @if (domainAccounts) {
+                <div class="info-alert-box">
+                  <span>Si entras con tu cuenta del dominio, cambia la contraseña en el directorio de tu organización.</span>
+                </div>
+              }
 
               <form [formGroup]="recoveryForm" (ngSubmit)="onRecoverySubmit()" class="surreal-form">
                 <div class="form-group">
@@ -1510,6 +1529,11 @@
             <div class="dialog-instruction-text" style="margin-bottom: 15px">
               Enter your registered email address to receive a recovery link.
             </div>
+            @if (domainAccounts) {
+              <div class="dialog-instruction-text" style="margin-bottom: 15px">
+                Domain accounts: change your password in your organization's directory.
+              </div>
+            }
 
             <form [formGroup]="recoveryForm" (ngSubmit)="onRecoverySubmit()" class="win-form">
               <div class="form-row-win">
@@ -1811,6 +1835,9 @@
             <div class="unix-divider">-----------------------------</div>
 
             <p class="unix-info-text">Enter your email address to receive a recovery link.</p>
+            @if (domainAccounts) {
+              <p class="unix-info-text">Domain accounts: change your password in your organization's directory.</p>
+            }
 
             <form [formGroup]="recoveryForm" (ngSubmit)="onRecoverySubmit()" class="unix-form">
               <div class="unix-form-group">
