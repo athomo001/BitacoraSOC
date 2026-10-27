@@ -16,6 +16,7 @@ const KNOWN: Record<string, { name: MessageKey; desc: MessageKey; available: boo
   complements: { name: 'features.complements.name', desc: 'features.complements.desc', available: true },
   zabbix_inbound: { name: 'features.zabbix_inbound.name', desc: 'features.zabbix_inbound.desc', available: false },
   glpi_sync: { name: 'features.glpi_sync.name', desc: 'features.glpi_sync.desc', available: true },
+  ldap: { name: 'features.ldap.name', desc: 'features.ldap.desc', available: true },
   calendar_feed: { name: 'features.calendar_feed.name', desc: 'features.calendar_feed.desc', available: true },
 };
 

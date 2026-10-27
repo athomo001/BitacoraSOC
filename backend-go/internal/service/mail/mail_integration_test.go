@@ -15,9 +15,11 @@ import (
 	"time"
 
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/service/mail"
+	"github.com/athomo001/BitacoraSOC/backend-go/internal/service/mail/mailpittest"
 )
 
 func TestSend_EntregaRealContraMailpit(t *testing.T) {
+	mailpittest.Require(t)
 	sender := mail.NewSender(mail.Config{
 		Host:        "127.0.0.1",
 		Port:        11025,

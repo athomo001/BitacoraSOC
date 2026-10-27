@@ -7,6 +7,7 @@ import { problemDetail } from '../../core/http-error';
 
 import '../../core/i18n/packs/admin';
 import '../../core/i18n/packs/notifications';
+import '../../core/i18n/packs/ldap';
 
 /**
  * Administración → Notificaciones (spec/16 §4.5, decisiones del dueño

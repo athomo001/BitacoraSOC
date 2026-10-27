@@ -112,6 +112,9 @@ type patchUserRequest struct {
 	// Cumpleaños "AAAA-MM-DD" ("" lo borra), como el formulario de usuarios
 	// del legacy; lo usan los correos de cumpleaños.
 	Birthday *string `json:"birthday"`
+	// De dónde sale la contraseña (spec/20): auto (la del dominio si está en
+	// el directorio) o local (solo la de la Bitácora). ldap lo pone el ingreso.
+	AuthSource *string `json:"authSource"`
 }
 
 func (h *UsersHandler) Patch(w http.ResponseWriter, r *http.Request) {
@@ -136,6 +139,21 @@ func (h *UsersHandler) Patch(w http.ResponseWriter, r *http.Request) {
 	if me, ok := middleware.UserFromContext(ctx); ok && me.ID == id {
 		if (req.Role != nil && *req.Role != "admin") || (req.Active != nil && !*req.Active) {
 			problemdetails.Write(w, r, http.StatusConflict, "self-lockout", "no puedes quitarte el rol de administrador ni desactivarte a ti mismo")
+			return
+		}
+		// Pasar la propia cuenta del dominio a local la deja sin contraseña conocida.
+		if req.AuthSource != nil {
+			problemdetails.Write(w, r, http.StatusConflict, "self-lockout", "no puedes cambiar de dónde sale tu propia contraseña")
+			return
+		}
+	}
+	if req.AuthSource != nil && *req.AuthSource != authSourceAuto && *req.AuthSource != authSourceLocal {
+		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "origen de la contraseña: auto o local")
+		return
+	}
+	if req.MustChangePassword != nil && *req.MustChangePassword {
+		if cur, err := h.Queries.GetUserByID(ctx, id); err == nil && domainManaged(ctx, h.Queries, cur) && req.AuthSource == nil {
+			problemdetails.Write(w, r, http.StatusConflict, "password-managed-by-directory", "la contraseña de esta cuenta es la del dominio: se cambia allá")
 			return
 		}
 	}
@@ -173,7 +191,15 @@ func (h *UsersHandler) Patch(w http.ResponseWriter, r *http.Request) {
 		problemdetails.Write(w, r, http.StatusNotFound, "not-found", "usuario no encontrado")
 		return
 	}
-	h.AuditLog.Log(ctx, "users.update", audit.LevelInfo, audit.Success(), map[string]any{"userId": id.String()})
+	details := map[string]any{"userId": id.String()}
+	if req.AuthSource != nil && *req.AuthSource != user.AuthSource {
+		if user, err = h.Queries.SetUserAuthSource(ctx, db.SetUserAuthSourceParams{ID: id, AuthSource: *req.AuthSource}); err != nil {
+			problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo cambiar el origen de la contraseña")
+			return
+		}
+		details["authSource"] = *req.AuthSource
+	}
+	h.AuditLog.Log(ctx, "users.update", audit.LevelInfo, audit.Success(), details)
 	writeData(w, http.StatusOK, toUserDTO(user))
 }
 

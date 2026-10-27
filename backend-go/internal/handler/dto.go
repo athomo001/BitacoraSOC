@@ -14,20 +14,22 @@ import (
 // salen, estructuralmente, porque el campo no existe acá). Ver
 // spec/07-backend-arquitectura-go.md sección 6.6.
 type UserDTO struct {
-	ID                 uuid.UUID  `json:"id"`
-	Username           string     `json:"username"`
-	Email              string     `json:"email"`
-	FullName           *string    `json:"fullName,omitempty"`
-	Phone              *string    `json:"phone,omitempty"`
-	Birthday           *string    `json:"birthday,omitempty"`
-	AvatarURL          *string    `json:"avatarUrl,omitempty"`
-	Role               string     `json:"role"`
-	CargoLabel         *string    `json:"cargoLabel,omitempty"`
-	MFAEnabled         bool       `json:"mfaEnabled"`
-	MustChangePassword bool       `json:"mustChangePassword"`
-	Active             bool       `json:"active"`
-	CreatedAt          time.Time  `json:"createdAt"`
-	LastLoginAt        *time.Time `json:"lastLoginAt,omitempty"`
+	ID                 uuid.UUID `json:"id"`
+	Username           string    `json:"username"`
+	Email              string    `json:"email"`
+	FullName           *string   `json:"fullName,omitempty"`
+	Phone              *string   `json:"phone,omitempty"`
+	Birthday           *string   `json:"birthday,omitempty"`
+	AvatarURL          *string   `json:"avatarUrl,omitempty"`
+	Role               string    `json:"role"`
+	CargoLabel         *string   `json:"cargoLabel,omitempty"`
+	MFAEnabled         bool      `json:"mfaEnabled"`
+	MustChangePassword bool      `json:"mustChangePassword"`
+	Active             bool      `json:"active"`
+	// AuthSource: de dónde sale su contraseña (auto, ldap o local; spec/20).
+	AuthSource  string     `json:"authSource"`
+	CreatedAt   time.Time  `json:"createdAt"`
+	LastLoginAt *time.Time `json:"lastLoginAt,omitempty"`
 }
 
 func toUserDTO(u db.User) UserDTO {
@@ -39,6 +41,7 @@ func toUserDTO(u db.User) UserDTO {
 		MFAEnabled:         u.MfaEnabled,
 		MustChangePassword: u.MustChangePassword,
 		Active:             u.Active,
+		AuthSource:         u.AuthSource,
 	}
 	if u.FullName.Valid {
 		dto.FullName = &u.FullName.String

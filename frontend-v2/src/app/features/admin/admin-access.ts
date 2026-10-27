@@ -14,9 +14,11 @@ import { AdminPasswordPolicyComponent } from './admin-password-policy';
 import { UserRetireComponent } from './user-retire';
 import { Area, AreasService, Level, PROFILES, Placement, Profile } from '../../core/areas/areas.service';
 import { openCsvImport } from '../../shared/csv-import/open-csv-import';
+import { SystemFeaturesService } from '../../core/system-features/system-features.service';
 
 import '../../core/i18n/packs/admin';
 import '../../core/i18n/packs/imports';
+import '../../core/i18n/packs/ldap';
 type Role = 'admin' | 'user' | 'auditor';
 
 interface AdminUser {
@@ -31,6 +33,8 @@ interface AdminUser {
   lastLoginAt?: string;
   /** AAAA-MM-DD; lo usan los correos de cumpleaños. */
   birthday?: string;
+  /** De dónde sale su contraseña (spec/20): ldap = ya vinculada al dominio. */
+  authSource?: 'auto' | 'ldap' | 'local';
 }
 /** Un grupo es área(s) + nivel + perfil (spec/16, 000033); areas son códigos ("soc", "noc"…). */
 interface PermissionGroup { id: string; code: string; name: string; areas: string[]; profile: Profile; levelId?: string; capabilities: string[]; active: boolean; }
@@ -96,6 +100,9 @@ export class AdminAccessComponent implements OnInit {
 
   protected readonly i18n = inject(I18nService);
   private readonly http = inject(HttpClient);
+  private readonly features = inject(SystemFeaturesService);
+  /** Con «Entrar con la cuenta del dominio» apagada, el origen de la contraseña no se ve. */
+  protected readonly ldapOn = computed(() => this.features.isEnabled('ldap'));
   private readonly perms = inject(PermissionsService);
   private readonly areasApi = inject(AreasService);
   private readonly injector = inject(Injector);
@@ -344,6 +351,12 @@ export class AdminAccessComponent implements OnInit {
 
   protected forcePasswordChange(user: AdminUser): Promise<void> {
     return this.patchUser(user, { mustChangePassword: true });
+  }
+
+  /** auto (del dominio si está en el directorio) o local; ldap lo pone el ingreso. */
+  protected setAuthSource(user: AdminUser, authSource: 'auto' | 'local'): Promise<void> {
+    const current = user.authSource === 'local' ? 'local' : 'auto';
+    return authSource === current ? Promise.resolve() : this.patchUser(user, { authSource });
   }
 
   protected setBirthday(user: AdminUser, birthday: string): Promise<void> {

@@ -165,6 +165,9 @@ func run(logger *slog.Logger) error {
 		return sender, err
 	}}
 	notificationsHandler := &handler.NotificationsHandler{Queries: queries, AuditLog: auditLog, Notify: notifier}
+	// Entrar con la cuenta del dominio (spec/20, pendiente 10k), detrás de ldap.
+	authHandler.Notify = notifier
+	ldapHandler := &handler.LdapHandler{Queries: queries, Crypto: cryptoBox, AuditLog: auditLog}
 	inventoryHandler := &handler.InventoryHandler{Pool: pool, Queries: queries, AuditLog: auditLog, Hub: hub, Notify: notifier}
 	agendaHandler := &handler.AgendaHandler{Queries: queries, AuditLog: auditLog, Hub: hub, Notify: notifier}
 	organizationsHandler := &handler.OrganizationsHandler{Pool: pool, Queries: queries, AuditLog: auditLog}
@@ -511,6 +514,9 @@ func run(logger *slog.Logger) error {
 	mux.Handle("POST /api/inventory/{id}/events", authed(inventoryHandler.AddEvent))
 	mux.Handle("POST /api/inventory/{id}/active", authed(inventoryHandler.SetActive))
 	mux.Handle("POST /api/inventory/{id}/requests", authed(inventoryHandler.Request))
+	mux.Handle("GET /api/ldap/config", admin(ldapHandler.RequireEnabled(ldapHandler.GetConfig)))
+	mux.Handle("PUT /api/ldap/config", admin(ldapHandler.RequireEnabled(ldapHandler.PutConfig)))
+	mux.Handle("POST /api/ldap/test", admin(ldapHandler.RequireEnabled(ldapHandler.Test)))
 	mux.Handle("GET /api/glpi/config", admin(glpiHandler.RequireEnabled(glpiHandler.GetConfig)))
 	mux.Handle("PUT /api/glpi/config", admin(glpiHandler.RequireEnabled(glpiHandler.PutConfig)))
 	mux.Handle("POST /api/glpi/test", admin(glpiHandler.RequireEnabled(glpiHandler.Test)))

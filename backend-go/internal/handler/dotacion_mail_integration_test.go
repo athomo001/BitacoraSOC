@@ -25,9 +25,11 @@ import (
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/mailtpl"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/repository/db"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/service/mail"
+	"github.com/athomo001/BitacoraSOC/backend-go/internal/service/mail/mailpittest"
 )
 
 func TestDotacionNotification_EntregaRealContraMailpit(t *testing.T) {
+	mailpittest.Require(t)
 	schedule := db.WorkShiftNotificationSchedule{
 		Name: fmt.Sprintf("Reporte de Guardia RRHH - %d", time.Now().UnixNano()),
 	}

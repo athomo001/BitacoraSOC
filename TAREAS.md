@@ -46,7 +46,6 @@ Lo hecho, lo que está en revisión y lo que falta hasta el corte. Marca con `[x
 - [x] Metas: el admin elige entre todos los usuarios, «Alguien sin cuenta» con nombre y correo que pasa a la cuenta al crearla, y «Sin área» en Usuarios (2026-10-21; `migrate … up` para la 000057)
 - [x] Desactivar y eliminar usuarios: al desactivar sale de guardias y escalamiento con aviso previo de lo que tiene a su nombre; eliminar borra solo a quien no tiene historial (2026-10-21)
 - [x] Metas por persona: agrupadas por persona, escalones primaria/secundaria/terciaria, regla por persona, lograda o no lograda (diseño aprobado y construido 2026-10-21; `migrate … up` para la 000058)
-- [ ] Ubicar en su área y nivel a los usuarios marcados «Sin área» (Administración → Usuarios y grupos → Áreas y nivel); kmateluna va al área CSM — Dueño
 - [x] Gestión CSM: aviso antes del vencimiento de una meta y metas cumplidas por persona en el Resumen mensual (2026-10-21; `migrate … up` para la 000055)
 - [x] La Gestión funciona sin la Ticketera: clientes, acciones, metas e indicadores de tareas, sin nada de tickets (2026-10-23)
 
@@ -73,7 +72,7 @@ Lo hecho, lo que está en revisión y lo que falta hasta el corte. Marca con `[x
 - [x] Inventario: dirección y coordenadas en el equipo, capa Equipos en el Mapa y grupos de equipos (rack o sala) con la ubicación compartida: construido el 2026-10-23
 - [x] Mapa: equipos de clientes en verde/rojo/ámbar según tickets, incidentes y Bitácora, con filtro por cliente y tarjetita al pasar el mouse: construido el 2026-10-23
 
-### Backlog
+### Backlog (después del corte, decisión del dueño 2026-10-26)
 - [x] 10a RACI por cliente (hecho el 2026-10-20; ver «En curso»)
 - [x] 10b Reenvío de eventos a un SIEM y API de integraciones (2026-10-21; ver «En curso»)
 - [ ] 10c SSO con Microsoft 365 — un admin del tenant registra la app en Entra ID
@@ -83,12 +82,14 @@ Lo hecho, lo que está en revisión y lo que falta hasta el corte. Marca con `[x
 - [ ] 10f Reportes avanzados — el puntaje de calidad por analista está hecho y revisado (2026-10-23); faltan estadísticas, boletines avanzados y PDF real
 - [x] 10g Carga CSV masiva: usuarios, organizaciones con servicios, ventanas de mantenimiento y entradas históricas (2026-10-22; ver «En curso»)
 - [x] 10h Enlaces públicos: guardias, Ticketera y Mapa en TV y estado para un cliente (2026-10-22; ver «En curso»)
+- [ ] 10k Entrar con la cuenta del dominio (LDAP / AD), construido el 2026-10-26 (`spec/20-ldap.md`): probarlo contra el AD real — `migrate … up` para la 000064; Funcionalidades → «Entrar con la cuenta del dominio»; Administración → LDAP (servidor `ldaps://`, cuenta de servicio de solo lectura, base DN) y «Probar» con un usuario; revisar que haya un admin «Solo local» en Usuarios y grupos; entrar con una cuenta creada antes (ver que queda vinculada y conserva sus áreas) y con una que no existía (llega el aviso y queda sin áreas) — Dueño
 - [x] 10i Complementos que agregan funciones (como los plugins de GLPI: informes, integraciones) sin tocar el núcleo (2026-10-26; ver «En curso»)
 - [x] 10j Seguimiento de entradas de la Bitácora (2026-10-21; ver «En curso»). «Seguir» con aviso en la campana queda para después
 
 ### Corte
 - [ ] Ensayo de paridad 2 con un respaldo de producción nuevo
 - [ ] Corte: pasar del legacy a 2.0 — Todos
+- [ ] Justo después del corte, a mano en producción: ubicar en su área y nivel a los «Sin área» y a quien no es de SOC (Administración → Usuarios y grupos → Áreas y nivel). El ETL deja a los usuarios del legacy en SOC y a los admin sin área; kmateluna va a CSM — Dueño
 - [ ] Ventana de rollback de 14 días — Equipo SOC
 
 ### Deuda menor

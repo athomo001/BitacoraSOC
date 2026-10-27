@@ -175,7 +175,7 @@ Generada desde `backend-go/cmd/server/main.go`, donde se registran las rutas. La
 
 | Método | Ruta | Acceso |
 | --- | --- | --- |
-| `POST` | `/api/auth/login` | Pública |
+| `POST` | `/api/auth/login` | Pública — con `ldap` encendida, las cuentas que no son «solo local» entran con la contraseña del dominio (ver LDAP); `503 directory-unavailable` si el directorio no responde y la cuenta ya está vinculada |
 | `POST` | `/api/auth/mfa/authenticate` | Pública |
 | `POST` | `/api/auth/mfa/setup` | Sesión |
 | `POST` | `/api/auth/mfa/verify` | Sesión |
@@ -196,7 +196,7 @@ Generada desde `backend-go/cmd/server/main.go`, donde se registran las rutas. La
 | `GET` | `/api/users` | Admin |
 | `GET` | `/api/users/cargos` | Admin |
 | `POST` | `/api/users` | Admin |
-| `PATCH` | `/api/users/{id}` | Admin |
+| `PATCH` | `/api/users/{id}` | Admin — `authSource: auto\|local` cambia de dónde sale la contraseña (no la propia); la respuesta trae `authSource: auto\|ldap\|local` |
 | `DELETE` | `/api/users/{id}` | Admin — `200 {deleted}`: borra de verdad (y de todos lados) a quien no tiene historial; si tiene, queda bloqueado (`deleted: false`). No a uno mismo (`409`) |
 | `GET` | `/api/users/{id}/links` | Admin — lo que tiene a su nombre antes de bloquearlo: `[{kind: guard\|escalation\|pool\|shift\|client\|ticket\|task\|goal\|asset, label, detail}]` (en `guard`, `detail` = turnos por venir) |
 | `POST` | `/api/users/force-reset-all` | Admin |
@@ -576,6 +576,16 @@ Quién: ve un equipo quien es del área dueña o de un área responsable (admin,
 | `POST` | `/api/inventory/groups` | Sesión (área dueña del grupo o admin) — `{name, area, territorialUnitId, address, latitude, longitude, rack, clientId}`; los equipos sin cliente toman el del grupo |
 | `PUT` | `/api/inventory/groups/{id}` | Área dueña del grupo o admin — sus equipos toman la ubicación nueva (queda en el historial de cada uno) |
 | `DELETE` | `/api/inventory/groups/{id}` | Área dueña del grupo o admin — los equipos quedan sin grupo, con la ubicación que tenían |
+
+### LDAP
+
+Entrar con la cuenta del dominio (spec/20, pendiente 10k). Solo admin y solo con `ldap` encendida (si no, `403 module-disabled`). El directorio solo valida la contraseña: rol, áreas, nivel y grupos se manejan en la Bitácora. Una cuenta del dominio no cambia ni recupera su contraseña acá (`PUT /api/users/me/password` responde `409 password-managed-by-directory`).
+
+| Método | Ruta | Notas |
+| --- | --- | --- |
+| `GET` | `/api/ldap/config` | Conexión y último «Probar»; la contraseña de servicio nunca vuelve (`hasBindPassword`). `localAdmins`: admins activos «solo local» |
+| `PUT` | `/api/ldap/config` | `{url, startTls, verifyTls, caPem, bindDn, bindPassword?, baseDn, userFilter, usernameAttr, nameAttr, emailAttr, groupDn, timeoutSeconds}`; sin TLS (`ldaps://` o `ldap://` con StartTLS) no se guarda; una contraseña vacía conserva la guardada |
+| `POST` | `/api/ldap/test` | `{username?}`: entra con la cuenta de servicio y, con un usuario, muestra a quién encontraría (`entry: {dn, username, name, email}`); no valida contraseñas ni crea nada |
 
 ### GLPI
 

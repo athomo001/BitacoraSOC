@@ -1,0 +1,157 @@
+<header class="adm-head">
+  <div>
+    <h2 class="adm-title">{{ i18n.t('admin.nav.ldap') }}</h2>
+    <p class="adm-muted">{{ i18n.t('ldap.subtitle') }}</p>
+  </div>
+</header>
+
+@if (error(); as e) { <p class="adm-error" role="alert">{{ e }}</p> }
+
+@if (draft(); as d) {
+  @if (saved()!.localAdmins === 0) {
+    <p class="ld__warn text-warn" role="status"><mat-icon>warning</mat-icon>{{ i18n.t('ldap.noLocalAdmin') }}</p>
+  }
+
+  <section class="adm-card">
+    <div class="ld__cols">
+      <div class="adm-card__body ld__body">
+        <h3 class="adm-card__title"><mat-icon>dns</mat-icon>{{ i18n.t('ldap.connection') }}</h3>
+        <label class="adm-field">
+          <span class="adm-label">{{ i18n.t('ldap.url') }}</span>
+          <input class="adm-input mono" name="ldapUrl" autocomplete="off" placeholder="ldaps://dc01.empresa.local:636" [value]="d.url" (input)="text('url', $event)" />
+          <span class="adm-hint">{{ i18n.t('ldap.urlHint') }}</span>
+        </label>
+        @if (!ldaps()) {
+          <label class="adm-switch-row">
+            <span class="switch">
+              <input class="switch__input" type="checkbox" role="switch" name="ldapStartTls" [checked]="d.startTls" (change)="patch({ startTls: !d.startTls })" />
+              <span class="switch__track" aria-hidden="true"></span>
+            </span>
+            <span>{{ i18n.t('ldap.startTls') }}</span>
+          </label>
+        }
+        <label class="adm-switch-row">
+          <span class="switch">
+            <input class="switch__input" type="checkbox" role="switch" name="ldapVerifyTls" [checked]="d.verifyTls" (change)="patch({ verifyTls: !d.verifyTls })" />
+            <span class="switch__track" aria-hidden="true"></span>
+          </span>
+          <span>{{ i18n.t('ldap.verifyTls') }}</span>
+        </label>
+        @if (!d.verifyTls) { <span class="adm-hint text-warn">{{ i18n.t('ldap.verifyTlsOff') }}</span> }
+        <label class="adm-field">
+          <span class="adm-label">{{ i18n.t('ldap.ca') }}</span>
+          <textarea class="adm-input mono ld__pem" name="ldapCa" rows="3" spellcheck="false" placeholder="-----BEGIN CERTIFICATE-----" [value]="d.caPem" (input)="text('caPem', $event)"></textarea>
+          <span class="adm-hint">{{ i18n.t('ldap.caHint') }}</span>
+        </label>
+        <label class="adm-field">
+          <span class="adm-label">{{ i18n.t('ldap.bindDn') }}</span>
+          <input class="adm-input mono" name="ldapBindDn" autocomplete="off" placeholder="CN=svc-bitacora,OU=Servicio,DC=empresa,DC=local" [value]="d.bindDn" (input)="text('bindDn', $event)" />
+          <span class="adm-hint">{{ i18n.t('ldap.bindDnHint') }}</span>
+        </label>
+        <div class="adm-field">
+          <span class="adm-label">{{ i18n.t('ldap.bindPassword') }}</span>
+          @if (saved()?.hasBindPassword && !replacing()) {
+            <span class="ld__line">
+              <span class="text-ok ld__state"><mat-icon>lock</mat-icon>{{ i18n.t('ldap.passwordSaved') }}</span>
+              <button type="button" class="adm-btn" (click)="replacing.set(true)">{{ i18n.t('ldap.replace') }}</button>
+            </span>
+          } @else {
+            <span class="ld__line">
+              <input class="adm-input ld__grow" type="password" autocomplete="new-password" name="ldapBindPassword"
+                [attr.aria-label]="i18n.t('ldap.bindPassword')" [value]="d.bindPassword ?? ''" (input)="patch({ bindPassword: $any($event.target).value })" />
+              @if (saved()?.hasBindPassword) { <button type="button" class="adm-btn" (click)="keepPassword()">{{ i18n.t('ldap.keep') }}</button> }
+            </span>
+          }
+        </div>
+      </div>
+
+      <div class="adm-card__body ld__body">
+        <h3 class="adm-card__title"><mat-icon>person_search</mat-icon>{{ i18n.t('ldap.search') }}</h3>
+        <label class="adm-field">
+          <span class="adm-label">{{ i18n.t('ldap.baseDn') }}</span>
+          <input class="adm-input mono" name="ldapBaseDn" autocomplete="off" placeholder="DC=empresa,DC=local" [value]="d.baseDn" (input)="text('baseDn', $event)" />
+        </label>
+        <label class="adm-field">
+          <span class="adm-label">{{ i18n.t('ldap.userFilter') }}</span>
+          <input class="adm-input mono" name="ldapUserFilter" autocomplete="off" [value]="d.userFilter" (input)="text('userFilter', $event)" />
+          <span class="adm-hint">{{ i18n.t('ldap.userFilterHint') }}</span>
+        </label>
+        <div class="ld__attrs">
+          <label class="adm-field">
+            <span class="adm-label">{{ i18n.t('ldap.usernameAttr') }}</span>
+            <input class="adm-input mono" name="ldapUsernameAttr" autocomplete="off" [value]="d.usernameAttr" (input)="text('usernameAttr', $event)" />
+          </label>
+          <label class="adm-field">
+            <span class="adm-label">{{ i18n.t('ldap.nameAttr') }}</span>
+            <input class="adm-input mono" name="ldapNameAttr" autocomplete="off" [value]="d.nameAttr" (input)="text('nameAttr', $event)" />
+          </label>
+          <label class="adm-field">
+            <span class="adm-label">{{ i18n.t('ldap.emailAttr') }}</span>
+            <input class="adm-input mono" name="ldapEmailAttr" autocomplete="off" [value]="d.emailAttr" (input)="text('emailAttr', $event)" />
+          </label>
+        </div>
+        <label class="adm-field">
+          <span class="adm-label">{{ i18n.t('ldap.groupDn') }}</span>
+          <input class="adm-input mono" name="ldapGroupDn" autocomplete="off" placeholder="CN=Bitacora,OU=Grupos,DC=empresa,DC=local" [value]="d.groupDn" (input)="text('groupDn', $event)" />
+          <span class="adm-hint">{{ i18n.t('ldap.groupDnHint') }}</span>
+        </label>
+        <label class="adm-field ld__narrow">
+          <span class="adm-label">{{ i18n.t('ldap.timeout') }}</span>
+          <input class="adm-input mono" type="number" min="2" max="60" name="ldapTimeout" [value]="d.timeoutSeconds" (input)="timeout($event)" />
+        </label>
+      </div>
+    </div>
+    <footer class="adm-foot">
+      <span class="adm-foot__status">
+        @if (notice(); as n) { <span class="text-ok adm-small">{{ n }}</span> }
+        @else if (problem(); as p) { <span class="text-bad adm-small">{{ p }}</span> }
+        @else { <span class="adm-muted">{{ i18n.t(dirty() ? 'admin.unsaved' : 'admin.noChanges') }}</span> }
+      </span>
+      @if (dirty()) { <button type="button" class="adm-btn adm-push" (click)="discard()">{{ i18n.t('admin.discard') }}</button> }
+      <button type="button" class="adm-btn adm-btn--primary" [class.adm-push]="!dirty()" [disabled]="!dirty() || !!problem() || !!busy()" (click)="save()">
+        <mat-icon>save</mat-icon>{{ i18n.t('ldap.save') }}
+      </button>
+    </footer>
+  </section>
+
+  <div class="ld__cols">
+    <section class="adm-card">
+      <div class="adm-card__head">
+        <h3 class="adm-card__title"><mat-icon>bolt</mat-icon>{{ i18n.t('ldap.test') }}</h3>
+      </div>
+      <div class="adm-card__body ld__body">
+        <label class="adm-field">
+          <span class="adm-label">{{ i18n.t('ldap.testUser') }}</span>
+          <span class="ld__line">
+            <input class="adm-input mono ld__grow" name="ldapTestUser" autocomplete="off" [value]="testUser()" (input)="testUser.set($any($event.target).value)" (keydown.enter)="runTest()" />
+            <button type="button" class="adm-btn" [disabled]="!saved()?.hasBindPassword || dirty() || !!busy()" (click)="runTest()">
+              <mat-icon>bolt</mat-icon>{{ i18n.t(busy() === 'test' ? 'ldap.testing' : 'ldap.test') }}
+            </button>
+          </span>
+          <span class="adm-hint">{{ i18n.t('ldap.testUserHint') }}</span>
+        </label>
+        @if (dirty()) { <span class="adm-hint">{{ i18n.t('ldap.testSaveFirst') }}</span> }
+        @if (test(); as t) {
+          <span class="ld__state" [class.text-ok]="t.ok" [class.text-bad]="!t.ok" role="status">
+            <mat-icon>{{ t.ok ? 'check_circle' : 'error' }}</mat-icon>{{ testText(t) }}
+          </span>
+          @if (t.entry; as e) { <span class="adm-hint mono ld__dn">{{ e.dn }}</span> }
+          <span class="adm-hint">{{ i18n.t('ldap.lastTest') }}: {{ t.at | date: 'dd/MM HH:mm' }}</span>
+        }
+      </div>
+    </section>
+
+    <section class="adm-card">
+      <div class="adm-card__head">
+        <h3 class="adm-card__title"><mat-icon>rule</mat-icon>{{ i18n.t('ldap.rules') }}</h3>
+        <span class="adm-hint adm-push">{{ i18n.tf('ldap.localAdmins', saved()!.localAdmins) }}</span>
+      </div>
+      <ul class="adm-card__body ld__rules">
+        <li>{{ i18n.t('ldap.rule.match') }}</li>
+        <li>{{ i18n.t('ldap.rule.new') }}</li>
+        <li>{{ i18n.t('ldap.rule.areas') }}</li>
+        <li>{{ i18n.t('ldap.rule.local') }}</li>
+      </ul>
+    </section>
+  </div>
+}

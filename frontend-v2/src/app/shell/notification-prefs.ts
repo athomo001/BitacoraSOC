@@ -6,6 +6,7 @@ import { MessageKey } from '../core/i18n/messages';
 import { problemDetail } from '../core/http-error';
 
 import '../core/i18n/packs/notifications';
+import '../core/i18n/packs/ldap';
 
 /**
  * Mi perfil → Notificaciones (spec/16 §4.5): cada persona elige qué le llega

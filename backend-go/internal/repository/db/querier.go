@@ -120,6 +120,8 @@ type Querier interface {
 	CountEntries(ctx context.Context, arg CountEntriesParams) (int64, error)
 	CountEntriesInWindow(ctx context.Context, arg CountEntriesInWindowParams) (int64, error)
 	CountIncidentEntriesInWindow(ctx context.Context, arg CountIncidentEntriesInWindowParams) (int64, error)
+	// Administradores activos que entran sin depender del directorio.
+	CountLocalAdmins(ctx context.Context) (int64, error)
 	CountOpenGlpiTicketsByGroup(ctx context.Context) ([]CountOpenGlpiTicketsByGroupRow, error)
 	CountOrgContacts(ctx context.Context, organizationID uuid.UUID) (int64, error)
 	CountReportEvents(ctx context.Context, q_ string) (int64, error)
@@ -189,6 +191,9 @@ type Querier interface {
 	// Una guardia nueva (9e): el equipo "oncall" con su área dueña.
 	CreateGuardTeam(ctx context.Context, arg CreateGuardTeamParams) (uuid.UUID, error)
 	CreateInventoryAsset(ctx context.Context, arg CreateInventoryAssetParams) (uuid.UUID, error)
+	// Primera vez que entra alguien del dominio sin cuenta: rol user, sin áreas.
+	// password_hash es aleatorio (nadie lo conoce); entra con la del dominio.
+	CreateLdapUser(ctx context.Context, arg CreateLdapUserParams) (User, error)
 	CreateLevel(ctx context.Context, arg CreateLevelParams) (Level, error)
 	CreateLogSource(ctx context.Context, arg CreateLogSourceParams) (CatalogLogSource, error)
 	CreateMaintenanceWindow(ctx context.Context, arg CreateMaintenanceWindowParams) (MaintenanceWindow, error)
@@ -478,6 +483,8 @@ type Querier interface {
 	// Checklist de inicio más reciente del mismo turno dentro de la ventana
 	// (loadShiftReportData del legacy).
 	GetLatestStartCheckInWindow(ctx context.Context, arg GetLatestStartCheckInWindowParams) (GetLatestStartCheckInWindowRow, error)
+	// Entrar con la cuenta del dominio (spec/20, 000064).
+	GetLdapConfig(ctx context.Context) (LdapConfig, error)
 	GetLoginRateLimit(ctx context.Context, ipAddress string) (LoginRateLimit, error)
 	// Gestión CSM (spec/16 §4.4, 9.4, 000051).
 	GetManagementSettings(ctx context.Context) (ManagementSetting, error)
@@ -549,6 +556,7 @@ type Querier interface {
 	GetTicketView(ctx context.Context, id uuid.UUID) (GetTicketViewRow, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
+	GetUserByLdapDN(ctx context.Context, dn string) (User, error)
 	// El servicio valida la expiración (reset_password_expires_at > now()) en
 	// Go, no acá, para poder distinguir "token no existe" de "token vencido" en
 	// los tests sin depender del reloj de Postgres.
@@ -603,6 +611,9 @@ type Querier interface {
 	LastTaggedEntryInWindow(ctx context.Context, arg LastTaggedEntryInWindowParams) (pgtype.Timestamptz, error)
 	LinkCorrelatedShiftCheckService(ctx context.Context, arg LinkCorrelatedShiftCheckServiceParams) (ShiftCheckService, error)
 	LinkEntryToTicket(ctx context.Context, arg LinkEntryToTicketParams) (Entry, error)
+	// La cuenta queda del dominio: la contraseña local y su reseteo dejan de
+	// servir. Áreas, rol y grupos no se tocan (spec/20 §2).
+	LinkUserToLdap(ctx context.Context, arg LinkUserToLdapParams) (User, error)
 	LinkWorkShiftToCycle(ctx context.Context, arg LinkWorkShiftToCycleParams) error
 	ListAPIKeyRequests(ctx context.Context, apiKeyID pgtype.UUID) ([]ApiKeyRequest, error)
 	ListAPIKeys(ctx context.Context) ([]ListAPIKeysRow, error)
@@ -1240,6 +1251,7 @@ type Querier interface {
 	// Para avisar solo de errores repetidos: el resultado de las últimas automáticas.
 	RecentGlpiTicketAutoRuns(ctx context.Context) ([]bool, error)
 	RecordGlpiTest(ctx context.Context, arg RecordGlpiTestParams) error
+	RecordLdapTest(ctx context.Context, arg RecordLdapTestParams) error
 	RecordSMTPTest(ctx context.Context, arg RecordSMTPTestParams) error
 	RegisterFailedLogin(ctx context.Context, id uuid.UUID) (int32, error)
 	// Re-hash oportunista en login (spec/07-backend-arquitectura-go.md sección
@@ -1383,6 +1395,9 @@ type Querier interface {
 	SetTicketPublicPin(ctx context.Context, arg SetTicketPublicPinParams) (Ticket, error)
 	SetTicketSeriesNext(ctx context.Context, arg SetTicketSeriesNextParams) error
 	SetUserActive(ctx context.Context, arg SetUserActiveParams) (User, error)
+	// auto o local (desde la ficha del usuario o al crear el admin del setup):
+	// deja de estar vinculada al directorio.
+	SetUserAuthSource(ctx context.Context, arg SetUserAuthSourceParams) (User, error)
 	// Renumerar en dos pasadas por la restricción única (policy_id, step_order).
 	ShiftPolicySteps(ctx context.Context, policyID uuid.UUID) error
 	// La tarea cambió de fecha: sus ventanas que todavía no empiezan se mueven igual.
@@ -1469,6 +1484,7 @@ type Querier interface {
 	UpdateGuardCycle(ctx context.Context, arg UpdateGuardCycleParams) (RotationCycle, error)
 	UpdateGuardSlot(ctx context.Context, arg UpdateGuardSlotParams) (RotationSlot, error)
 	UpdateInventoryAsset(ctx context.Context, arg UpdateInventoryAssetParams) error
+	UpdateLdapConfig(ctx context.Context, arg UpdateLdapConfigParams) error
 	UpdateLogSource(ctx context.Context, arg UpdateLogSourceParams) (CatalogLogSource, error)
 	UpdateManagementSettings(ctx context.Context, slaTarget int32) error
 	UpdateMyProfile(ctx context.Context, arg UpdateMyProfileParams) (User, error)

@@ -20,3 +20,10 @@ allowBuilds:
 # pnpm 12 ya no reconoce (lo reemplazó `pmOnFail`) y que npm marcaba como
 # "Unknown project config".
 pmOnFail: error
+
+# @angular/build 22.2.x fija vite en 8.3.0 exacto, que arrastra avisos de
+# seguridad del servidor de desarrollo (server.fs, middleware, launch-editor;
+# corregidos en >=8.3.3). Se fuerza el parche del mismo minor. Quitar cuando
+# @angular/build declare una vite >=8.3.3 por su cuenta.
+overrides:
+  vite: 8.3.5

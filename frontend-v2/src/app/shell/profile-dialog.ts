@@ -4,12 +4,14 @@ import { NotificationPrefsComponent } from './notification-prefs';
 import { CalendarFeedComponent } from './calendar-feed';
 import { CalendarFeed, CalendarFeedService } from '../core/calendar/calendar-feed.service';
 import '../core/i18n/packs/notifications';
+import '../core/i18n/packs/ldap';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../core/auth/auth.service';
 import { MfaEnrollment } from '../core/auth/auth.models';
 import { I18nService } from '../core/i18n/i18n.service';
 import { MessageKey } from '../core/i18n/messages';
 import { PreferencesService, Theme } from '../core/preferences/preferences.service';
+import { SystemFeaturesService } from '../core/system-features/system-features.service';
 import { ModalComponent } from '../shared/ui/modal/modal';
 import { ButtonComponent } from '../shared/ui/button/button';
 import { UserAvatarComponent } from './user-avatar';
@@ -57,6 +59,9 @@ export class ProfileDialogComponent implements OnInit {
   private readonly auth = inject(AuthService);
   private readonly calendarApi = inject(CalendarFeedService);
   protected readonly user = this.auth.user;
+  private readonly features = inject(SystemFeaturesService);
+  /** Cuenta del dominio (spec/20): su contraseña se cambia allá. */
+  protected readonly domainPassword = computed(() => this.user()?.authSource === 'ldap' && this.features.isEnabled('ldap'));
 
   /** Calendario en Outlook (9.7): la pestaña aparece solo con la funcionalidad prendida. */
   protected readonly calendarAvailable = signal(false);

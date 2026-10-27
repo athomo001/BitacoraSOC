@@ -331,8 +331,14 @@ func TestManagement_SaludMetasYPlantillas(t *testing.T) {
 		t.Fatalf("tareas de la renovación: %+v", tasks)
 	}
 	// 90 días antes ya pasó (faltan 70): queda para hoy o el próximo hábil.
-	if tasks[0].Due.Before(time.Now().AddDate(0, 0, -1)) {
-		t.Fatalf("lo que ya pasó queda para hoy: %+v", tasks[0])
+	// «Hoy» es el de la app (zona de la Agenda), no el instante en UTC: desde
+	// las 21:00 en Chile, UTC ya va en el día siguiente.
+	clk, err := h.clock(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tasks[0].Due.Before(clk.today) {
+		t.Fatalf("lo que ya pasó queda para hoy (%s): %+v", clk.today.Format("2006-01-02"), tasks[0])
 	}
 	if w := call(h.ApplyPlaybook, tomas, "POST", "/", map[string]any{"clientId": casinos}, "id", renewalPB); w.Code != http.StatusConflict {
 		t.Fatalf("la misma plantilla no se aplica dos veces: %d", w.Code)

@@ -120,6 +120,11 @@ func (h *SetupHandler) runBootstrap(ctx context.Context, req bootstrapRequest) (
 	if err != nil {
 		return db.User{}, &bootstrapError{http.StatusConflict, "duplicate-user", "el username o email ya existe"}
 	}
+	// El primer admin es la puerta de emergencia: nunca se vincula al
+	// directorio del dominio (spec/20), así entra aunque LDAP falle.
+	if user, err = h.Queries.SetUserAuthSource(ctx, db.SetUserAuthSourceParams{ID: user.ID, AuthSource: authSourceLocal}); err != nil {
+		return db.User{}, &bootstrapError{http.StatusInternalServerError, "internal-error", "no se pudo crear el admin"}
+	}
 	if req.TicketsEnabled {
 		if _, err := h.Queries.UpdateSystemFeature(ctx, db.UpdateSystemFeatureParams{
 			Code: ticketsFeature, IsEnabled: true, UpdatedBy: pgtype.UUID{Bytes: user.ID, Valid: true},

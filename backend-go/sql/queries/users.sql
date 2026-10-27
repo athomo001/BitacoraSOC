@@ -83,9 +83,10 @@ UPDATE users SET must_change_password = $2, updated_at = now() WHERE id = $1;
 -- name: ForceResetAllActivePasswords :many
 -- POST /api/users/force-reset-all — usuarios internos = no invitados
 -- (is_guest=false), activos. Devuelve los afectados para poder notificarlos
--- por correo sin una segunda consulta.
+-- por correo sin una segunda consulta. Las cuentas del dominio no (spec/20):
+-- su contraseña se cambia en el directorio.
 UPDATE users SET must_change_password = true, updated_at = now()
-WHERE active = true AND is_guest = false
+WHERE active = true AND is_guest = false AND auth_source <> 'ldap'
 RETURNING *;
 
 -- name: RegisterFailedLogin :one

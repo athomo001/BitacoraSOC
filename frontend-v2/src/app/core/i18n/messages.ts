@@ -21,6 +21,7 @@ import type { ImportsKey } from './packs/imports';
 import type { PublicLinksKey } from './packs/public-links';
 import type { DepartmentsKey } from './packs/departments';
 import type { ComplementFeaturesKey } from './packs/complement-features';
+import type { LdapKey } from './packs/ldap';
 
 const ES = {
   'nav.entries': 'Bitácora',
@@ -256,7 +257,8 @@ export type MessageKey =
   | ImportsKey
   | PublicLinksKey
   | DepartmentsKey
-  | ComplementFeaturesKey;
+  | ComplementFeaturesKey
+  | LdapKey;
 
 /**
  * El inglés va en messages-en.ts y se descarga solo al cambiar a EN: así no

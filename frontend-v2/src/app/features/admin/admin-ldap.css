@@ -1,0 +1,81 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+mat-icon {
+  width: 16px;
+  height: 16px;
+  font-size: 16px;
+}
+
+.ld__cols {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.ld__body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ld__attrs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.ld__narrow {
+  max-width: 180px;
+}
+
+.ld__line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ld__grow {
+  flex: 1;
+  min-width: 0;
+}
+
+.ld__state,
+.ld__warn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ld__warn {
+  margin: 0;
+}
+
+.ld__pem {
+  resize: vertical;
+  min-height: 64px;
+}
+
+.ld__dn {
+  overflow-wrap: anywhere;
+}
+
+.ld__rules {
+  margin: 0;
+  padding-left: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+@media (width <= 960px) {
+  .ld__cols,
+  .ld__attrs {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

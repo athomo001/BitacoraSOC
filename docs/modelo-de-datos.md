@@ -2,7 +2,7 @@
 
 > Generado por `backend-go/cmd/er-docs` desde `backend-go/sql/schema/0001_init_schema.sql`, el esquema que usa sqlc, con todas las migraciones aplicadas. **No se edita a mano**: si cambia el esquema, se regenera con `go run ./cmd/er-docs` desde `backend-go/`.
 
-124 tablas en PostgreSQL, agrupadas en 17 dominios. Notación pata de gallo: `||` uno, `|o` / `o|` cero o uno, `o{` cero o muchos. La etiqueta de cada línea es la columna que hace la referencia.
+125 tablas en PostgreSQL, agrupadas en 17 dominios. Notación pata de gallo: `||` uno, `|o` / `o|` cero o uno, `o{` cero o muchos. La etiqueta de cada línea es la columna que hace la referencia.
 
 - Cada entidad muestra todas sus columnas salvo `created_at` y `updated_at`. `PK` clave primaria, `FK` referencia a otra tabla, `UK` valor único.
 - Las tablas de otros dominios aparecen como cajas sin columnas: son la misma tabla, dibujada donde se une.
@@ -13,7 +13,7 @@ Correspondencia con el legacy (MongoDB): [modelo-er-legacy-2.0.md](modelo-er-leg
 
 ## Índice
 
-1. [Usuarios, acceso y permisos](#1-usuarios-acceso-y-permisos) — 9 tablas
+1. [Usuarios, acceso y permisos](#1-usuarios-acceso-y-permisos) — 10 tablas
 2. [Territorio, organizaciones y activos](#2-territorio-organizaciones-y-activos) — 17 tablas
 3. [Directorio de contactos](#3-directorio-de-contactos) — 2 tablas
 4. [Ticketera](#4-ticketera) — 8 tablas
@@ -35,7 +35,7 @@ Correspondencia con el legacy (MongoDB): [modelo-er-legacy-2.0.md](modelo-er-leg
 
 ## 1. Usuarios, acceso y permisos
 
-Cuentas, sesiones revocadas, llaves de API y los grupos de permisos que acotan qué módulos y capacidades tiene cada usuario.
+Cuentas, sesiones revocadas, llaves de API y los grupos de permisos que acotan qué módulos y capacidades tiene cada usuario. La conexión con el directorio del dominio (LDAP) solo valida contraseñas: las áreas y los grupos se manejan acá.
 
 ```mermaid
 erDiagram
@@ -61,6 +61,8 @@ erDiagram
         timestamptz reset_password_expires_at
         boolean active
         timestamptz last_login_at
+        text auth_source
+        text ldap_dn
     }
     LOGIN_RATE_LIMITS {
         text ip_address PK
@@ -115,6 +117,25 @@ erDiagram
         uuid permission_group_id PK, FK
         timestamptz assigned_at
         uuid assigned_by FK
+    }
+    LDAP_CONFIG {
+        boolean id PK
+        text url
+        boolean start_tls
+        boolean verify_tls
+        text ca_pem
+        text bind_dn
+        text bind_password_encrypted
+        text base_dn
+        text user_filter
+        text username_attr
+        text name_attr
+        text email_attr
+        text group_dn
+        int timeout_seconds
+        timestamptz last_test_at
+        boolean last_test_ok
+        jsonb last_test
     }
 
     AREAS ||--o{ PERMISSION_GROUP_AREAS : "area_id"

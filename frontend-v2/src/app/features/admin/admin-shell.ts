@@ -28,6 +28,7 @@ import { AdminClientAlertsComponent } from './admin-client-alerts';
 import { AdminTicketsComponent } from './admin-tickets';
 import { AdminAreasComponent } from './admin-areas';
 import { AdminGlpiComponent } from './admin-glpi';
+import { AdminLdapComponent } from './admin-ldap';
 import { AdminEntryTagsComponent } from './admin-entry-tags';
 import { AdminRaciComponent } from './admin-raci';
 import { AdminIntegrationsComponent } from './admin-integrations';
@@ -41,7 +42,7 @@ import '../../core/i18n/packs/raci';
 export type AdminSection =
   | 'access' | 'areas' | 'shifts' | 'checklist' | 'escalation' | 'raci' | 'tickets' | 'clientAlerts' | 'smtp' | 'reports'
   | 'agenda' | 'notifications' | 'organizations' | 'territory' | 'inventory' | 'teams'
-  | 'modules' | 'brand' | 'features' | 'glpi' | 'integrations' | 'publicLinks' | 'backups' | 'audit' | 'complements' | 'tags'
+  | 'modules' | 'brand' | 'features' | 'glpi' | 'ldap' | 'integrations' | 'publicLinks' | 'backups' | 'audit' | 'complements' | 'tags'
   // Página de un complemento «de la casa» (10i): «c:slug|page:id».
   | `c:${string}`;
 
@@ -101,6 +102,7 @@ const NAV: readonly { labelKey: MessageKey; items: readonly NavItem[] }[] = [
       { id: 'modules', icon: 'apps', labelKey: 'admin.nav.modules' },
       { id: 'features', icon: 'toggle_on', labelKey: 'admin.nav.features' },
       { id: 'glpi', icon: 'cloud_download', labelKey: 'admin.nav.glpi', requiresFeature: 'glpi_sync' },
+      { id: 'ldap', icon: 'badge', labelKey: 'admin.nav.ldap', requiresFeature: 'ldap' },
       { id: 'integrations', icon: 'cable', labelKey: 'admin.nav.integrations' },
       { id: 'publicLinks', icon: 'link', labelKey: 'admin.nav.publicLinks' },
       { id: 'backups', icon: 'backup', labelKey: 'admin.nav.backups' },
@@ -138,7 +140,7 @@ function normalize(text: string): string {
   imports: [
     MatIconModule, AdminModulesComponent, AdminBrandComponent, AdminFeaturesComponent, AdminTerritoryComponent, AdminInventoryComponent, AdminOrganizationsComponent, AdminTeamsComponent,
     AdminEscalationComponent, AdminShiftsComponent, AdminSmtpComponent, AdminReportsComponent, AdminBackupsComponent, AdminAuditComponent,
-    AdminAccessComponent, AdminChecklistComponent, AdminComplementsComponent, AdminClientAlertsComponent, AdminTicketsComponent, AdminAreasComponent, AdminAgendaComponent, AdminNotificationsComponent, AdminGlpiComponent,
+    AdminAccessComponent, AdminChecklistComponent, AdminComplementsComponent, AdminClientAlertsComponent, AdminTicketsComponent, AdminAreasComponent, AdminAgendaComponent, AdminNotificationsComponent, AdminGlpiComponent, AdminLdapComponent,
     AdminEntryTagsComponent, AdminRaciComponent, AdminIntegrationsComponent, AdminPublicLinksComponent, ComplementFrameComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -194,6 +196,7 @@ function normalize(text: string): string {
           @case ('modules') { <app-admin-modules /> }
           @case ('features') { <app-admin-features /> }
           @case ('glpi') { <app-admin-glpi /> }
+          @case ('ldap') { <app-admin-ldap /> }
           @case ('integrations') { <app-admin-integrations /> }
           @case ('publicLinks') { <app-admin-public-links /> }
           @case ('backups') { <app-admin-backups (goToFeatures)="go('features')" /> }

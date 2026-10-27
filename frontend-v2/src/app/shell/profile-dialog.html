@@ -69,51 +69,55 @@
       }
       @case ('security') {
         <div class="pf__panel pf__security" role="tabpanel">
-          <div class="pf__grid pf__grid--3">
-            <label class="field">
-              <span>{{ i18n.t('profile.currentPassword') }}</span>
-              <span class="pf__pw">
-                <input [type]="showPw() ? 'text' : 'password'" name="currentPassword" autocomplete="current-password" [ngModel]="currentPassword()" (ngModelChange)="currentPassword.set($event)" />
-              </span>
-            </label>
-            <label class="field">
-              <span>{{ i18n.t('profile.newPassword') }}</span>
-              <span class="pf__pw">
-                <input [type]="showPw() ? 'text' : 'password'" name="newPassword" autocomplete="new-password" [ngModel]="newPassword()" (ngModelChange)="newPassword.set($event)" />
-              </span>
-            </label>
-            <label class="field">
-              <span>{{ i18n.t('profile.repeatPassword') }}</span>
-              <span class="pf__pw">
-                <input [type]="showPw() ? 'text' : 'password'" name="repeatPassword" autocomplete="new-password" [ngModel]="repeatPassword()" (ngModelChange)="repeatPassword.set($event)" />
-                @if (repeatPassword()) {
-                  <span class="material-icons" [class.pf__ok]="passwordsMatch()" [class.pf__bad]="!passwordsMatch()" aria-hidden="true">
-                    {{ passwordsMatch() ? 'check_circle' : 'cancel' }}
-                  </span>
+          @if (domainPassword()) {
+            <p class="pf__hint"><span class="material-icons pf__ico" aria-hidden="true">badge</span>{{ i18n.t('ldap.profile.domain') }}</p>
+          } @else {
+            <div class="pf__grid pf__grid--3">
+              <label class="field">
+                <span>{{ i18n.t('profile.currentPassword') }}</span>
+                <span class="pf__pw">
+                  <input [type]="showPw() ? 'text' : 'password'" name="currentPassword" autocomplete="current-password" [ngModel]="currentPassword()" (ngModelChange)="currentPassword.set($event)" />
+                </span>
+              </label>
+              <label class="field">
+                <span>{{ i18n.t('profile.newPassword') }}</span>
+                <span class="pf__pw">
+                  <input [type]="showPw() ? 'text' : 'password'" name="newPassword" autocomplete="new-password" [ngModel]="newPassword()" (ngModelChange)="newPassword.set($event)" />
+                </span>
+              </label>
+              <label class="field">
+                <span>{{ i18n.t('profile.repeatPassword') }}</span>
+                <span class="pf__pw">
+                  <input [type]="showPw() ? 'text' : 'password'" name="repeatPassword" autocomplete="new-password" [ngModel]="repeatPassword()" (ngModelChange)="repeatPassword.set($event)" />
+                  @if (repeatPassword()) {
+                    <span class="material-icons" [class.pf__ok]="passwordsMatch()" [class.pf__bad]="!passwordsMatch()" aria-hidden="true">
+                      {{ passwordsMatch() ? 'check_circle' : 'cancel' }}
+                    </span>
+                  }
+                </span>
+              </label>
+            </div>
+            <div class="pf__meter-row">
+              <span class="pf__meter" aria-hidden="true">
+                @for (i of [1, 2, 3, 4]; track i) {
+                  <span [style.background]="i <= strength().score ? strength().color : null"></span>
                 }
               </span>
-            </label>
-          </div>
-          <div class="pf__meter-row">
-            <span class="pf__meter" aria-hidden="true">
-              @for (i of [1, 2, 3, 4]; track i) {
-                <span [style.background]="i <= strength().score ? strength().color : null"></span>
+              @if (newPassword()) {
+                <span class="pf__meter-label" [style.color]="strength().color">{{ i18n.t(strength().label) }}</span>
+                <span class="pf__hint">{{ i18n.tf('profile.passwordRule', minPassword()) }}</span>
               }
-            </span>
-            @if (newPassword()) {
-              <span class="pf__meter-label" [style.color]="strength().color">{{ i18n.t(strength().label) }}</span>
-              <span class="pf__hint">{{ i18n.tf('profile.passwordRule', minPassword()) }}</span>
+              <button type="button" class="pf__link" (click)="showPw.set(!showPw())">
+                <span class="material-icons pf__ico" aria-hidden="true">{{ showPw() ? 'visibility_off' : 'visibility' }}</span>
+                {{ i18n.t(showPw() ? 'profile.hidePasswords' : 'profile.showPasswords') }}
+              </button>
+              <app-button variant="primary" [disabled]="saving() || !canChangePassword()" (pressed)="savePassword()">
+                <span class="material-icons pf__ico" aria-hidden="true">key</span>{{ i18n.t('profile.changePassword') }}
+              </app-button>
+            </div>
+            @if (passwordFeedback(); as fb) {
+              <span class="msg" [class.msg--ok]="fb.ok" [class.msg--error]="!fb.ok">{{ i18n.t(fb.key) }}</span>
             }
-            <button type="button" class="pf__link" (click)="showPw.set(!showPw())">
-              <span class="material-icons pf__ico" aria-hidden="true">{{ showPw() ? 'visibility_off' : 'visibility' }}</span>
-              {{ i18n.t(showPw() ? 'profile.hidePasswords' : 'profile.showPasswords') }}
-            </button>
-            <app-button variant="primary" [disabled]="saving() || !canChangePassword()" (pressed)="savePassword()">
-              <span class="material-icons pf__ico" aria-hidden="true">key</span>{{ i18n.t('profile.changePassword') }}
-            </app-button>
-          </div>
-          @if (passwordFeedback(); as fb) {
-            <span class="msg" [class.msg--ok]="fb.ok" [class.msg--error]="!fb.ok">{{ i18n.t(fb.key) }}</span>
           }
 
           <section class="pf__mfa" [class.pf__mfa--on]="user()?.mfaEnabled">

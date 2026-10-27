@@ -5,7 +5,7 @@
 # porque este Dockerfile necesita copiar frontend-v2/, que vive fuera de
 # backend-go/ — Docker no permite `COPY ../algo` con un contexto más chico.
 
-FROM node:24-slim AS frontend-build
+FROM node:24.22.1-slim AS frontend-build
 WORKDIR /src/frontend-v2
 RUN corepack enable
 COPY frontend-v2/package.json frontend-v2/pnpm-lock.yaml frontend-v2/pnpm-workspace.yaml ./
@@ -16,7 +16,7 @@ COPY frontend-v2/ ./
 COPY seed/ /src/seed/
 RUN pnpm run build
 
-FROM golang:1.27 AS build
+FROM golang:1.27.3 AS build
 WORKDIR /src
 COPY backend-go/go.mod backend-go/go.sum ./
 RUN go mod download

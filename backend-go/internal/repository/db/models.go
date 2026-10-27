@@ -2150,6 +2150,27 @@ type Holiday struct {
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
 
+type LdapConfig struct {
+	ID                    bool               `json:"id"`
+	Url                   string             `json:"url"`
+	StartTls              bool               `json:"start_tls"`
+	VerifyTls             bool               `json:"verify_tls"`
+	CaPem                 string             `json:"ca_pem"`
+	BindDn                string             `json:"bind_dn"`
+	BindPasswordEncrypted pgtype.Text        `json:"bind_password_encrypted"`
+	BaseDn                string             `json:"base_dn"`
+	UserFilter            string             `json:"user_filter"`
+	UsernameAttr          string             `json:"username_attr"`
+	NameAttr              string             `json:"name_attr"`
+	EmailAttr             string             `json:"email_attr"`
+	GroupDn               string             `json:"group_dn"`
+	TimeoutSeconds        int32              `json:"timeout_seconds"`
+	LastTestAt            pgtype.Timestamptz `json:"last_test_at"`
+	LastTestOk            pgtype.Bool        `json:"last_test_ok"`
+	LastTest              []byte             `json:"last_test"`
+	UpdatedAt             pgtype.Timestamptz `json:"updated_at"`
+}
+
 type Level struct {
 	ID     uuid.UUID `json:"id"`
 	Code   string    `json:"code"`
@@ -2869,6 +2890,8 @@ type User struct {
 	CreatedAt              pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt              pgtype.Timestamptz `json:"updated_at"`
 	LastLoginAt            pgtype.Timestamptz `json:"last_login_at"`
+	AuthSource             string             `json:"auth_source"`
+	LdapDn                 pgtype.Text        `json:"ldap_dn"`
 }
 
 type UserPermissionGroup struct {

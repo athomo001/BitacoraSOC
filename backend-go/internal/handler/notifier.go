@@ -33,6 +33,7 @@ const (
 	NotifGlpiWrite      = "glpi.write"
 	NotifWindow         = "window"
 	NotifNotice         = "notice"
+	NotifLdapUser       = "ldap.user"
 )
 
 // notifKind: valores por defecto de cada tipo. Email: si el tipo puede salir
@@ -63,6 +64,8 @@ var notifKinds = []notifKind{
 	{NotifForwardDown, true, false, false, true},
 	// Un envío a GLPI (comentario o estado de una copia) no se pudo hacer en 24 horas (solo admin).
 	{NotifGlpiWrite, true, false, false, true},
+	// Alguien entró por primera vez con su cuenta del dominio y quedó sin áreas (solo admin, spec/20).
+	{NotifLdapUser, true, false, false, true},
 	{NotifWindow, false, false, false, true},
 	// El aviso con acuse se muestra como ventana: no tiene emergente ni correo propio.
 	{NotifNotice, false, false, false, false},

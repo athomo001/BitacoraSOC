@@ -145,8 +145,25 @@
             <span class="aa__label">{{ i18n.t('access.security') }}</span>
             <span class="aa__inline"><mat-icon [class.text-ok]="user.mfaEnabled" [class.text-warn]="!user.mfaEnabled">{{ user.mfaEnabled ? 'verified_user' : 'gpp_maybe' }}</mat-icon>{{ i18n.t(user.mfaEnabled ? 'access.mfaOn' : 'access.mfaOff') }}</span>
             @if (user.mustChangePassword) { <span class="aa__inline text-warn"><mat-icon>key</mat-icon>{{ i18n.t('access.pendingPassword') }}</span> }
+            @if (ldapOn()) {
+              <span class="aa__label aa__label--gap">{{ i18n.t('ldap.source') }}</span>
+              <span class="aa__seg-row" role="group" [attr.aria-label]="i18n.t('ldap.source')">
+                <button type="button" class="seg" [attr.aria-pressed]="user.authSource !== 'local'" [disabled]="isMe()" (click)="setAuthSource(user, 'auto')">{{ i18n.t('ldap.source.auto') }}</button>
+                <button type="button" class="seg" [attr.aria-pressed]="user.authSource === 'local'" [disabled]="isMe()" (click)="setAuthSource(user, 'local')">{{ i18n.t('ldap.source.local') }}</button>
+              </span>
+              <span class="aa__muted">
+                @switch (user.authSource) {
+                  @case ('ldap') { {{ i18n.t('ldap.source.linkedHint') }} }
+                  @case ('local') { {{ i18n.t('ldap.source.localHint') }} }
+                  @default { {{ i18n.t('ldap.source.autoHint') }} }
+                }
+              </span>
+              @if (isMe()) { <span class="aa__muted">{{ i18n.t('ldap.source.self') }}</span> }
+            }
             <span class="aa__seg-row">
-              <button type="button" class="aa-btn" [disabled]="user.mustChangePassword" (click)="forcePasswordChange(user)">{{ i18n.t('access.forcePassword') }}</button>
+              @if (!ldapOn() || user.authSource !== 'ldap') {
+                <button type="button" class="aa-btn" [disabled]="user.mustChangePassword" (click)="forcePasswordChange(user)">{{ i18n.t('access.forcePassword') }}</button>
+              }
               @if (!user.active) {
                 <button type="button" class="aa-btn" (click)="setActive(user, true)">{{ i18n.t('access.activate') }}</button>
               }

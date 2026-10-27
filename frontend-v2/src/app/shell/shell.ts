@@ -65,12 +65,18 @@ export class ShellComponent implements OnInit {
       if (this.features.isEnabled('complements')) void this.complements.refresh();
       else this.complements.clear();
     });
-    effect(() => {
+    // El import diferido puede resolver con el shell ya destruido (o tras otra
+    // vuelta del effect): ahí no se monta, el injector ya no sirve (NG0205).
+    effect((onCleanup) => {
       const bar = this.topbar();
       const host = this.topbarHost();
       if (!bar || !host) return;
+      let stale = false;
+      onCleanup(() => (stale = true));
       untracked(() =>
-        void import('../shared/complement-frame/complement-frame').then((m) => m.mountFrame(host, bar)),
+        void import('../shared/complement-frame/complement-frame').then((m) => {
+          if (!stale) m.mountFrame(host, bar);
+        }),
       );
     });
     // Si apagan (aquí o en otra pestaña) el módulo de la pantalla abierta, se

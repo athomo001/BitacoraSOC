@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
@@ -14,10 +15,12 @@ import (
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/audit"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/auth"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/crypto"
+	"github.com/athomo001/BitacoraSOC/backend-go/internal/ldapauth"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/middleware"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/problemdetails"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/ratelimit"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/repository/db"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -39,6 +42,11 @@ type AuthHandler struct {
 	LoginLimiter  *ratelimit.LoginLimiter
 	AuditLog      *audit.Logger
 	PublicBaseURL string
+	// Notify avisa a los admins de una cuenta nueva del dominio (spec/20).
+	Notify *Notifier
+	// LdapDial abre la conexión con el directorio (nil = la real; en las
+	// pruebas, un directorio falso).
+	LdapDial func(ldapauth.Config) (ldapauth.Conn, error)
 }
 
 type loginRequest struct {
@@ -68,42 +76,58 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	user, err := h.Queries.GetUserForLogin(ctx, strings.TrimSpace(req.Username))
-	if err != nil {
+	login := strings.TrimSpace(req.Username)
+	user, err := h.Queries.GetUserForLogin(ctx, login)
+	found := err == nil
+	// Bloqueada o inactiva se corta antes de preguntarle al directorio: los
+	// intentos no llegan al AD (que tiene su propio bloqueo).
+	if found && h.rejectUnusable(w, r, user, req.Username) {
+		return
+	}
+
+	// Cuenta del dominio (spec/20): con LDAP encendido, todo lo que no es
+	// «solo local» pasa primero por el directorio.
+	viaDirectory := false
+	if featureEnabled(ctx, h.Queries, ldapFeature) && (!found || user.AuthSource != authSourceLocal) {
+		dirUser, ok, fail := h.directoryLogin(ctx, login, req.Password, found, user)
+		if fail != nil {
+			attempts := int32(0)
+			if fail.count {
+				attempts = h.registerFailedLogin(ctx, user.ID)
+			}
+			h.AuditLog.Log(ctx, "auth.login.fail", audit.LevelWarn, audit.Failure(fail.reason), map[string]any{"username": req.Username, "source": authSourceLDAP, "failedAttempts": attempts})
+			problemdetails.Write(w, r, fail.status, fail.code, fail.detail)
+			return
+		}
+		if ok {
+			// La cuenta reconocida puede no ser la que se buscó por lo tipeado.
+			if dirUser.ID != user.ID && h.rejectUnusable(w, r, dirUser, req.Username) {
+				return
+			}
+			user, found, viaDirectory = dirUser, true, true
+		}
+	}
+
+	if !found {
 		h.AuditLog.Log(ctx, "auth.login.fail", audit.LevelWarn, audit.Failure("usuario inexistente"), map[string]any{"username": req.Username})
 		problemdetails.Write(w, r, http.StatusUnauthorized, "invalid-credentials", "credenciales inválidas")
 		return
 	}
 
-	if user.LockedUntil.Valid && user.LockedUntil.Time.After(time.Now()) {
-		h.AuditLog.Log(ctx, "auth.login.fail", audit.LevelWarn, audit.Failure("cuenta bloqueada"), map[string]any{"username": req.Username})
-		problemdetails.Write(w, r, http.StatusLocked, "account-locked", "cuenta bloqueada temporalmente por múltiples intentos fallidos, probá en 15 minutos")
-		return
-	}
-	if !user.Active {
-		h.AuditLog.Log(ctx, "auth.login.fail", audit.LevelWarn, audit.Failure("cuenta inactiva"), map[string]any{"username": req.Username})
-		problemdetails.Write(w, r, http.StatusUnauthorized, "invalid-credentials", "credenciales inválidas")
-		return
-	}
-
-	if err := auth.CheckPassword(user.PasswordHash, req.Password); err != nil {
-		attempts, regErr := h.Queries.RegisterFailedLogin(ctx, user.ID)
-		if regErr == nil && attempts >= accountLockThreshold {
-			_ = h.Queries.LockUser(ctx, db.LockUserParams{
-				ID:          user.ID,
-				LockedUntil: pgtype.Timestamptz{Time: time.Now().Add(accountLockDuration), Valid: true},
-			})
+	if !viaDirectory {
+		if err := auth.CheckPassword(user.PasswordHash, req.Password); err != nil {
+			attempts := h.registerFailedLogin(ctx, user.ID)
+			h.AuditLog.Log(ctx, "auth.login.fail", audit.LevelWarn, audit.Failure("contraseña incorrecta"), map[string]any{"username": req.Username, "failedAttempts": attempts})
+			problemdetails.Write(w, r, http.StatusUnauthorized, "invalid-credentials", "credenciales inválidas")
+			return
 		}
-		h.AuditLog.Log(ctx, "auth.login.fail", audit.LevelWarn, audit.Failure("contraseña incorrecta"), map[string]any{"username": req.Username, "failedAttempts": attempts})
-		problemdetails.Write(w, r, http.StatusUnauthorized, "invalid-credentials", "credenciales inválidas")
-		return
 	}
 
 	// Contraseña correcta: limpiar intentos fallidos y, si el hash viene del
 	// legacy (costo < 12), re-hashearlo transparentemente.
 	_ = h.Queries.ResetFailedLoginAttempts(ctx, user.ID)
 	_ = h.Queries.TouchLastLogin(ctx, user.ID)
-	if auth.NeedsRehash(user.PasswordHash) {
+	if !viaDirectory && auth.NeedsRehash(user.PasswordHash) {
 		if newHash, err := auth.HashPassword(req.Password); err == nil {
 			_ = h.Queries.RehashPassword(ctx, db.RehashPasswordParams{ID: user.ID, PasswordHash: newHash})
 		}
@@ -127,6 +151,33 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 	h.AuditLog.Log(ctx, "auth.login.success", audit.LevelInfo, audit.Success(), map[string]any{"username": user.Username})
 	writeData(w, http.StatusOK, map[string]any{"token": token, "mustChangePassword": user.MustChangePassword})
+}
+
+// rejectUnusable corta el ingreso de una cuenta bloqueada o inactiva.
+func (h *AuthHandler) rejectUnusable(w http.ResponseWriter, r *http.Request, user db.User, typed string) bool {
+	if user.LockedUntil.Valid && user.LockedUntil.Time.After(time.Now()) {
+		h.AuditLog.Log(r.Context(), "auth.login.fail", audit.LevelWarn, audit.Failure("cuenta bloqueada"), map[string]any{"username": typed})
+		problemdetails.Write(w, r, http.StatusLocked, "account-locked", "cuenta bloqueada temporalmente por múltiples intentos fallidos, probá en 15 minutos")
+		return true
+	}
+	if !user.Active {
+		h.AuditLog.Log(r.Context(), "auth.login.fail", audit.LevelWarn, audit.Failure("cuenta inactiva"), map[string]any{"username": typed})
+		problemdetails.Write(w, r, http.StatusUnauthorized, "invalid-credentials", "credenciales inválidas")
+		return true
+	}
+	return false
+}
+
+// registerFailedLogin suma un intento fallido y bloquea la cuenta al quinto.
+func (h *AuthHandler) registerFailedLogin(ctx context.Context, id uuid.UUID) int32 {
+	attempts, err := h.Queries.RegisterFailedLogin(ctx, id)
+	if err == nil && attempts >= accountLockThreshold {
+		_ = h.Queries.LockUser(ctx, db.LockUserParams{
+			ID:          id,
+			LockedUntil: pgtype.Timestamptz{Time: time.Now().Add(accountLockDuration), Valid: true},
+		})
+	}
+	return attempts
 }
 
 type mfaAuthenticateRequest struct {
@@ -264,7 +315,7 @@ func (h *AuthHandler) MFADisable(w http.ResponseWriter, r *http.Request) {
 	}
 
 	dbUser, err := h.Queries.GetUserByID(ctx, user.ID)
-	if err != nil || auth.CheckPassword(dbUser.PasswordHash, req.Password) != nil {
+	if err != nil || !h.passwordMatches(ctx, dbUser, req.Password) {
 		problemdetails.Write(w, r, http.StatusUnauthorized, "invalid-credentials", "contraseña incorrecta")
 		return
 	}
@@ -381,6 +432,10 @@ func (h *AuthHandler) ChangeMyPassword(w http.ResponseWriter, r *http.Request) {
 		problemdetails.Write(w, r, http.StatusNotFound, "not-found", "usuario no encontrado")
 		return
 	}
+	if domainManaged(ctx, h.Queries, dbUser) {
+		problemdetails.Write(w, r, http.StatusConflict, "password-managed-by-directory", "tu contraseña es la del dominio: se cambia allá")
+		return
+	}
 
 	// currentPassword no se exige si mustChangePassword=true — spec/04-contratos-api.md:
 	// "el usuario no debería tener que recordar la temporal que le dieron".
@@ -423,7 +478,8 @@ func (h *AuthHandler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user, err := h.Queries.GetUserByEmail(ctx, req.Email)
-	if err != nil || !user.Active {
+	// Una cuenta del dominio no tiene contraseña que recuperar acá (spec/20).
+	if err != nil || !user.Active || domainManaged(ctx, h.Queries, user) {
 		w.WriteHeader(http.StatusAccepted)
 		return
 	}
@@ -489,7 +545,7 @@ func (h *AuthHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-token", "token inválido o expirado")
 		return
 	}
-	if !user.ResetPasswordExpiresAt.Valid || user.ResetPasswordExpiresAt.Time.Before(time.Now()) {
+	if !user.ResetPasswordExpiresAt.Valid || user.ResetPasswordExpiresAt.Time.Before(time.Now()) || domainManaged(ctx, h.Queries, user) {
 		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-token", "token inválido o expirado")
 		return
 	}

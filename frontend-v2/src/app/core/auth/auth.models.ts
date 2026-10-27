@@ -11,6 +11,8 @@ export interface AuthUser {
   mfaEnabled: boolean;
   mustChangePassword: boolean;
   active: boolean;
+  /** De dónde sale su contraseña (spec/20): ldap = la del dominio. */
+  authSource?: 'auto' | 'ldap' | 'local';
   createdAt: string;
   lastLoginAt?: string;
 }

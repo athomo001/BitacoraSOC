@@ -18,6 +18,7 @@ import (
 
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/audit"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/repository/db"
+	"github.com/athomo001/BitacoraSOC/backend-go/internal/service/mail/mailpittest"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -26,6 +27,7 @@ func TestShiftAlerts_ChecklistYGuardiaLleganUnaVez(t *testing.T) {
 	if dsn == "" {
 		t.Skip("BITACORA_TEST_DSN no definido")
 	}
+	mailpittest.Require(t)
 	ctx := context.Background()
 	pool, err := pgxpool.New(ctx, dsn)
 	if err != nil {

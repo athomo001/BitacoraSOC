@@ -15,7 +15,7 @@ import (
 const createTeamUser = `-- name: CreateTeamUser :one
 INSERT INTO users (username, email, full_name, password_hash, role, must_change_password)
 VALUES ($1, $2, $3, $4, 'user', true)
-RETURNING id, username, email, full_name, phone, birthday, avatar_url, password_hash, role, cargo_label, mfa_enabled, mfa_secret_encrypted, is_guest, guest_expires_at, must_change_password, failed_login_attempts, locked_until, reset_password_token_hash, reset_password_expires_at, active, created_at, updated_at, last_login_at
+RETURNING id, username, email, full_name, phone, birthday, avatar_url, password_hash, role, cargo_label, mfa_enabled, mfa_secret_encrypted, is_guest, guest_expires_at, must_change_password, failed_login_attempts, locked_until, reset_password_token_hash, reset_password_expires_at, active, created_at, updated_at, last_login_at, auth_source, ldap_dn
 `
 
 type CreateTeamUserParams struct {
@@ -57,6 +57,8 @@ func (q *Queries) CreateTeamUser(ctx context.Context, arg CreateTeamUserParams) 
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.LastLoginAt,
+		&i.AuthSource,
+		&i.LdapDn,
 	)
 	return i, err
 }
@@ -468,7 +470,7 @@ func (q *Queries) RemoveUserPermissionGroup(ctx context.Context, arg RemoveUserP
 }
 
 const setUserActive = `-- name: SetUserActive :one
-UPDATE users SET active = $2, updated_at = now() WHERE id = $1 RETURNING id, username, email, full_name, phone, birthday, avatar_url, password_hash, role, cargo_label, mfa_enabled, mfa_secret_encrypted, is_guest, guest_expires_at, must_change_password, failed_login_attempts, locked_until, reset_password_token_hash, reset_password_expires_at, active, created_at, updated_at, last_login_at
+UPDATE users SET active = $2, updated_at = now() WHERE id = $1 RETURNING id, username, email, full_name, phone, birthday, avatar_url, password_hash, role, cargo_label, mfa_enabled, mfa_secret_encrypted, is_guest, guest_expires_at, must_change_password, failed_login_attempts, locked_until, reset_password_token_hash, reset_password_expires_at, active, created_at, updated_at, last_login_at, auth_source, ldap_dn
 `
 
 type SetUserActiveParams struct {
@@ -503,6 +505,8 @@ func (q *Queries) SetUserActive(ctx context.Context, arg SetUserActiveParams) (U
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.LastLoginAt,
+		&i.AuthSource,
+		&i.LdapDn,
 	)
 	return i, err
 }

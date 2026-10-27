@@ -16,6 +16,11 @@ describe('Enlaces públicos: la vista sin sesión (10h)', () => {
   let httpMock: HttpTestingController;
 
   beforeEach(() => {
+    // Reloj fijo (miércoles 10:00, hora local): con el real, «en 2 horas»
+    // después de las 22:00 ya es mañana y el texto cambia. Solo Date: settle()
+    // usa setTimeout de verdad.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 9, 21, 10, 0));
     TestBed.configureTestingModule({
       imports: [PublicViewComponent],
       providers: [
@@ -27,7 +32,10 @@ describe('Enlaces públicos: la vista sin sesión (10h)', () => {
     httpMock = TestBed.inject(HttpTestingController);
   });
 
-  afterEach(() => httpMock.verify());
+  afterEach(() => {
+    httpMock.verify();
+    vi.useRealTimers();
+  });
 
   async function render(respond: (req: ReturnType<HttpTestingController['expectOne']>) => void) {
     const fixture = TestBed.createComponent(PublicViewComponent);
