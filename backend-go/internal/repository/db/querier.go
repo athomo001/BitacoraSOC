@@ -415,7 +415,8 @@ type Querier interface {
 	FinishIdempotency(ctx context.Context, arg FinishIdempotencyParams) error
 	// POST /api/users/force-reset-all — usuarios internos = no invitados
 	// (is_guest=false), activos. Devuelve los afectados para poder notificarlos
-	// por correo sin una segunda consulta.
+	// por correo sin una segunda consulta. Las cuentas del dominio no (spec/20):
+	// su contraseña se cambia en el directorio.
 	ForceResetAllActivePasswords(ctx context.Context) ([]User, error)
 	GetAPIKey(ctx context.Context, id uuid.UUID) (ApiKey, error)
 	// La llave con su creador: si la persona se dio de baja, la llave no vale.
@@ -634,6 +635,11 @@ type Querier interface {
 	ListActiveUserIDs(ctx context.Context) ([]uuid.UUID, error)
 	// Personas activas con correo cuyo cargo está en la lista (sin distinguir mayúsculas).
 	ListActiveUsersByCargo(ctx context.Context, cargos []string) ([]ListActiveUsersByCargoRow, error)
+	// Mi equipo → Actividad (10f): cuántas acciones hizo cada persona por día de
+	// la semana y hora, a la hora real de la acción (la de la Auditoría).
+	// Solo lo que salió bien y solo los eventos de trabajo que se piden.
+	// day: 1 = lunes … 7 = domingo.
+	ListActivityCounts(ctx context.Context, arg ListActivityCountsParams) ([]ListActivityCountsRow, error)
 	ListAdminUserIDs(ctx context.Context) ([]uuid.UUID, error)
 	// paused: su cliente está desactivado (como las tareas).
 	ListAgendaFlows(ctx context.Context, includeInactive bool) ([]ListAgendaFlowsRow, error)

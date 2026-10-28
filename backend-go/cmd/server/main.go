@@ -434,6 +434,7 @@ func run(logger *slog.Logger) error {
 	}
 	mux.Handle("GET /api/team/areas", leadOrAuditor(teamHandler.Areas))
 	mux.Handle("GET /api/team/quality", leadOrAuditor(teamHandler.Quality))
+	mux.Handle("GET /api/team/activity", leadOrAuditor(teamHandler.Activity))
 	// Departamentos que dirige (o, el auditor, los que tienen Calidad): Mi equipo del departamento.
 	mux.Handle("GET /api/team/departments", leadOrAuditor(teamHandler.Departments))
 	mux.Handle("GET /api/team", withCapability(handler.CapAreaLead, teamHandler.Get))

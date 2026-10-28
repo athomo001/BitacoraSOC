@@ -116,7 +116,8 @@ RETURNING id, username, email, full_name, phone, birthday, avatar_url, password_
 
 // POST /api/users/force-reset-all — usuarios internos = no invitados
 // (is_guest=false), activos. Devuelve los afectados para poder notificarlos
-// por correo sin una segunda consulta.
+// por correo sin una segunda consulta. Las cuentas del dominio no (spec/20):
+// su contraseña se cambia en el directorio.
 func (q *Queries) ForceResetAllActivePasswords(ctx context.Context) ([]User, error) {
 	rows, err := q.db.Query(ctx, forceResetAllActivePasswords)
 	if err != nil {

@@ -36,6 +36,7 @@ Lo hecho, lo que está en revisión y lo que falta hasta el corte. Marca con `[x
 - [ ] Revisar en la app las certificaciones validadas por la CSM: `migrate … up` para la 000062; crear una meta de certificación para una persona («Pedir la validación de la CSM»), marcar sus hitos y ver el aviso en la campana de la CSM; con la CSM, «Validar certificación» — Dueño y CSM
 - [ ] Probar la 10i (complementos que agregan funciones): la 000063 ya está aplicada en desarrollo (también la 000062). En Administración → Complementos → «Subir ZIP» sube `docs/complementos/informe-incidentes.zip`, publícalo y en «Qué agrega» aprueba la página y sus tres permisos de datos; en Reportes aparece la pestaña «Incidentes por cliente» (prueba «Descargar PDF» y los tres temas). Para un servicio, sigue `docs/complementos.md` §3 con `docs/complementos/servicio-ejemplo` — Dueño
 - [ ] Revisar en la app la Gestión sin la Ticketera: apagarla en Administración → Módulos, abrir Gestión (Clientes, ficha, Indicadores y Exportar resumen) y ver que carga sin columnas ni cifras de tickets; encenderla de nuevo y ver que vuelven — Dueño
+- [ ] Revisar en la app el mapa de calor de actividad (10f, 2026-10-28): en Mi equipo → Actividad, ver la semana × hora de tu área con 7, 30 o 90 días o un mes; apagar tipos de trabajo (Bitácora, Correos, Escalamiento, Tickets, Turno y tareas), hacer clic en una persona para ver solo la suya y revisar la cifra «De noche (22:00–07:00)». Con el respaldo migrado se ve también la historia del legacy — Dueño
 
 ## Por hacer
 
@@ -79,7 +80,7 @@ Lo hecho, lo que está en revisión y lo que falta hasta el corte. Marca con `[x
 - [x] 10d.1 Tickets de GLPI en la Ticketera, solo para mirar (2026-10-20; ver «En curso»)
 - [x] 10d.2 De la app a GLPI: comentar los GLPI-… y «Crear en GLPI» (2026-10-21; ver «En curso»)
 - Decidido: 10e Pedidos especiales no se hace; ya lo cubren la Solicitud de la Ticketera y las acciones de Gestión (dueño, 2026-10-23)
-- [ ] 10f Reportes avanzados — el puntaje de calidad por analista está hecho y revisado (2026-10-23); faltan estadísticas, boletines avanzados y PDF real
+- [ ] 10f Reportes avanzados — el puntaje de calidad por analista está hecho y revisado (2026-10-23) y el mapa de calor de actividad está hecho (2026-10-28; ver «En curso»); faltan estadísticas, boletines avanzados y PDF real
 - [x] 10g Carga CSV masiva: usuarios, organizaciones con servicios, ventanas de mantenimiento y entradas históricas (2026-10-22; ver «En curso»)
 - [x] 10h Enlaces públicos: guardias, Ticketera y Mapa en TV y estado para un cliente (2026-10-22; ver «En curso»)
 - [ ] 10k Entrar con la cuenta del dominio (LDAP / AD), construido el 2026-10-26 (`spec/20-ldap.md`): probarlo contra el AD real — `migrate … up` para la 000064; Funcionalidades → «Entrar con la cuenta del dominio»; Administración → LDAP (servidor `ldaps://`, cuenta de servicio de solo lectura, base DN) y «Probar» con un usuario; revisar que haya un admin «Solo local» en Usuarios y grupos; entrar con una cuenta creada antes (ver que queda vinculada y conserva sus áreas) y con una que no existía (llega el aviso y queda sin áreas) — Dueño

@@ -11,6 +11,7 @@ import { AdminEscalationComponent } from '../admin/admin-escalation';
 import { TeamGuardsComponent } from './team-guards';
 import { TeamMonthlyComponent } from './team-monthly';
 import { TeamQualityComponent } from './team-quality';
+import { TeamActivityComponent } from './team-activity';
 import { PersonGoalsComponent } from '../management/person-goals';
 
 import '../../core/i18n/packs/team';
@@ -36,7 +37,7 @@ const CONDITION_STYLE: Record<TeamCondition, { icon: string; tone: string }> = {
 @Component({
   selector: 'app-team',
   standalone: true,
-  imports: [FormsModule, RouterLink, MatIconModule, AdminGuardsComponent, AdminEscalationComponent, TeamGuardsComponent, TeamMonthlyComponent, TeamQualityComponent, PersonGoalsComponent],
+  imports: [FormsModule, RouterLink, MatIconModule, AdminGuardsComponent, AdminEscalationComponent, TeamGuardsComponent, TeamMonthlyComponent, TeamQualityComponent, TeamActivityComponent, PersonGoalsComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <header class="tm__head no-print">
@@ -68,9 +69,13 @@ const CONDITION_STYLE: Record<TeamCondition, { icon: string; tone: string }> = {
         @if (a.quality) {
           <button type="button" role="tab" class="seg" [attr.aria-pressed]="tab() === 'quality'" [attr.aria-selected]="tab() === 'quality'" (click)="tab.set('quality')"><mat-icon>fact_check</mat-icon>{{ i18n.t('team.tab.quality') }}</button>
         }
+        <button type="button" role="tab" class="seg" [attr.aria-pressed]="tab() === 'activity'" [attr.aria-selected]="tab() === 'activity'" (click)="tab.set('activity')"><mat-icon>local_fire_department</mat-icon>{{ i18n.t('team.tab.activity') }}</button>
       </div>
       @if (tab() === 'quality') {
         @for (code of [a.code]; track code) { <app-team-quality [area]="code" [areaName]="a.name" /> }
+      }
+      @if (tab() === 'activity') {
+        @for (code of [a.code]; track code) { <app-team-activity [area]="code" [areaName]="a.name" /> }
       }
     }
     @if (view(); as v) {
@@ -317,7 +322,7 @@ export class TeamComponent implements OnInit {
   protected readonly i18n = inject(I18nService);
   private readonly api = inject(TeamService);
 
-  protected readonly tab = signal<'people' | 'guards' | 'escalation' | 'monthly' | 'quality'>('people');
+  protected readonly tab = signal<'people' | 'guards' | 'escalation' | 'monthly' | 'quality' | 'activity'>('people');
   protected readonly guardsTimeline = viewChild(AdminGuardsComponent);
   protected readonly areas = signal<TeamArea[]>([]);
   protected readonly area = signal('');
@@ -406,10 +411,10 @@ export class TeamComponent implements OnInit {
     this.created.set(null);
     this.selectedId.set(null);
     const info = this.areaInfo();
-    // El auditor (o un área de la que no es jefatura) solo ve la Calidad.
+    // El auditor (o un área de la que no es jefatura) solo ve la Calidad y la Actividad.
     if (!info?.lead) {
       this.view.set(null);
-      this.tab.set('quality');
+      if (this.tab() !== 'activity') this.tab.set('quality');
       return;
     }
     if (this.tab() === 'quality' && !info.quality) this.tab.set('people');

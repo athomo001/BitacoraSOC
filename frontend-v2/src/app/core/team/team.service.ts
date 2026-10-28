@@ -87,6 +87,30 @@ export interface QualityView {
   people: QualityPerson[];
 }
 
+export type ActivityKind = 'entries' | 'mail' | 'escalation' | 'tickets' | 'shift';
+
+/** Las acciones de una persona de un tipo en un día (1 = lunes … 7 = domingo) y una hora (0-23). */
+export interface ActivityCell {
+  userId: string;
+  kind: ActivityKind;
+  day: number;
+  hour: number;
+  count: number;
+}
+
+export interface ActivityView {
+  areaCode: string;
+  areaName: string;
+  /** 7, 30 o 90; 0 si se pidió un mes. */
+  days: number;
+  month?: string;
+  from: string;
+  to: string;
+  kinds: ActivityKind[];
+  people: { id: string; name: string; level: string }[];
+  cells: ActivityCell[];
+}
+
 export interface TeamGroup {
   id: string;
   name: string;
@@ -222,6 +246,10 @@ export class TeamService {
   /** Calidad de registro del área en los últimos 7, 15 o 30 días, o en un mes YYYY-MM (10f). */
   async quality(area: string, period: { days: number } | { month: string }): Promise<QualityView> {
     return (await firstValueFrom(this.http.get<ApiEnvelope<QualityView>>('/api/team/quality', { params: { ...scope(area), ...period } }))).data;
+  }
+
+  async activity(area: string, period: { days: number } | { month: string }): Promise<ActivityView> {
+    return (await firstValueFrom(this.http.get<ApiEnvelope<ActivityView>>('/api/team/activity', { params: { ...scope(area), ...period } }))).data;
   }
 
   async sendMonthly(area: string, month: string, to: string[]): Promise<void> {

@@ -55,7 +55,7 @@ describe('TeamComponent (Mi equipo, jefatura de área, spec/16 9d)', () => {
     expect(el.querySelectorAll('.tm__day').length).toBe(5);
   });
 
-  it('el auditor ve solo la Calidad de las áreas que usan la Bitácora (10f)', async () => {
+  it('el auditor ve solo la Calidad y la Actividad de las áreas que usan la Bitácora (10f)', async () => {
     const fixture = TestBed.createComponent(TeamComponent);
     fixture.detectChanges();
     http.expectOne('/api/team/areas').flush({ data: [{ code: 'soc', name: 'SOC', lead: false, quality: true }] });
@@ -70,7 +70,7 @@ describe('TeamComponent (Mi equipo, jefatura de área, spec/16 9d)', () => {
     fixture.detectChanges();
     const el = fixture.nativeElement as HTMLElement;
     const tabs = [...el.querySelectorAll('[role=tab]')].map((t) => t.textContent?.trim());
-    expect(tabs).toEqual(['fact_checkCalidad']);
+    expect(tabs).toEqual(['fact_checkCalidad', 'local_fire_departmentActividad']);
     expect(el.textContent).toContain('Calidad de registro en SOC');
   });
 

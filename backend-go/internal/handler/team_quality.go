@@ -208,6 +208,12 @@ type qualityRange struct {
 // qualityPeriod: los últimos 7, 15 o 30 días (hoy incluido) o un mes
 // (YYYY-MM, hasta hoy si es el actual). Sin nada, los últimos 30 días.
 func (h *TeamHandler) qualityPeriod(daysParam, monthParam string) (qualityRange, error) {
+	return h.period(daysParam, monthParam, qualityPeriods, "el período es de 7, 15 o 30 días, o un mes")
+}
+
+// period: los últimos N días permitidos (hoy incluido) o un mes (YYYY-MM,
+// hasta hoy si es el actual). Sin nada, los últimos 30 días.
+func (h *TeamHandler) period(daysParam, monthParam string, allowed map[int]bool, invalid string) (qualityRange, error) {
 	loc := teamLocation()
 	y, m, d := h.now().In(loc).Date()
 	tomorrow := time.Date(y, m, d+1, 0, 0, 0, 0, loc)
@@ -230,8 +236,8 @@ func (h *TeamHandler) qualityPeriod(daysParam, monthParam string) (qualityRange,
 	if daysParam != "" {
 		days, _ = strconv.Atoi(daysParam)
 	}
-	if !qualityPeriods[days] {
-		return qualityRange{}, errors.New("el período es de 7, 15 o 30 días, o un mes")
+	if !allowed[days] {
+		return qualityRange{}, errors.New(invalid)
 	}
 	return qualityRange{days: days, fromAt: time.Date(y, m, d-days+1, 0, 0, 0, 0, loc), toAt: tomorrow}, nil
 }

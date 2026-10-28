@@ -256,7 +256,8 @@ Generada desde `backend-go/cmd/server/main.go`, donde se registran las rutas. La
 | `GET` | `/api/team/monthly?area=&month=YYYY-MM` | Capacidad `area:lead` — resumen mensual del área: por persona y total (tareas, a tiempo, hechas tarde, atrasos abiertos, omitidas, tickets resueltos, dentro del SLA, días ausente), `frozen` y los porcentajes del mes anterior. En áreas con Bitácora, `entries` y `quality` por persona (10f); la respuesta trae `bitacora` y `tickets` (Ticketera encendida) |
 | `POST` | `/api/team/monthly/send` | Capacidad `area:lead` — `{area, month, to: [correos]}` (1 a 30, dominios válidos de Reportes) |
 | `GET` | `/api/team/quality?area=&days=7\|15\|30` o `&month=YYYY-MM` | Capacidad `area:lead` (sus áreas) o auditor (todas) — puntaje de calidad de registro por persona (10f): entradas, turnos, puntaje, estado, ausencia y las 7 reglas con porcentaje, puntos, si pasa el límite y ejemplos. `404` si el área no usa la Bitácora |
-| `GET` | `/api/team/departments` | Capacidad `area:lead` o auditor — los departamentos que dirige (el admin, todos; el auditor, los que tienen Calidad). `GET /api/team`, `/api/team/monthly` y `/api/team/quality` aceptan `?department=` |
+| `GET` | `/api/team/activity?area=&days=7\|30\|90` o `&month=YYYY-MM` | Capacidad `area:lead` (sus áreas) o auditor — mapa de calor de actividad (10f): acciones de trabajo de la gente del área (Bitácora, correos enviados, escalamiento, tickets, checklist/turno/Agenda) desde la Auditoría, por persona, tipo, día de la semana (1 = lunes) y hora local; incluye los nombres de eventos del legacy migrados. Acepta `?department=` |
+| `GET` | `/api/team/departments` | Capacidad `area:lead` o auditor — los departamentos que dirige (el admin, todos; el auditor, los que tienen Calidad). `GET /api/team`, `/api/team/monthly`, `/api/team/quality` y `/api/team/activity` aceptan `?department=` |
 
 ### Configuración
 
